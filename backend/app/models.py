@@ -12,6 +12,7 @@ class User(db.Model):
     name = db.Column(db.String(255), nullable=False)
     email = db.Column(db.String(255), unique=True, nullable=False)
     password = db.Column(db.String(255), nullable=False)
+    mobile = db.Column(db.Integer , nullable  = False)
     role = db.Column(db.String(50), nullable=False)
 
     complaints = db.relationship('Complaint', backref='citizen', lazy=True)
@@ -29,6 +30,24 @@ class User(db.Model):
         backref='assigner', 
         lazy=True
     )
+
+class Citizens(db.Model):
+    __tablename__ = 'citizens'
+    id = db.Column(db.Integer , primary_key = True)
+    user_id = db.Column(db.Integer , db.ForeignKey('users.id') , nullable= False)
+    name = db.Column(db.String(30) , nullable = False)
+    contact = db.Column(db.Integer , nullable = False)
+    pincode = db.Column(db.Integer , nullable = False)
+    add = db.Column(db.String(100) , nullable = False)
+    city = db.Column(db.String(30) , nullable = False)
+
+class Worker(db.Model):
+    __tablename__ = 'workers'
+    id = db.Column(db.Integer , primary_key = True)
+    user_id = db.Column(db.Integer , db.ForeignKey('users.id') , nullable= False)
+    name = db.Column(db.String(30) , nullable = False)
+    contact = db.Column(db.Integer , nullable = False)
+    Expertise = db.Column(db.String(30) , nullable = False)
 
 
 class Complaint(db.Model):
