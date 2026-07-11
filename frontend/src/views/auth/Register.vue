@@ -14,7 +14,7 @@
               CivicDesk
             </h1>
             <h2 class="text-xl text-[#2563EB] font-semibold mb-4">
-              Create Your Citizen Account
+              Create Your Account
             </h2>
             <p class="text-slate-600 leading-relaxed">
               Join CivicDesk to report civic issues, monitor complaint progress, receive updates, and help improve your community.
@@ -103,21 +103,32 @@
               <span v-if="errors.mobile" class="text-red-500 text-xs mt-1.5 block">{{ errors.mobile }}</span>
             </div>
 
-            <!-- Role (Read-only) -->
+            <!-- Account Role (Dropdown) -->
             <div>
               <label for="role" class="block text-sm font-medium text-slate-700 mb-1.5">Account Role</label>
               <div class="relative">
                 <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
                   <Shield class="w-5 h-5 text-slate-400" />
                 </div>
-                <input
+                <select
                   id="role"
-                  :value="form.role"
-                  type="text"
-                  disabled
-                  class="w-full pl-10 pr-4 py-2.5 bg-slate-100 border border-slate-200 rounded-lg text-sm text-slate-500 cursor-not-allowed"
-                />
+                  v-model="form.role"
+                  :class="[
+                    'w-full pl-10 pr-10 py-2.5 bg-slate-50 border rounded-lg text-sm appearance-none focus:outline-none focus:ring-2 transition-all cursor-pointer',
+                    errors.role ? 'border-red-500 focus:ring-red-200 bg-red-50/50' : 'border-slate-200 focus:border-[#2563EB] focus:ring-[#2563EB]/20 focus:bg-white',
+                    !form.role ? 'text-slate-400' : 'text-slate-900'
+                  ]"
+                >
+                  <option value="" disabled selected>Select your role</option>
+                  <option value="Citizen">Citizen</option>
+                  <option value="Officer">Civic Officer</option>
+                  <option value="Worker">Field Worker</option>
+                </select>
+                <div class="absolute inset-y-0 right-0 pr-3 flex items-center pointer-events-none">
+                  <ChevronDown class="w-5 h-5 text-slate-400" />
+                </div>
               </div>
+              <span v-if="errors.role" class="text-red-500 text-xs mt-1.5 block">{{ errors.role }}</span>
             </div>
 
             <!-- Residential Address -->
@@ -289,7 +300,7 @@ import Navbar from '../../components/Navbar.vue' // Adjust path based on your fo
 import Footer from '../../components/Footer.vue' // Adjust path based on your folder structure
 import { 
   User, Mail, Phone, MapPin, Building, Hash, Lock, 
-  Eye, EyeOff, Shield, Check, Loader2 
+  Eye, EyeOff, Shield, Check, Loader2, ChevronDown 
 } from 'lucide-vue-next'
 
 // --- State ---
@@ -309,7 +320,7 @@ const form = reactive({
   pincode: '',
   password: '',
   confirmPassword: '',
-  role: 'Citizen',
+  role: '', // Set empty to force selection
   terms: false
 })
 
@@ -390,6 +401,12 @@ const validateForm = () => {
     isValid = false
   }
 
+  // Role validation
+  if (!form.role) {
+    errors.role = 'Please select an account role'
+    isValid = false
+  }
+
   // Address & City
   if (!form.address.trim()) {
     errors.address = 'Residential address is required'
@@ -444,7 +461,7 @@ const handleRegister = async () => {
   
   isLoading.value = false
   
-  // In real app: Navigate to success page or dashboard using vue-router
+  // In real app: Navigate to success page or dashboard using vue-router based on form.role
 }
 </script>
 

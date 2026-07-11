@@ -6,7 +6,7 @@
 
     <!-- Main Content (Added pt-24 to prevent overlap with the fixed Navbar) -->
     <main class="flex-1 flex max-w-7xl w-full mx-auto pt-24 pb-12">
-      <!-- Left Side (Illustration & Branding) -->
+      <!-- Left Side (Branding & Features) -->
       <section class="hidden lg:flex lg:w-1/2 flex-col justify-center px-12 py-8">
         <div class="max-w-lg">
           <div class="mb-8">
@@ -29,11 +29,6 @@
               </div>
               <span class="font-medium">{{ feature }}</span>
             </div>
-          </div>
-
-          <!-- Placeholder for Illustration -->
-          <div class="w-full h-64 bg-slate-200 rounded-2xl border-2 border-dashed border-slate-300 flex items-center justify-center text-slate-500">
-            [ Civic Services Illustration ]
           </div>
         </div>
       </section>
@@ -100,35 +95,6 @@
               <span v-if="errors.password" class="text-red-500 text-xs mt-1.5 block">{{ errors.password }}</span>
             </div>
 
-            <!-- Role Selection -->
-            <div>
-              <label for="role" class="block text-sm font-medium text-slate-700 mb-1.5">Role</label>
-              <div class="relative">
-                <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                  <User class="w-5 h-5 text-slate-400" />
-                </div>
-                <select
-                  id="role"
-                  v-model="form.role"
-                  :class="[
-                    'w-full pl-10 pr-10 py-2.5 bg-slate-50 border rounded-lg text-sm appearance-none focus:outline-none focus:ring-2 transition-all cursor-pointer',
-                    errors.role ? 'border-red-500 focus:ring-red-200 bg-red-50/50' : 'border-slate-200 focus:border-[#2563EB] focus:ring-[#2563EB]/20 focus:bg-white',
-                    !form.role ? 'text-slate-400' : 'text-slate-900'
-                  ]"
-                  aria-label="Select Role"
-                >
-                  <option value="" disabled selected>Select your role</option>
-                  <option value="citizen">Citizen</option>
-                  <option value="officer">Civic Officer</option>
-                  <option value="worker">Field Worker</option>
-                </select>
-                <div class="absolute inset-y-0 right-0 pr-3 flex items-center pointer-events-none">
-                  <ChevronDown class="w-5 h-5 text-slate-400" />
-                </div>
-              </div>
-              <span v-if="errors.role" class="text-red-500 text-xs mt-1.5 block">{{ errors.role }}</span>
-            </div>
-
             <!-- Options Row -->
             <div class="flex items-center justify-between mt-2">
               <label class="flex items-center gap-2 cursor-pointer group">
@@ -181,8 +147,7 @@ import { ref, reactive } from 'vue'
 import Navbar from '../../components/Navbar.vue' // Adjust path based on your folder structure
 import Footer from '../../components/Footer.vue' // Adjust path based on your folder structure
 import { 
-  Mail, Lock, Eye, EyeOff, User, 
-  ChevronDown, Loader2, Check
+  Mail, Lock, Eye, EyeOff, Loader2, Check
 } from 'lucide-vue-next'
 
 const features = [
@@ -195,14 +160,12 @@ const features = [
 const form = reactive({
   email: '',
   password: '',
-  role: '',
   rememberMe: false
 })
 
 const errors = reactive({
   email: '',
-  password: '',
-  role: ''
+  password: ''
 })
 
 const showPassword = ref(false)
@@ -213,7 +176,6 @@ const validateForm = () => {
   
   errors.email = ''
   errors.password = ''
-  errors.role = ''
 
   if (!form.email) {
     errors.email = 'Email address is required'
@@ -231,11 +193,6 @@ const validateForm = () => {
     isValid = false
   }
 
-  if (!form.role) {
-    errors.role = 'Please select a role'
-    isValid = false
-  }
-
   return isValid
 }
 
@@ -248,7 +205,9 @@ const handleLogin = async () => {
   await new Promise(resolve => setTimeout(resolve, 1500))
   
   isLoading.value = false
-  // Hand-off to Vue Router would happen here
+  // Because email maps to a role on the backend, once your API responds with a token, 
+  // you will read the user's role from the token/response and use Vue Router to 
+  // push them to the correct dashboard (e.g., /citizen/dashboard, /officer/dashboard).
 }
 </script>
 
