@@ -1,15 +1,44 @@
 from flask import Flask
-from flask_sqlalchemy import SQLAlchemy
+from flask_restful import Api
+from flask_jwt_extended import JWTManager
+from flask_cors import CORS
+
 from app.models import db
 
+# Authentication APIs
+from app.resources.authentication.register import RegisterAPI
+from app.resources.authentication.login import LoginAPI
+
 app = Flask(__name__)
-app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///civicdesk.db'
-app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
+# Enable CORS
+CORS(app)
+
+# --------------------------------
+# Configuration
+# --------------------------------
+app.config["SQLALCHEMY_DATABASE_URI"] = "sqlite:///civicdesk.db"
+app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
+app.config["JWT_SECRET_KEY"] = "your-secret-key"  # Change this in production
+
+# --------------------------------
+# Initialize Extensions
+# --------------------------------
 db.init_app(app)
+api = Api(app)
+jwt = JWTManager(app)
 
+# --------------------------------
+# Register API Routes
+# --------------------------------
+api.add_resource(RegisterAPI, "/api/register")
+api.add_resource(LoginAPI, "/api/login")
 
-if __name__ == '__main__':
+# --------------------------------
+# Create Database & Run Server
+# --------------------------------
+if __name__ == "__main__":
     with app.app_context():
         db.create_all()
-    app.run(debug = True)
+
+    app.run(debug=True)
