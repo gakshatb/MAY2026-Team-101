@@ -1,0 +1,722 @@
+<template>
+  <div class="flex h-screen overflow-hidden bg-[#F8FAFC] font-sans">
+    
+    <!-- Mobile Sidebar Backdrop -->
+    <div 
+      v-if="sidebarOpen" 
+      class="fixed inset-0 bg-slate-900/50 z-40 lg:hidden transition-opacity backdrop-blur-sm" 
+      @click="sidebarOpen = false"
+      aria-hidden="true"
+    ></div>
+
+    <!-- Sidebar Wrapper -->
+    <div 
+      :class="[
+        'fixed inset-y-0 left-0 z-50 transform transition-transform duration-300 lg:relative lg:translate-x-0 shadow-2xl lg:shadow-none',
+        sidebarOpen ? 'translate-x-0' : '-translate-x-full'
+      ]"
+    >
+      <Sidebar userRole="Administrator" />
+    </div>
+
+    <!-- Main Content Area -->
+    <div class="flex-1 flex flex-col relative overflow-hidden w-full">
+      
+      <!-- Top Navbar -->
+      <DashboardNavbar 
+        userRole="System Administrator" 
+        pageTitle="Announcements" 
+        @toggle-sidebar="sidebarOpen = !sidebarOpen" 
+      />
+      
+      <!-- Scrollable Dashboard Content -->
+      <main class="flex-1 overflow-y-auto p-4 md:p-6 lg:p-8 animate-fade-in custom-scrollbar">
+        
+        <!-- Header & Breadcrumbs -->
+        <header class="mb-6 flex flex-col md:flex-row md:items-end justify-between gap-4">
+          <div>
+            <nav class="flex text-sm text-gray-500 mb-2 font-medium">
+              <span class="hover:text-[#2563EB] cursor-pointer transition-colors">Dashboard</span>
+              <span class="mx-2">/</span>
+              <span class="text-gray-900">Announcements</span>
+            </nav>
+            <h1 class="text-3xl font-bold text-gray-900 tracking-tight">Announcements</h1>
+            <p class="text-gray-500 mt-1 text-sm md:text-base">
+              Create, publish, schedule, and manage platform announcements for all users.
+            </p>
+          </div>
+          <div class="bg-white px-5 py-2.5 rounded-[14px] shadow-sm border border-gray-100 flex items-center gap-3 shrink-0">
+            <Calendar class="w-5 h-5 text-[#2563EB]" />
+            <span class="text-sm font-semibold text-gray-700">{{ currentDate }}</span>
+          </div>
+        </header>
+
+        <!-- Top Statistics Grid -->
+        <section class="mb-6 grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-4">
+          <div v-for="(stat, index) in topStats" :key="index" class="bg-white p-5 rounded-[14px] shadow-sm border border-gray-50 flex flex-col group hover:border-[#2563EB] hover:shadow-md transition-all">
+            <div class="flex items-center justify-between mb-3">
+              <div :class="`p-2.5 rounded-xl bg-opacity-10 ${stat.colorClass} bg-current group-hover:scale-110 transition-transform duration-300`">
+                <component :is="stat.icon" class="w-5 h-5" :class="stat.textClass" />
+              </div>
+            </div>
+            <h3 class="text-2xl font-bold text-gray-900 mb-0.5">{{ stat.value }}</h3>
+            <span class="text-xs text-gray-500 font-semibold uppercase tracking-wide">{{ stat.label }}</span>
+          </div>
+        </section>
+
+        <!-- Quick Actions -->
+        <section class="mb-6 grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-3">
+          <button @click="openModal('create')" class="flex items-center gap-3 p-3.5 bg-[#2563EB] text-white rounded-[14px] hover:bg-[#1E40AF] transition-colors shadow-sm font-medium">
+            <Megaphone class="w-5 h-5 shrink-0" />
+            <span class="text-sm">Create New</span>
+          </button>
+          <button @click="openModal('create')" class="flex items-center gap-3 p-3.5 bg-white border border-gray-100 text-gray-700 rounded-[14px] hover:border-[#2563EB] hover:bg-blue-50 hover:text-[#2563EB] transition-colors font-medium">
+            <Clock class="w-5 h-5 shrink-0 text-gray-400" />
+            <span class="text-sm">Schedule</span>
+          </button>
+          <button class="flex items-center gap-3 p-3.5 bg-white border border-gray-100 text-gray-700 rounded-[14px] hover:border-gray-300 hover:bg-gray-50 transition-colors font-medium">
+            <FileText class="w-5 h-5 shrink-0 text-gray-400" />
+            <span class="text-sm">Drafts</span>
+          </button>
+          <button class="flex items-center gap-3 p-3.5 bg-white border border-gray-100 text-gray-700 rounded-[14px] hover:border-gray-300 hover:bg-gray-50 transition-colors font-medium">
+            <Archive class="w-5 h-5 shrink-0 text-gray-400" />
+            <span class="text-sm">Archived</span>
+          </button>
+          <button @click="scrollTo('analytics')" class="flex items-center gap-3 p-3.5 bg-white border border-gray-100 text-gray-700 rounded-[14px] hover:border-[#2563EB] hover:bg-blue-50 hover:text-[#2563EB] transition-colors font-medium">
+            <BarChart3 class="w-5 h-5 shrink-0 text-gray-400" />
+            <span class="text-sm">Analytics</span>
+          </button>
+          <button @click="scrollTo('templates')" class="flex items-center gap-3 p-3.5 bg-white border border-gray-100 text-gray-700 rounded-[14px] hover:border-[#2563EB] hover:bg-blue-50 hover:text-[#2563EB] transition-colors font-medium">
+            <Copy class="w-5 h-5 shrink-0 text-gray-400" />
+            <span class="text-sm">Templates</span>
+          </button>
+        </section>
+
+        <!-- Insights & Pinned Split -->
+        <section class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
+          <div class="bg-white p-6 rounded-[14px] shadow-sm border border-gray-50">
+            <h2 class="text-sm font-bold text-gray-900 uppercase tracking-wider mb-4 flex items-center gap-2">
+              <TrendingUp class="w-4 h-4 text-[#F59E0B]" /> Quick Insights
+            </h2>
+            <div class="grid grid-cols-2 gap-4">
+              <div v-for="(insight, index) in quickInsights" :key="index" class="p-3 bg-gray-50 rounded-xl border border-gray-100">
+                <p class="text-[10px] font-bold text-gray-500 uppercase tracking-wide mb-1">{{ insight.label }}</p>
+                <p class="font-bold text-gray-900 text-sm leading-snug">{{ insight.value }}</p>
+              </div>
+            </div>
+          </div>
+          
+          <div class="bg-white p-6 rounded-[14px] shadow-sm border border-gray-50 flex flex-col">
+            <h2 class="text-sm font-bold text-gray-900 uppercase tracking-wider mb-4 flex items-center gap-2">
+              <AlertTriangle class="w-4 h-4 text-[#EF4444]" /> Pinned & Critical
+            </h2>
+            <div class="flex-1 space-y-3">
+              <div v-for="pin in pinnedAnnouncements" :key="pin.id" class="p-3 bg-red-50 border border-red-100 rounded-xl flex items-center justify-between group">
+                <div class="flex items-center gap-3">
+                  <div class="w-2 h-2 rounded-full bg-red-500 animate-pulse"></div>
+                  <div>
+                    <h4 class="font-bold text-red-900 text-sm">{{ pin.title }}</h4>
+                    <p class="text-xs text-red-700 font-medium">{{ pin.audience }} • {{ pin.views }} views</p>
+                  </div>
+                </div>
+                <button class="px-3 py-1.5 bg-white border border-red-200 text-red-600 text-xs font-bold rounded-lg hover:bg-red-600 hover:text-white transition-colors shadow-sm">
+                  Manage
+                </button>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <!-- Search & Filter Panel -->
+        <section class="bg-white p-5 rounded-[14px] shadow-sm border border-gray-50 mb-6 flex flex-col xl:flex-row gap-4 items-center justify-between">
+          <div class="w-full xl:w-[25%] relative">
+            <Search class="w-5 h-5 text-gray-400 absolute left-3 top-3" />
+            <input 
+              v-model="filters.search" 
+              type="text" 
+              placeholder="Search title, category, author..." 
+              class="w-full pl-10 pr-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#2563EB]/20 focus:border-[#2563EB] transition-all"
+            />
+          </div>
+          <div class="w-full xl:w-[75%] flex flex-wrap xl:flex-nowrap gap-3 justify-end">
+            <select v-model="filters.status" class="bg-gray-50 border border-gray-200 text-gray-700 text-sm rounded-xl px-3 py-2.5 focus:ring-2 focus:ring-[#2563EB]/20 focus:outline-none w-full sm:w-auto">
+              <option value="All">All Status</option>
+              <option value="Published">Published</option>
+              <option value="Scheduled">Scheduled</option>
+              <option value="Draft">Draft</option>
+              <option value="Archived">Archived</option>
+            </select>
+            <select v-model="filters.audience" class="bg-gray-50 border border-gray-200 text-gray-700 text-sm rounded-xl px-3 py-2.5 focus:ring-2 focus:ring-[#2563EB]/20 focus:outline-none w-full sm:w-auto">
+              <option value="All">All Audiences</option>
+              <option value="All Users">All Users</option>
+              <option value="Citizens">Citizens</option>
+              <option value="Officers">Officers</option>
+              <option value="Workers">Workers</option>
+            </select>
+            <select v-model="filters.priority" class="bg-gray-50 border border-gray-200 text-gray-700 text-sm rounded-xl px-3 py-2.5 focus:ring-2 focus:ring-[#2563EB]/20 focus:outline-none w-full sm:w-auto">
+              <option value="All">All Priorities</option>
+              <option value="Critical">Critical</option>
+              <option value="Important">Important</option>
+              <option value="Normal">Normal</option>
+            </select>
+            <select v-model="filters.category" class="bg-gray-50 border border-gray-200 text-gray-700 text-sm rounded-xl px-3 py-2.5 focus:ring-2 focus:ring-[#2563EB]/20 focus:outline-none w-full sm:w-auto">
+              <option value="All">All Categories</option>
+              <option value="Maintenance">Maintenance</option>
+              <option value="Policy">Policy</option>
+              <option value="Alert">Alert</option>
+              <option value="General">General</option>
+            </select>
+            <select v-model="filters.sort" class="bg-gray-50 border border-gray-200 text-gray-700 text-sm rounded-xl px-3 py-2.5 focus:ring-2 focus:ring-[#2563EB]/20 focus:outline-none w-full sm:w-auto">
+              <option value="Newest">Newest First</option>
+              <option value="Oldest">Oldest First</option>
+              <option value="Views">Most Viewed</option>
+            </select>
+            <button @click="resetFilters" class="px-4 py-2.5 text-sm font-medium text-gray-600 hover:bg-gray-100 rounded-xl transition-colors shrink-0 border border-transparent">
+              Reset
+            </button>
+          </div>
+        </section>
+
+        <!-- Announcements Data Table (Desktop) -->
+        <section class="hidden lg:block bg-white rounded-[14px] shadow-sm border border-gray-50 overflow-hidden mb-8">
+          <div class="overflow-x-auto">
+            <table class="w-full text-left border-collapse">
+              <thead>
+                <tr class="bg-gray-50 text-gray-500 text-[11px] uppercase tracking-wider font-bold">
+                  <th class="p-4 whitespace-nowrap">ID & Title</th>
+                  <th class="p-4 whitespace-nowrap">Category</th>
+                  <th class="p-4 whitespace-nowrap">Audience</th>
+                  <th class="p-4 whitespace-nowrap text-center">Priority</th>
+                  <th class="p-4 whitespace-nowrap text-center">Status</th>
+                  <th class="p-4 whitespace-nowrap">Dates (Pub / Exp)</th>
+                  <th class="p-4 whitespace-nowrap text-center">Views</th>
+                  <th class="p-4 whitespace-nowrap text-right">Actions</th>
+                </tr>
+              </thead>
+              <tbody class="divide-y divide-gray-100 text-sm">
+                <tr v-for="ann in filteredAnnouncements" :key="ann.id" class="hover:bg-gray-50 transition-colors group">
+                  <td class="p-4">
+                    <p class="font-bold text-gray-900">{{ ann.title }}</p>
+                    <p class="text-xs text-gray-500">{{ ann.id }} • By {{ ann.author }}</p>
+                  </td>
+                  <td class="p-4 font-medium text-gray-700">{{ ann.category }}</td>
+                  <td class="p-4">
+                    <span :class="['px-2.5 py-1 rounded-md text-xs font-semibold', getAudienceBadge(ann.audience)]">
+                      {{ ann.audience }}
+                    </span>
+                  </td>
+                  <td class="p-4 text-center">
+                    <span :class="['px-2 py-0.5 rounded text-[10px] font-bold uppercase', getPriorityBadge(ann.priority)]">
+                      {{ ann.priority }}
+                    </span>
+                  </td>
+                  <td class="p-4 text-center">
+                    <span :class="['px-2.5 py-1 rounded-full text-[10px] font-bold uppercase tracking-wide flex items-center justify-center gap-1.5 w-max mx-auto', getStatusBadge(ann.status)]">
+                      <span class="w-1.5 h-1.5 rounded-full bg-current"></span> {{ ann.status }}
+                    </span>
+                  </td>
+                  <td class="p-4 text-gray-600 text-xs whitespace-nowrap">
+                    <p>{{ ann.publishDate }}</p>
+                    <p class="text-gray-400">{{ ann.expiryDate }}</p>
+                  </td>
+                  <td class="p-4 text-center font-semibold text-gray-900">{{ ann.views }}</td>
+                  <td class="p-4 text-right">
+                    <div class="flex items-center justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                      <button @click="openDrawer(ann)" class="p-1.5 text-gray-400 hover:text-[#2563EB] hover:bg-blue-50 rounded-lg" title="View"><Eye class="w-4 h-4" /></button>
+                      <button @click="openModal('edit', ann)" class="p-1.5 text-gray-400 hover:text-gray-700 hover:bg-gray-100 rounded-lg" title="Edit"><Pencil class="w-4 h-4" /></button>
+                      <button v-if="ann.status !== 'Published'" class="p-1.5 text-gray-400 hover:text-green-600 hover:bg-green-50 rounded-lg" title="Publish"><Send class="w-4 h-4" /></button>
+                      <button v-if="ann.status !== 'Archived'" @click="openModal('archive', ann)" class="p-1.5 text-gray-400 hover:text-yellow-600 hover:bg-yellow-50 rounded-lg" title="Archive"><Archive class="w-4 h-4" /></button>
+                      <button @click="openModal('delete', ann)" class="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg" title="Delete"><Trash2 class="w-4 h-4" /></button>
+                    </div>
+                  </td>
+                </tr>
+                <tr v-if="filteredAnnouncements.length === 0">
+                  <td colspan="8" class="p-8 text-center text-gray-500">No announcements match your filters.</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+          <!-- Pagination Placeholder -->
+          <div class="p-4 border-t border-gray-100 flex items-center justify-between text-sm text-gray-500 bg-gray-50/50">
+            <span>Showing 1 to {{ filteredAnnouncements.length }} of {{ announcements.length }}</span>
+            <div class="flex gap-1">
+              <button class="px-3 py-1 border border-gray-200 bg-white rounded-md hover:bg-gray-50">Prev</button>
+              <button class="px-3 py-1 border border-gray-200 bg-[#2563EB] text-white rounded-md">1</button>
+              <button class="px-3 py-1 border border-gray-200 bg-white rounded-md hover:bg-gray-50">Next</button>
+            </div>
+          </div>
+        </section>
+
+        <!-- Mobile Announcement Cards -->
+        <section class="lg:hidden space-y-4 mb-8">
+          <div v-for="ann in filteredAnnouncements" :key="ann.id" class="bg-white p-4 rounded-[14px] shadow-sm border border-gray-50">
+            <div class="flex justify-between items-start mb-2">
+              <h3 class="font-bold text-gray-900 leading-tight pr-2">{{ ann.title }}</h3>
+              <span :class="['px-2 py-0.5 rounded-full text-[10px] font-bold uppercase shrink-0', getStatusBadge(ann.status)]">{{ ann.status }}</span>
+            </div>
+            <div class="flex flex-wrap gap-2 mb-3">
+              <span :class="['px-2 py-0.5 rounded text-[10px] font-bold uppercase', getPriorityBadge(ann.priority)]">{{ ann.priority }}</span>
+              <span :class="['px-2 py-0.5 rounded text-[10px] font-semibold', getAudienceBadge(ann.audience)]">{{ ann.audience }}</span>
+              <span class="px-2 py-0.5 bg-gray-100 text-gray-600 rounded text-[10px] font-semibold">{{ ann.category }}</span>
+            </div>
+            <div class="text-xs text-gray-500 flex justify-between items-center mb-4">
+              <span>Pub: {{ ann.publishDate }}</span>
+              <span class="font-bold text-gray-900 flex items-center gap-1"><Eye class="w-3 h-3"/> {{ ann.views }}</span>
+            </div>
+            <div class="grid grid-cols-2 gap-2">
+              <button @click="openDrawer(ann)" class="w-full py-2 bg-blue-50 text-[#2563EB] rounded-lg text-sm font-semibold hover:bg-blue-100 transition-colors">View</button>
+              <button @click="openModal('edit', ann)" class="w-full py-2 bg-gray-50 text-gray-700 border border-gray-200 rounded-lg text-sm font-semibold hover:bg-gray-100 transition-colors">Edit</button>
+            </div>
+          </div>
+        </section>
+
+        <!-- Analytics Charts Grid -->
+        <section id="analytics" class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-6 mb-8">
+          <div class="bg-white p-6 rounded-[14px] shadow-sm border border-gray-50">
+             <h3 class="text-xs font-bold text-gray-900 uppercase tracking-wider mb-4 flex items-center gap-2"><LineChart class="w-4 h-4 text-[#2563EB]"/> Views by Month</h3>
+             <div class="relative h-48 w-full"><canvas ref="viewsChartRef"></canvas></div>
+          </div>
+          <div class="bg-white p-6 rounded-[14px] shadow-sm border border-gray-50">
+             <h3 class="text-xs font-bold text-gray-900 uppercase tracking-wider mb-4 flex items-center gap-2"><PieChart class="w-4 h-4 text-[#2563EB]"/> Categories</h3>
+             <div class="relative h-48 w-full flex justify-center"><canvas ref="categoryChartRef"></canvas></div>
+          </div>
+          <div class="bg-white p-6 rounded-[14px] shadow-sm border border-gray-50">
+             <h3 class="text-xs font-bold text-gray-900 uppercase tracking-wider mb-4 flex items-center gap-2"><BarChart3 class="w-4 h-4 text-[#2563EB]"/> Audience Spl.</h3>
+             <div class="relative h-48 w-full"><canvas ref="audienceChartRef"></canvas></div>
+          </div>
+          <div class="bg-white p-6 rounded-[14px] shadow-sm border border-gray-50">
+             <h3 class="text-xs font-bold text-gray-900 uppercase tracking-wider mb-4 flex items-center gap-2"><PieChart class="w-4 h-4 text-[#2563EB]"/> Priority Dist.</h3>
+             <div class="relative h-48 w-full flex justify-center"><canvas ref="priorityChartRef"></canvas></div>
+          </div>
+        </section>
+
+        <!-- Bottom Grid: Activity, Templates, Comments -->
+        <section class="grid grid-cols-1 xl:grid-cols-3 gap-6 mb-6">
+          
+          <!-- Recent Activity -->
+          <div class="bg-white rounded-[14px] shadow-sm border border-gray-50 p-6 flex flex-col h-[400px]">
+            <h3 class="text-sm font-bold text-gray-900 uppercase tracking-wider mb-5 flex items-center gap-2">
+              <Activity class="w-4 h-4 text-[#2563EB]" /> Recent Activity
+            </h3>
+            <div class="flex-1 overflow-y-auto custom-scrollbar">
+              <div class="relative border-l-2 border-gray-100 ml-3 space-y-6">
+                <div v-for="act in recentActivity" :key="act.id" class="relative pl-5">
+                  <span :class="`absolute -left-[9px] top-1 w-4 h-4 rounded-full bg-white border-2 ${act.color}`"></span>
+                  <div class="flex justify-between items-baseline mb-0.5">
+                    <h4 class="text-xs font-bold text-gray-900">{{ act.action }}</h4>
+                    <span class="text-[10px] text-gray-400 font-medium">{{ act.time }}</span>
+                  </div>
+                  <p class="text-[11px] text-gray-500">{{ act.desc }}</p>
+                  <p class="text-[10px] text-[#2563EB] font-semibold mt-0.5">Admin: {{ act.admin }}</p>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Templates -->
+          <div id="templates" class="bg-white rounded-[14px] shadow-sm border border-gray-50 p-6 flex flex-col h-[400px]">
+            <h3 class="text-sm font-bold text-gray-900 uppercase tracking-wider mb-5 flex items-center gap-2">
+              <Copy class="w-4 h-4 text-[#2563EB]" /> Templates
+            </h3>
+            <div class="flex-1 overflow-y-auto custom-scrollbar space-y-3 pr-2">
+              <div v-for="tpl in templates" :key="tpl.name" class="p-3 border border-gray-100 rounded-xl hover:border-[#2563EB] transition-colors group flex justify-between items-center">
+                <div>
+                  <h4 class="font-bold text-gray-900 text-sm group-hover:text-[#2563EB] transition-colors">{{ tpl.name }}</h4>
+                  <p class="text-xs text-gray-500">{{ tpl.category }}</p>
+                </div>
+                <button class="px-3 py-1.5 bg-gray-50 border border-gray-200 text-gray-700 text-xs font-bold rounded-lg hover:bg-[#2563EB] hover:text-white transition-colors">
+                  Use
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <!-- Recent Comments Placeholder -->
+          <div class="bg-white rounded-[14px] shadow-sm border border-gray-50 p-6 flex flex-col h-[400px]">
+            <h3 class="text-sm font-bold text-gray-900 uppercase tracking-wider mb-5 flex items-center gap-2">
+              <MessageSquare class="w-4 h-4 text-[#2563EB]" /> Recent Comments
+            </h3>
+            <div class="flex-1 overflow-y-auto custom-scrollbar space-y-4 pr-2">
+              <div v-for="comment in comments" :key="comment.id" class="p-3 bg-gray-50 border border-gray-100 rounded-xl">
+                <div class="flex justify-between items-start mb-1">
+                  <p class="text-xs font-bold text-gray-900">{{ comment.user }}</p>
+                  <span class="text-[10px] text-gray-400">{{ comment.date }}</span>
+                </div>
+                <p class="text-xs text-gray-600 mb-2">"{{ comment.text }}"</p>
+                <p class="text-[10px] text-[#2563EB] font-medium truncate">On: {{ comment.announcement }}</p>
+              </div>
+            </div>
+          </div>
+
+        </section>
+      </main>
+    </div>
+
+    <!-- Announcement Details Drawer -->
+    <div v-if="isDrawerOpen && selectedAnn" class="fixed inset-0 z-50 overflow-hidden" aria-labelledby="slide-over-title" role="dialog" aria-modal="true">
+      <div class="absolute inset-0 bg-slate-900/40 backdrop-blur-sm transition-opacity" @click="closeDrawer"></div>
+      <div class="fixed inset-y-0 right-0 max-w-lg w-full bg-white shadow-2xl flex flex-col transform transition-transform duration-300 ease-in-out border-l border-gray-100">
+        
+        <div class="p-6 border-b border-gray-100 bg-gray-50/50 flex justify-between items-start">
+          <div class="pr-4">
+             <div class="flex gap-2 mb-2">
+               <span :class="['px-2 py-0.5 rounded-full text-[10px] font-bold uppercase', getStatusBadge(selectedAnn.status)]">{{ selectedAnn.status }}</span>
+               <span :class="['px-2 py-0.5 rounded text-[10px] font-bold uppercase', getPriorityBadge(selectedAnn.priority)]">{{ selectedAnn.priority }}</span>
+             </div>
+             <h2 class="text-xl font-bold text-gray-900 leading-tight">{{ selectedAnn.title }}</h2>
+             <p class="text-xs text-gray-500 mt-1">{{ selectedAnn.id }} • Created by {{ selectedAnn.author }}</p>
+          </div>
+          <button @click="closeDrawer" class="p-2 text-gray-400 hover:bg-gray-200 rounded-full transition-colors shrink-0"><X class="w-5 h-5"/></button>
+        </div>
+
+        <div class="flex-1 overflow-y-auto p-6 custom-scrollbar space-y-6">
+          <div class="bg-gray-50 p-4 rounded-xl border border-gray-100 grid grid-cols-2 gap-4 text-sm">
+            <div><p class="text-xs text-gray-500 mb-0.5">Audience</p><p class="font-bold text-gray-900">{{ selectedAnn.audience }}</p></div>
+            <div><p class="text-xs text-gray-500 mb-0.5">Category</p><p class="font-bold text-gray-900">{{ selectedAnn.category }}</p></div>
+            <div><p class="text-xs text-gray-500 mb-0.5">Publish Date</p><p class="font-bold text-gray-900">{{ selectedAnn.publishDate }}</p></div>
+            <div><p class="text-xs text-gray-500 mb-0.5">Expiry Date</p><p class="font-bold text-gray-900">{{ selectedAnn.expiryDate }}</p></div>
+            <div class="col-span-2"><p class="text-xs text-gray-500 mb-0.5">Total Views</p><p class="font-bold text-[#2563EB] flex items-center gap-1"><Eye class="w-4 h-4"/> {{ selectedAnn.views }} Views</p></div>
+          </div>
+
+          <div>
+            <h3 class="text-xs font-bold text-gray-400 uppercase tracking-wider mb-2">Description / Content</h3>
+            <div class="text-sm text-gray-700 leading-relaxed space-y-2">
+              <p>This is a detailed description placeholder for <strong>{{ selectedAnn.title }}</strong>.</p>
+              <p>In a production environment, this area would render rich text or HTML content allowing administrators to format policies, maintenance schedules, or emergency alerts properly with bullet points, bold text, and links.</p>
+            </div>
+          </div>
+
+          <div>
+            <h3 class="text-xs font-bold text-gray-400 uppercase tracking-wider mb-2">Attachments</h3>
+            <div class="flex items-center gap-3 p-3 border border-gray-200 rounded-xl hover:bg-gray-50 transition-colors cursor-pointer">
+              <div class="p-2 bg-blue-50 text-[#2563EB] rounded-lg"><FileText class="w-4 h-4"/></div>
+              <div class="flex-1"><p class="text-sm font-semibold text-gray-900">Official_Notice.pdf</p><p class="text-[10px] text-gray-500">2.4 MB</p></div>
+              <Download class="w-4 h-4 text-gray-400"/>
+            </div>
+          </div>
+        </div>
+
+        <div class="p-4 border-t border-gray-100 bg-white grid grid-cols-3 gap-3">
+          <button @click="openModal('edit', selectedAnn)" class="py-2.5 bg-gray-50 border border-gray-200 text-gray-700 text-sm font-semibold rounded-xl hover:bg-gray-100">Edit</button>
+          <button v-if="selectedAnn.status !== 'Published'" class="py-2.5 bg-[#2563EB] text-white text-sm font-semibold rounded-xl hover:bg-[#1E40AF] shadow-sm">Publish</button>
+          <button v-if="selectedAnn.status !== 'Archived'" @click="openModal('archive', selectedAnn)" class="py-2.5 bg-yellow-50 text-yellow-700 border border-yellow-200 text-sm font-semibold rounded-xl hover:bg-yellow-100">Archive</button>
+          <button v-if="selectedAnn.status === 'Archived'" @click="openModal('delete', selectedAnn)" class="py-2.5 bg-red-50 text-red-600 border border-red-200 text-sm font-semibold rounded-xl hover:bg-red-100">Delete</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Modals Container -->
+    <div v-if="activeModal" class="fixed inset-0 z-[60] flex items-center justify-center p-4">
+      <div class="absolute inset-0 bg-slate-900/60 backdrop-blur-sm transition-opacity" @click="closeModal"></div>
+      
+      <!-- 1. Create / Edit Modal -->
+      <div v-if="activeModal === 'create' || activeModal === 'edit'" class="relative bg-white rounded-2xl shadow-xl w-full max-w-2xl p-6 lg:p-8 transform transition-all max-h-[90vh] overflow-y-auto custom-scrollbar">
+        <div class="flex justify-between items-center mb-6">
+          <div>
+            <h2 class="text-xl font-bold text-gray-900">{{ activeModal === 'create' ? 'Create Announcement' : 'Edit Announcement' }}</h2>
+            <p class="text-sm text-gray-500 mt-1">Broadcast information to users across the platform.</p>
+          </div>
+          <button @click="closeModal" class="p-2 bg-gray-50 text-gray-500 rounded-full hover:bg-gray-100 transition-colors"><X class="w-5 h-5"/></button>
+        </div>
+        
+        <form @submit.prevent="handleActionClose" class="space-y-5">
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1.5">Announcement Title</label>
+            <input type="text" class="w-full px-4 py-2.5 border border-gray-200 rounded-xl focus:ring-2 focus:ring-[#2563EB]/20 focus:border-[#2563EB] outline-none" placeholder="e.g. Scheduled Maintenance for Sector 4" />
+          </div>
+          
+          <div class="grid grid-cols-1 md:grid-cols-3 gap-5">
+            <div>
+              <label class="block text-sm font-medium text-gray-700 mb-1.5">Category</label>
+              <select class="w-full px-4 py-2.5 border border-gray-200 rounded-xl focus:ring-2 focus:ring-[#2563EB]/20 focus:border-[#2563EB] outline-none">
+                <option>Maintenance</option><option>Policy</option><option>Alert</option><option>Holiday</option><option>General</option>
+              </select>
+            </div>
+            <div>
+              <label class="block text-sm font-medium text-gray-700 mb-1.5">Target Audience</label>
+              <select class="w-full px-4 py-2.5 border border-gray-200 rounded-xl focus:ring-2 focus:ring-[#2563EB]/20 focus:border-[#2563EB] outline-none">
+                <option>All Users</option><option>Citizens</option><option>Officers</option><option>Workers</option>
+              </select>
+            </div>
+            <div>
+              <label class="block text-sm font-medium text-gray-700 mb-1.5">Priority</label>
+              <select class="w-full px-4 py-2.5 border border-gray-200 rounded-xl focus:ring-2 focus:ring-[#2563EB]/20 focus:border-[#2563EB] outline-none">
+                <option>Normal</option><option>Important</option><option>Critical</option><option>Emergency</option>
+              </select>
+            </div>
+          </div>
+
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1.5">Short Summary</label>
+            <textarea rows="2" class="w-full px-4 py-2.5 border border-gray-200 rounded-xl focus:ring-2 focus:ring-[#2563EB]/20 focus:border-[#2563EB] outline-none resize-none custom-scrollbar" placeholder="Brief summary visible on cards..."></textarea>
+          </div>
+          
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1.5">Full Description</label>
+            <textarea rows="5" class="w-full px-4 py-2.5 border border-gray-200 rounded-xl focus:ring-2 focus:ring-[#2563EB]/20 focus:border-[#2563EB] outline-none resize-none custom-scrollbar" placeholder="Detailed content..."></textarea>
+          </div>
+
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-5">
+             <div>
+              <label class="block text-sm font-medium text-gray-700 mb-1.5">Publish Date</label>
+              <input type="datetime-local" class="w-full px-4 py-2.5 border border-gray-200 rounded-xl focus:ring-2 focus:ring-[#2563EB]/20 outline-none" />
+            </div>
+            <div>
+              <label class="block text-sm font-medium text-gray-700 mb-1.5">Expiry Date (Optional)</label>
+              <input type="datetime-local" class="w-full px-4 py-2.5 border border-gray-200 rounded-xl focus:ring-2 focus:ring-[#2563EB]/20 outline-none" />
+            </div>
+          </div>
+          
+          <div class="pt-6 flex justify-end gap-3 mt-4 border-t border-gray-100">
+            <button type="button" @click="closeModal" class="px-6 py-2.5 text-sm font-medium text-gray-700 bg-gray-50 border border-gray-200 rounded-xl transition-colors">Cancel</button>
+            <button type="button" class="px-6 py-2.5 text-sm font-bold text-[#2563EB] bg-blue-50 hover:bg-blue-100 border border-blue-100 rounded-xl transition-colors">Save Draft</button>
+            <button type="submit" class="px-6 py-2.5 text-sm font-bold text-white bg-[#2563EB] hover:bg-[#1E40AF] rounded-xl transition-colors shadow-sm">
+              {{ activeModal === 'create' ? 'Publish Now' : 'Save Changes' }}
+            </button>
+          </div>
+        </form>
+      </div>
+
+      <!-- 2. Archive Confirm -->
+      <div v-if="activeModal === 'archive'" class="relative bg-white rounded-2xl shadow-xl w-full max-w-sm p-6 text-center transform transition-all">
+        <div class="w-16 h-16 bg-yellow-100 text-yellow-600 rounded-full flex items-center justify-center mx-auto mb-4"><Archive class="w-8 h-8"/></div>
+        <h2 class="text-xl font-bold text-gray-900 mb-2">Archive Announcement?</h2>
+        <p class="text-sm text-gray-500 mb-6">Archived announcements will no longer be visible to users but remain in the system records.</p>
+        <div class="flex justify-center gap-3">
+          <button @click="closeModal" class="px-5 py-2.5 text-sm font-medium text-gray-700 bg-gray-50 border border-gray-200 rounded-xl">Cancel</button>
+          <button @click="handleActionClose" class="px-5 py-2.5 text-sm font-bold text-white bg-yellow-500 hover:bg-yellow-600 rounded-xl shadow-sm">Archive</button>
+        </div>
+      </div>
+
+      <!-- 3. Delete Confirm -->
+      <div v-if="activeModal === 'delete'" class="relative bg-white rounded-2xl shadow-xl w-full max-w-sm p-6 text-center transform transition-all">
+        <div class="w-16 h-16 bg-red-100 text-red-600 rounded-full flex items-center justify-center mx-auto mb-4"><Trash2 class="w-8 h-8"/></div>
+        <h2 class="text-xl font-bold text-gray-900 mb-2">Delete Permanently?</h2>
+        <p class="text-sm text-gray-500 mb-6">This announcement will be permanently removed. This action cannot be undone.</p>
+        <div class="flex justify-center gap-3">
+          <button @click="closeModal" class="px-5 py-2.5 text-sm font-medium text-gray-700 bg-gray-50 border border-gray-200 rounded-xl">Cancel</button>
+          <button @click="handleActionClose" class="px-5 py-2.5 text-sm font-bold text-white bg-red-600 hover:bg-red-700 rounded-xl shadow-sm">Delete</button>
+        </div>
+      </div>
+      
+    </div>
+  </div>
+</template>
+
+<script setup>
+import { ref, computed, onMounted, reactive } from 'vue';
+import Chart from 'chart.js/auto';
+
+// Layout Components
+import DashboardNavbar from '@/components/dashboard/DashboardNavbar.vue';
+import Sidebar from '@/components/dashboard/Sidebar.vue';
+
+// Icons
+import { 
+  Megaphone, Bell, MessageSquare, Newspaper, ClipboardList, 
+  Calendar, Clock, Users, ShieldAlert, AlertTriangle, FileText, 
+  Search, Eye, Pencil, Trash2, Archive, Copy, Send, BarChart3, 
+  PieChart, TrendingUp, X, Download
+} from 'lucide-vue-next';
+
+// View State
+const sidebarOpen = ref(false);
+const isDrawerOpen = ref(false);
+const activeModal = ref(null);
+const selectedAnn = ref(null);
+const targetAnn = ref(null);
+const currentDate = new Date().toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
+
+// --- Dummy Data ---
+const topStats = ref([
+  { label: 'Total Announcements', value: '245', icon: Newspaper, colorClass: 'text-[#2563EB] bg-blue-100', textClass: 'text-[#2563EB]' },
+  { label: 'Published', value: '180', icon: Send, colorClass: 'text-[#22C55E] bg-green-100', textClass: 'text-[#22C55E]' },
+  { label: 'Scheduled', value: '15', icon: Clock, colorClass: 'text-[#F59E0B] bg-yellow-100', textClass: 'text-[#F59E0B]' },
+  { label: 'Drafts', value: '8', icon: FileText, colorClass: 'text-gray-600 bg-gray-100', textClass: 'text-gray-600' },
+  { label: 'Archived', value: '42', icon: Archive, colorClass: 'text-red-600 bg-red-100', textClass: 'text-red-600' },
+  { label: 'Total Views', value: '45.2K', icon: Eye, colorClass: 'text-purple-600 bg-purple-100', textClass: 'text-purple-600' }
+]);
+
+const quickInsights = ref([
+  { label: 'Most Viewed', value: 'New Platform Update v2.0 (1.2k)' },
+  { label: 'Most Active Audience', value: 'Citizens (65%)' },
+  { label: 'Top Category', value: 'Maintenance Alerts' },
+  { label: 'Latest Published', value: 'Water Supply Issue (Today)' }
+]);
+
+const pinnedAnnouncements = ref([
+  { id: 1, title: 'Severe Cyclone Warning - Zones 1-3', audience: 'All Users', views: 8450 },
+  { id: 2, title: 'System Downtime Scheduled for Sunday', audience: 'Officers & Workers', views: 1240 }
+]);
+
+const announcements = ref([
+  { id: 'ANN-1045', title: 'Severe Cyclone Warning - Zones 1-3', category: 'Alert', audience: 'All Users', priority: 'Emergency', status: 'Published', publishDate: 'Jul 12, 2026', expiryDate: 'Jul 15, 2026', views: 8450, author: 'Admin Jane' },
+  { id: 'ANN-1044', title: 'Water Supply Issue in Sector 4', category: 'Maintenance', audience: 'Citizens', priority: 'Important', status: 'Published', publishDate: 'Jul 11, 2026', expiryDate: 'Jul 13, 2026', views: 3200, author: 'Admin John' },
+  { id: 'ANN-1043', title: 'System Downtime Scheduled for Sunday', category: 'Maintenance', audience: 'Officers', priority: 'Critical', status: 'Scheduled', publishDate: 'Jul 15, 2026', expiryDate: 'Jul 16, 2026', views: 0, author: 'Admin Jane' },
+  { id: 'ANN-1042', title: 'New Safety Protocol for Field Work', category: 'Policy', audience: 'Workers', priority: 'Important', status: 'Draft', publishDate: '-', expiryDate: '-', views: 0, author: 'Admin Sarah' },
+  { id: 'ANN-1041', title: 'Independence Day Holiday Notice', category: 'Holiday', audience: 'All Users', priority: 'Normal', status: 'Published', publishDate: 'Jul 01, 2026', expiryDate: 'Aug 16, 2026', views: 12500, author: 'Admin Jane' },
+  { id: 'ANN-1020', title: 'Q1 Performance Review Criteria', category: 'General', audience: 'Officers', priority: 'Normal', status: 'Archived', publishDate: 'Jan 10, 2026', expiryDate: 'Feb 10, 2026', views: 420, author: 'Admin John' }
+]);
+
+const templates = ref([
+  { name: 'Routine Maintenance Notice', category: 'Maintenance' },
+  { name: 'Emergency Weather Alert', category: 'Alert' },
+  { name: 'Public Holiday Declaration', category: 'Holiday' },
+  { name: 'Internal Policy Update', category: 'Policy' }
+]);
+
+const recentActivity = ref([
+  { id: 1, action: 'Announcement Published', desc: 'Severe Cyclone Warning broadcasted to All Users.', time: '2 hours ago', admin: 'Jane Doe', color: 'border-green-500' },
+  { id: 2, action: 'Announcement Scheduled', desc: 'System Downtime set for Jul 15.', time: '5 hours ago', admin: 'Jane Doe', color: 'border-[#2563EB]' },
+  { id: 3, action: 'Draft Saved', desc: 'New Safety Protocol saved to drafts.', time: 'Yesterday', admin: 'Sarah Smith', color: 'border-gray-400' },
+  { id: 4, action: 'Announcement Archived', desc: 'Q2 Reports notice moved to archive.', time: 'Jul 10', admin: 'John Doe', color: 'border-yellow-500' }
+]);
+
+const comments = ref([
+  { id: 1, user: 'Rahul Sharma (Citizen)', date: 'Today, 10:30 AM', text: 'Will the water supply be restored by evening?', announcement: 'Water Supply Issue in Sector 4' },
+  { id: 2, user: 'Amit Patel (Officer)', date: 'Yesterday, 14:15 PM', text: 'Noted. Forwarded to all field workers in my zone.', announcement: 'Severe Cyclone Warning' },
+  { id: 3, user: 'Sanjay Kumar (Worker)', date: 'Jul 10', text: 'Where can I find the attachment?', announcement: 'New Safety Protocol' }
+]);
+
+// --- Filters & Sorting ---
+const filters = reactive({
+  search: '', status: 'All', audience: 'All', priority: 'All', category: 'All', sort: 'Newest'
+});
+
+const filteredAnnouncements = computed(() => {
+  let result = announcements.value;
+
+  if (filters.search) {
+    const q = filters.search.toLowerCase();
+    result = result.filter(a => a.title.toLowerCase().includes(q) || a.category.toLowerCase().includes(q) || a.author.toLowerCase().includes(q));
+  }
+  if (filters.status !== 'All') result = result.filter(a => a.status === filters.status);
+  if (filters.audience !== 'All') result = result.filter(a => a.audience === filters.audience);
+  if (filters.priority !== 'All') result = result.filter(a => a.priority === filters.priority);
+  if (filters.category !== 'All') result = result.filter(a => a.category === filters.category);
+
+  result.sort((a, b) => {
+    if (filters.sort === 'Views') return b.views - a.views;
+    // Basic string comparison for date sorting as fallback
+    if (filters.sort === 'Oldest') return a.id.localeCompare(b.id);
+    return b.id.localeCompare(a.id); // Newest
+  });
+
+  return result;
+});
+
+const resetFilters = () => {
+  filters.search = ''; filters.status = 'All'; filters.audience = 'All'; 
+  filters.priority = 'All'; filters.category = 'All'; filters.sort = 'Newest';
+};
+
+// --- UI Logic Helpers ---
+const getStatusBadge = (status) => {
+  switch(status) {
+    case 'Published': return 'bg-green-100 text-green-700';
+    case 'Scheduled': return 'bg-blue-100 text-blue-700';
+    case 'Archived': return 'bg-yellow-100 text-yellow-700';
+    default: return 'bg-gray-100 text-gray-600'; // Draft
+  }
+};
+const getPriorityBadge = (priority) => {
+  switch(priority) {
+    case 'Emergency': return 'bg-red-100 text-red-700 border border-red-200';
+    case 'Critical': return 'bg-red-50 text-red-600 border border-red-100';
+    case 'Important': return 'bg-orange-50 text-orange-600 border border-orange-100';
+    default: return 'bg-blue-50 text-blue-600 border border-blue-100';
+  }
+};
+const getAudienceBadge = (audience) => {
+  switch(audience) {
+    case 'All Users': return 'bg-blue-100 text-blue-700';
+    case 'Citizens': return 'bg-teal-100 text-teal-700';
+    case 'Officers': return 'bg-purple-100 text-purple-700';
+    case 'Workers': return 'bg-yellow-100 text-yellow-700';
+    default: return 'bg-gray-100 text-gray-600';
+  }
+};
+
+const scrollTo = (id) => document.getElementById(id)?.scrollIntoView({ behavior: 'smooth' });
+
+// Modal / Drawer interactions
+const openDrawer = (ann) => { selectedAnn.value = ann; isDrawerOpen.value = true; };
+const closeDrawer = () => { isDrawerOpen.value = false; setTimeout(() => { selectedAnn.value = null; }, 300); };
+const openModal = (type, ann = null) => { activeModal.value = type; if(ann) targetAnn.value = ann; };
+const closeModal = () => { activeModal.value = null; targetAnn.value = null; };
+const handleActionClose = () => { closeModal(); closeDrawer(); };
+
+// --- Charts Logic ---
+const viewsChartRef = ref(null);
+const categoryChartRef = ref(null);
+const audienceChartRef = ref(null);
+const priorityChartRef = ref(null);
+
+onMounted(() => {
+  Chart.defaults.font.family = 'Inter, sans-serif';
+  Chart.defaults.color = '#64748b';
+
+  // 1. Line Chart
+  new Chart(viewsChartRef.value, {
+    type: 'line',
+    data: {
+      labels: ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun'],
+      datasets: [{ label: 'Total Views', data: [1200, 1500, 1100, 2100, 1800, 2400], borderColor: '#2563EB', backgroundColor: 'rgba(37, 99, 235, 0.1)', tension: 0.4, fill: true }]
+    },
+    options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { y: { grid: { color: '#F3F4F6' } }, x: { grid: { display: false } } } }
+  });
+
+  // 2. Pie Chart (Category)
+  new Chart(categoryChartRef.value, {
+    type: 'pie',
+    data: {
+      labels: ['Maintenance', 'Policy', 'Alert', 'General'],
+      datasets: [{ data: [40, 25, 20, 15], backgroundColor: ['#2563EB', '#1E40AF', '#EF4444', '#94A3B8'], borderWidth: 0 }]
+    },
+    options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'right', labels: { boxWidth: 10, font: { size: 10 } } } } }
+  });
+
+  // 3. Bar Chart (Audience)
+  new Chart(audienceChartRef.value, {
+    type: 'bar',
+    data: {
+      labels: ['All', 'Citizens', 'Officers', 'Workers'],
+      datasets: [{ label: 'Announcements', data: [45, 120, 35, 45], backgroundColor: '#3B82F6', borderRadius: 4 }]
+    },
+    options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { y: { grid: { color: '#F3F4F6' } }, x: { grid: { display: false } } } }
+  });
+
+  // 4. Doughnut Chart (Priority)
+  new Chart(priorityChartRef.value, {
+    type: 'doughnut',
+    data: {
+      labels: ['Emergency', 'Critical', 'Important', 'Normal'],
+      datasets: [{ data: [5, 10, 35, 50], backgroundColor: ['#EF4444', '#DC2626', '#F59E0B', '#3B82F6'], borderWidth: 0 }]
+    },
+    options: { responsive: true, maintainAspectRatio: false, cutout: '70%', plugins: { legend: { position: 'right', labels: { boxWidth: 10, font: { size: 10 } } } } }
+  });
+});
+</script>
+
+<style scoped>
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+
+.font-sans { font-family: 'Inter', sans-serif; }
+
+/* Custom Scrollbars */
+.custom-scrollbar::-webkit-scrollbar { width: 6px; height: 6px; }
+.custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
+.custom-scrollbar::-webkit-scrollbar-thumb { background: #CBD5E1; border-radius: 4px; }
+.custom-scrollbar::-webkit-scrollbar-thumb:hover { background: #94A3B8; }
+
+/* Entry Animation */
+@keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+.animate-fade-in { animation: fadeIn 0.4s ease-out forwards; }
+
+.line-clamp-2 {
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+</style>

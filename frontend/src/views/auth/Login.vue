@@ -4,7 +4,7 @@
     <!-- Reusable Navbar -->
     <Navbar />
 
-    <!-- Main Content (Added pt-24 to prevent overlap with the fixed Navbar) -->
+    <!-- Main Content -->
     <main class="flex-1 flex max-w-7xl w-full mx-auto pt-24 pb-12">
       <!-- Left Side (Branding & Features) -->
       <section class="hidden lg:flex lg:w-1/2 flex-col justify-center px-12 py-8">
@@ -39,6 +39,15 @@
           <div class="mb-8 text-center lg:text-left">
             <h3 class="text-2xl font-bold text-slate-900 mb-2">Welcome Back</h3>
             <p class="text-slate-500 text-sm">Login to continue using CivicDesk.</p>
+          </div>
+
+          <!-- Global Error Alert from API -->
+          <div v-if="globalError" class="mb-6 bg-red-50 border-l-4 border-red-500 p-4 rounded-r-lg">
+            <div class="flex items-center">
+              <div class="ml-3">
+                <p class="text-sm text-red-700 font-medium">{{ globalError }}</p>
+              </div>
+            </div>
           </div>
 
           <form @submit.prevent="handleLogin" class="space-y-5" novalidate>
@@ -144,11 +153,15 @@
 
 <script setup>
 import { ref, reactive } from 'vue'
+import { useRouter } from 'vue-router'
+import axios from 'axios'
 import Navbar from '../../components/Navbar.vue' // Adjust path based on your folder structure
 import Footer from '../../components/Footer.vue' // Adjust path based on your folder structure
 import { 
   Mail, Lock, Eye, EyeOff, Loader2, Check
 } from 'lucide-vue-next'
+
+const router = useRouter()
 
 const features = [
   'Report Complaints',
@@ -170,12 +183,14 @@ const errors = reactive({
 
 const showPassword = ref(false)
 const isLoading = ref(false)
+const globalError = ref('')
 
 const validateForm = () => {
   let isValid = true
   
   errors.email = ''
   errors.password = ''
+  globalError.value = ''
 
   if (!form.email) {
     errors.email = 'Email address is required'
@@ -188,9 +203,6 @@ const validateForm = () => {
   if (!form.password) {
     errors.password = 'Password is required'
     isValid = false
-  } else if (form.password.length < 8) {
-    errors.password = 'Password must be at least 8 characters'
-    isValid = false
   }
 
   return isValid
@@ -200,14 +212,50 @@ const handleLogin = async () => {
   if (!validateForm()) return
 
   isLoading.value = true
+  globalError.value = ''
   
-  // Simulate API delay
-  await new Promise(resolve => setTimeout(resolve, 1500))
-  
-  isLoading.value = false
-  // Because email maps to a role on the backend, once your API responds with a token, 
-  // you will read the user's role from the token/response and use Vue Router to 
-  // push them to the correct dashboard (e.g., /citizen/dashboard, /officer/dashboard).
+  try {
+    // Replace the URL with your Flask API's local development URL
+    const response = await axios.post('http://127.0.0.1:5000/api/login', {
+      email: form.email,
+      password: form.password
+    })
+
+    if (response.data.success) {
+      const { token, user } = response.data
+
+      // Save token and user details in localStorage
+      localStorage.setItem('token', token)
+      localStorage.setItem('user', JSON.stringify(user))
+
+      // Direct users to their specific dashboard based on their role
+      switch (user.role.toLowerCase()) {
+        case 'administrator':
+        case 'admin':
+          router.push('/admin/dashboard')
+          break
+        case 'officer':
+          router.push('/officer/dashboard')
+          break
+        case 'worker':
+          router.push('/worker/dashboard')
+          break
+        case 'citizen':
+        default:
+          router.push('/citizen/dashboard')
+          break
+      }
+    }
+  } catch (error) {
+    // Catch API errors (400, 401, 403) and display the backend message
+    if (error.response && error.response.data && error.response.data.message) {
+      globalError.value = error.response.data.message
+    } else {
+      globalError.value = 'An unexpected error occurred. Please try again later.'
+    }
+  } finally {
+    isLoading.value = false
+  }
 }
 </script>
 
