@@ -1,0 +1,70 @@
+Table User {
+  ID         integer   [primary key, increment]
+  Name       varchar   [not null]
+  Email      varchar   [unique, not null]
+  Password   varchar   [not null]
+  Phone      varchar
+  Role       varchar   [not null, note: 'citizen | officer | worker']
+  Status     varchar   [default: 'active']
+  Created_At timestamp [default: `now()`]
+}
+
+Table Department {
+  ID              integer   [primary key, increment]
+  User_ID         integer   [ref: > User.ID]
+  Department_Name varchar   [not null]
+  Created_At      timestamp [default: `now()`]
+}
+
+Table Complaint {
+  ID               integer   [primary key, increment]
+  Title            varchar   [not null, note: 'Subject of the complaint']
+  Description      text      [not null, note: 'Content of the complaint']
+  Department       varchar   [not null]
+  Location         varchar   [not null]
+  Created_By       integer   [ref: > User.ID, not null]
+  Assigned_Officer integer   [ref: > User.ID]
+  Status           varchar   [default: 'Pending']
+  Is_Escalated     bool      [default: false]
+  Updated_At       timestamp
+  Created_At       timestamp [default: `now()`]
+}
+
+Table Status_Log {
+  ID           integer   [primary key, increment]
+  Complaint_ID integer   [ref: > Complaint.ID, not null]
+  Old_Status   varchar
+  New_Status   varchar   [not null]
+  Remark       varchar
+  Changed_At   timestamp [default: `now()`]
+}
+
+Table Complaint_Images {
+  ID           integer   [primary key, increment]
+  Complaint_ID integer   [ref: > Complaint.ID, not null]
+  Image_URL    varchar   [not null]
+  Uploaded_At  timestamp [default: `now()`]
+}
+
+Table Feedback {
+  ID           integer   [primary key, increment]
+  Complaint_ID integer   [ref: - Complaint.ID, not null]
+  Rating       integer   [not null, note: '1 to 5']
+  Comments     varchar
+  Submitted_At timestamp [default: `now()`]
+}
+
+Table Notification {
+  ID           integer   [primary key, increment]
+  Complaint_ID integer   [ref: > Complaint.ID]
+  Message      varchar   [not null]
+  Created_At   timestamp [default: `now()`]
+}
+
+Table Assignment {
+  ID           integer   [primary key, increment]
+  Complaint_ID integer   [ref: > Complaint.ID, not null]
+  Worker_ID    integer   [ref: > User.ID, not null]
+  Assigned_By  integer   [ref: > User.ID, not null]
+  Assigned_At  timestamp [default: `now()`]
+}
