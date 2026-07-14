@@ -1,0 +1,306 @@
+DESIGN OF COMPONENTS
+====================
+Project  : CivicDesk — Civic Complaint Management Platform
+Team     : MAY2026-Team-101
+Stack    : Vue 3 + Vite (Frontend) | Flask + SQLAlchemy (Backend) | SQLite (Database)
+
+CivicDesk is divided into 8 core components. Each component maps to a set of
+frontend views, backend API endpoints, and database models.
+
+================================================================================
+COMPONENT 1 — USER AUTHENTICATION MODULE
+================================================================================
+
+Responsibility:
+Handles registration, login, logout, and password reset for all three user
+roles: citizen, officer, and worker. Enforces role-based access so that each
+role can only access their respective dashboard and routes.
+
+Frontend Views:
+  - views/auth/Login.vue           — Email/password login form
+  - views/auth/Register.vue        — New user registration (name, email,
+                                     password, phone, address, city, pincode)
+  - views/auth/ForgotPassword.vue  — Password reset via email OTP
+
+Backend APIs:
+  POST   /api/auth/register         — Create new user account
+  POST   /api/auth/login            — Validate credentials, return JWT token
+  POST   /api/auth/logout           — Invalidate session
+  POST   /api/auth/reset-password   — Send reset email and update password
+
+Database Models:
+  - User (id, name, email, password, phone, role, status, created_at)
+
+Key Implementation Details:
+  - Passwords are hashed using bcrypt before storage
+  - JWT tokens are issued on login using Flask-JWT-Extended
+  - Role field (citizen | officer | worker) determines post-login redirect:
+      citizen  → /citizen/dashboard
+      officer  → /officer/dashboard
+      worker   → /worker/dashboard
+  - All protected routes carry requiresAuth: true in Vue Router meta
+
+
+================================================================================
+COMPONENT 2 — COMPLAINT MANAGEMENT MODULE
+================================================================================
+
+Responsibility:
+Core module of the platform. Manages the complete lifecycle of a civic
+complaint from submission by a citizen to closure by an officer or worker.
+Supports image attachments, category and priority tagging, and location fields.
+
+Frontend Views:
+  - views/citizen/SubmitComplaint.vue   — Multi-step complaint form with
+                                          category (Roads, Drainage, Sanitation,
+                                          Electrical, Water Supply), priority
+                                          (Low, Medium, High, Emergency),
+                                          location fields (ward, area, street,
+                                          landmark), incident date, visit time,
+                                          urgency note, and image upload (JPG/PNG)
+  - views/citizen/MyComplaints.vue      — Paginated list of citizen's complaints
+                                          with status badges and filters
+  - views/citizen/ComplaintDetails.vue  — Full complaint detail view with
+                                          images, current status, and timeline
+  - views/officer/ComplaintManagement.vue — Officer's complaint list with
+                                            search, filter by status/priority/
+                                            category, and bulk actions
+  - views/officer/ComplaintDetails.vue  — Officer view of complaint with
+                                          assignment controls and remarks
+
+Backend APIs:
+  POST   /api/complaints              — Submit a new complaint (citizen only)
+  GET    /api/complaints              — List complaints (filtered by role)
+  GET    /api/complaints/<id>         — Get full complaint details
+  PATCH  /api/complaints/<id>/status  — Update status (officer/worker only)
+  GET    /api/complaints/<id>/history — Retrieve full status log timeline
+
+Database Models:
+  - Complaint      (id, title, description, department, location,
+                    created_by, assigned_officer, status, is_escalated,
+                    created_at, updated_at)
+  - ComplaintImages (id, complaint_id, image_url, uploaded_at)
+  - StatusLog      (id, complaint_id, old_status, new_status,
+                    remark, changed_at)
+
+Complaint Status Flow:
+  Pending → Assigned → In Progress → Resolved → Closed
+
+
+================================================================================
+COMPONENT 3 — COMPLAINT TRACKING MODULE
+================================================================================
+
+Responsibility:
+Allows citizens to track the real-time status of their submitted complaints
+through a visual timeline. Every status change made by an officer or worker
+is recorded in Status_Log and displayed chronologically.
+
+Frontend Views:
+  - views/citizen/ComplaintTracking.vue — Interactive timeline showing all
+                                          status stages with timestamps,
+                                          stage labels, and officer remarks.
+                                          Stages: Pending, Assigned,
+                                          In Progress, Resolved, Closed
+
+Backend APIs:
+  GET  /api/complaints/<id>/history   — Returns full Status_Log for a complaint
+                                        ordered by changed_at (ascending)
+
+Database Models:
+  - StatusLog (id, complaint_id, old_status, new_status, remark, changed_at)
+
+Key Implementation Details:
+  - A new StatusLog row is inserted on every status change
+  - old_status is NULL for the very first log entry (initial submission)
+  - The timeline is rendered in the frontend using the ordered log entries
+
+
+================================================================================
+COMPONENT 4 — DEPARTMENT AND ROUTING MODULE
+================================================================================
+
+Responsibility:
+Manages municipal departments and routes complaints to the correct department
+based on the category selected during submission. Officers are associated with
+departments and receive complaints routed to their department.
+
+Frontend Views:
+  - views/officer/Dashboard.vue         — Shows department-level KPIs and
+                                          complaint summary cards
+  - views/officer/ComplaintManagement.vue — Filter complaints by department
+
+Backend APIs:
+  GET   /api/departments           — List all departments
+  POST  /api/departments           — Create a new department (admin only)
+  PATCH /api/departments/<id>      — Update department details
+
+Database Models:
+  - Department (id, user_id, department_name, created_at)
+
+Key Implementation Details:
+  - Complaint.department stores the department name as a varchar (not FK)
+    for simplicity — consistent with the final ER diagram
+  - Category selected in SubmitComplaint.vue determines which department
+    the complaint is routed to at the API layer
+  - Department.user_id points to the officer (User with role='officer')
+    who heads that department
+
+
+================================================================================
+COMPONENT 5 — ASSIGNMENT MODULE
+================================================================================
+
+Responsibility:
+Enables officers to assign available workers to specific complaints. Workers
+can then accept the task, update their progress through 8 stages, and mark
+it as complete. Officers can reassign if needed.
+
+Frontend Views:
+  - views/officer/AssignWorker.vue      — Officer selects an available worker
+                                          from a filtered list (by department,
+                                          availability, area) and assigns them
+                                          with priority, completion date/time,
+                                          notes, and remarks
+  - views/officer/ManageWorkers.vue     — View all workers with their current
+                                          workload, rating, and availability
+  - views/worker/AssignedTasks.vue      — Worker's list of active assignments
+  - views/worker/TaskDetails.vue        — Full detail of a single task
+  - views/worker/UpdateComplaint.vue    — Worker updates status through 8 stages:
+                                          Assigned → Accepted → Travelling →
+                                          Reached Site → Work Started →
+                                          In Progress → Quality Check →
+                                          Completed
+
+Backend APIs:
+  POST   /api/assignments              — Assign worker to complaint (officer)
+  GET    /api/assignments/<id>         — Get assignment details
+  PATCH  /api/assignments/<id>         — Update status / progress (worker)
+  GET    /api/assignments/worker/<id>  — Get all tasks for a worker
+
+Database Models:
+  - Assignment (id, complaint_id, worker_id, assigned_by, assigned_at)
+
+Key Implementation Details:
+  - worker_id and assigned_by are both FKs to users.id
+  - Multiple assignments per complaint are allowed (reassignment history)
+  - The most recent assignment is considered the active one
+
+
+================================================================================
+COMPONENT 6 — FEEDBACK MODULE
+================================================================================
+
+Responsibility:
+Collects post-resolution feedback from citizens after their complaint is
+marked Resolved. Feedback includes an overall rating and detailed category
+ratings. Feedback is one-to-one with a complaint.
+
+Frontend Views:
+  - views/citizen/Feedback.vue   — Star rating UI (1–5) for overall rating,
+                                   service category ratings (quality, response,
+                                   communication, resolution, professionalism),
+                                   feedback category tags, written comments,
+                                   improvement suggestions, recommendation
+                                   (Yes/No/Maybe), and anonymous toggle
+
+Backend APIs:
+  POST  /api/feedback                      — Submit feedback (citizen only,
+                                             complaint must be Resolved)
+  GET   /api/feedback/<complaint_id>       — Get feedback for a complaint
+  GET   /api/feedback/officer/<officer_id> — Aggregate rating for an officer
+
+Database Models:
+  - Feedback (id, complaint_id, rating, comments, submitted_at)
+
+Key Implementation Details:
+  - Feedback.complaint_id has a UNIQUE constraint — enforces 1:1 relationship
+  - Feedback option is only shown to citizen after status = 'Resolved'
+  - Rating field stores the overall rating (1–5 integer)
+
+
+================================================================================
+COMPONENT 7 — NOTIFICATION MODULE
+================================================================================
+
+Responsibility:
+Generates and delivers in-app notifications to citizens, officers, and workers
+whenever a key event occurs — such as a status change, new assignment, or
+escalation. Each user has a notification inbox they can view and mark as read.
+
+Frontend Views:
+  - views/citizen/Notifications.vue  — Citizen notification inbox
+  - views/officer/Notifications.vue  — Officer notification inbox
+  - views/worker/Notifications.vue   — Worker notification inbox
+
+Backend APIs:
+  GET    /api/notifications              — Get all notifications for logged-in user
+  PATCH  /api/notifications/<id>/read   — Mark a notification as read
+  POST   /api/notifications             — Internal: triggered on status change
+
+Database Models:
+  - Notification (id, complaint_id, message, created_at)
+
+Key Implementation Details:
+  - Notifications are created automatically at the backend whenever:
+      * A complaint status changes
+      * A worker is assigned to a complaint
+      * A complaint is escalated
+  - complaint_id links the notification back to the source complaint
+
+
+================================================================================
+COMPONENT 8 — ANALYTICS AND REPORTING MODULE
+================================================================================
+
+Responsibility:
+Provides officers with platform-wide analytics on complaint volumes, resolution
+rates, department performance, and worker efficiency. Rendered using Chart.js.
+
+Frontend Views:
+  - views/officer/AnalyticsReports.vue  — KPI cards (total complaints,
+                                          resolved, pending, avg resolution
+                                          time), bar/pie charts by category
+                                          and status, top workers table,
+                                          emergency complaint list, date range
+                                          filters, and insight summaries
+
+Backend APIs:
+  GET  /api/analytics/summary      — Aggregate complaint counts by status
+  GET  /api/analytics/department   — Per-department complaint breakdown
+  GET  /api/analytics/workers      — Worker performance rankings
+
+Database Models:
+  - Complaint  (aggregated queries on status, department, created_at)
+  - Assignment (aggregated queries on completed_at for resolution time)
+  - Feedback   (aggregated rating scores per officer)
+
+Key Implementation Details:
+  - All analytics are read-only, officer-only endpoints
+  - Charts rendered client-side using Chart.js (^4.5.1)
+  - Date range filters applied at the API query level
+
+
+================================================================================
+SUMMARY TABLE
+================================================================================
+
+Component                  | Frontend Views          | Backend APIs  | DB Models
+---------------------------|-------------------------|---------------|------------------
+1. User Authentication     | Login, Register,        | /auth/*       | User
+                           | ForgotPassword          |               |
+2. Complaint Management    | SubmitComplaint,        | /complaints/* | Complaint,
+                           | MyComplaints, Details   |               | ComplaintImages,
+                           |                         |               | StatusLog
+3. Complaint Tracking      | ComplaintTracking       | /complaints/  | StatusLog
+                           |                         | <id>/history  |
+4. Department & Routing    | OfficerDashboard,       | /departments/ | Department
+                           | ComplaintManagement     |               |
+5. Assignment              | AssignWorker,           | /assignments/ | Assignment
+                           | ManageWorkers,          |               |
+                           | Worker Task views       |               |
+6. Feedback                | Feedback                | /feedback/*   | Feedback
+7. Notification            | Notifications (×3)      | /notif/*      | Notification
+8. Analytics & Reporting   | AnalyticsReports        | /analytics/*  | Complaint,
+                           |                         |               | Assignment,
+                           |                         |               | Feedback
