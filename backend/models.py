@@ -1,6 +1,6 @@
 from datetime import datetime
-from flask_sqlalchemy import SQLAlchemy
-from werkzeug.security import generate_password_hash
+from flask_sqlalchemy import SQLAlchemy # type: ignore
+from werkzeug.security import generate_password_hash # type: ignore
 
 db = SQLAlchemy()
 

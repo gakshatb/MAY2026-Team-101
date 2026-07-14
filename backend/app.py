@@ -1,6 +1,6 @@
-from flask import Flask
-from flask_cors import CORS
-from flask_jwt_extended import JWTManager
+from flask import Flask # type: ignore
+from flask_cors import CORS # type: ignore
+from flask_jwt_extended import JWTManager # type: ignore
 
 from models import init_db
 from api import init_routes
