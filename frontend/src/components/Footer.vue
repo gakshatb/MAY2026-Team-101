@@ -86,7 +86,7 @@
       <div class="pt-8 border-t border-slate-800 flex flex-col md:flex-row items-center justify-between gap-4 text-xs text-slate-500">
         <p>&copy; 2026 CivicDesk. All Rights Reserved.</p>
         <p class="text-center md:text-right">
-          Software Engineering Group Project <br class="md:hidden" />
+          Software Engineering Group Project MAY2026-TEAM-101 <br class="md:hidden" />
           <span class="hidden md:inline">|</span> Indian Institute of Technology Madras
         </p>
       </div>
