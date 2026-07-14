@@ -302,6 +302,7 @@ import {
   User, Mail, Phone, MapPin, Building, Hash, Lock, 
   Eye, EyeOff, Shield, Check, Loader2, ChevronDown 
 } from 'lucide-vue-next'
+import axios from "axios"
 
 // --- State ---
 const features = [
@@ -456,8 +457,20 @@ const handleRegister = async () => {
 
   isLoading.value = true
   
-  // Simulate API request delay
-  await new Promise(resolve => setTimeout(resolve, 1500))
+  try {
+    isLoading.value = true
+
+    const response = await axios.post(
+        "http://127.0.0.1:5000/api/register",
+        form
+    )
+
+    console.log(response.data)
+    } catch (err) {
+      console.error(err)
+    } finally {
+        isLoading.value = false
+    }
   
   isLoading.value = false
   
