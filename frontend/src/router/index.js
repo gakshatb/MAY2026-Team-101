@@ -43,7 +43,7 @@ import WorkerNotifications from '../views/worker/Notifications.vue'
 import WorkerProfile from '../views/worker/Profile.vue'
 import DepartmentApplications from '../views/worker/DepartmentApplications.vue'
 
-
+// --- Admin Imports ---
 import AdminDashboard from '../views/admin/Dashboard.vue'
 import DepartmentManagement from '../views/admin/DepartmentManagement.vue'
 import OfficerDetails from '../views/admin/OfficerDetails.vue'
@@ -52,7 +52,6 @@ import OfficersProfile from '../views/admin/Profile.vue'
 import SystemAnalytics from '../views/admin/SystemAnalytics.vue'
 import ActivityLogs from '../views/admin/ActivityLogs.vue'
 import Announcements from '../views/admin/Announcements.vue'
-
 
 const router = createRouter({
   history: createWebHistory(import.meta.env.BASE_URL),
@@ -92,6 +91,15 @@ const router = createRouter({
 
     // --- Worker Routes ---
     { path: '/worker/dashboard', name: 'WorkerDashboard', component: WorkerDashboard, meta: { title: 'Worker Dashboard | CivicDesk', requiresAuth: true } },
+    { path: '/worker/tasks', name: 'WorkerAssignedTasks', component: WorkerAssignedTasks, meta: { title: 'Assigned Tasks | CivicDesk', requiresAuth: true } },
+    { path: '/worker/task/:id', name: 'WorkerTaskDetails', component: WorkerTaskDetails, meta: { title: 'Task Details | CivicDesk', requiresAuth: true }, props: true },
+    { path: '/worker/update/:id', name: 'WorkerUpdateComplaint', component: WorkerUpdateComplaint, meta: { title: 'Update Complaint | CivicDesk', requiresAuth: true }, props: true },
+    { path: '/worker/completed', name: 'WorkerCompletedTasks', component: WorkerCompletedTasks, meta: { title: 'Completed Tasks | CivicDesk', requiresAuth: true } },
+    { path: '/worker/notifications', name: 'WorkerNotifications', component: WorkerNotifications, meta: { title: 'Notifications | CivicDesk', requiresAuth: true } },
+    { path: '/worker/profile', name: 'WorkerProfile', component: WorkerProfile, meta: { title: 'Profile | CivicDesk', requiresAuth: true } },
+    { path: '/worker/departmentapplications', name: 'DepartmentApplications', component: DepartmentApplications, meta: { title: 'Department Applications | CivicDesk', requiresAuth: true } },
+
+    // --- Admin Routes ---
     { path: '/admin/dashboard', name: 'AdminDashboard', component: AdminDashboard, meta: { title: 'Admin Dashboard | CivicDesk', requiresAuth: true } },
     { path: '/admin/departmentmanagement', name: 'DepartmentManagement', component: DepartmentManagement, meta: { title: 'Department Management | CivicDesk', requiresAuth: true } },
     { path: '/admin/officerdetails', name: 'OfficerDetails', component: OfficerDetails, meta: { title: 'Officer Details | CivicDesk', requiresAuth: true } },
@@ -100,13 +108,6 @@ const router = createRouter({
     { path: '/admin/systemanalytics', name: 'SystemAnalytics', component: SystemAnalytics, meta: { title: 'System Analytics | CivicDesk', requiresAuth: true } },
     { path: '/admin/activitylogs', name: 'ActivityLogs', component: ActivityLogs, meta: { title: 'Activity Logs | CivicDesk', requiresAuth: true } },
     { path: '/admin/announcements', name: 'Announcements', component: Announcements, meta: { title: 'Announcements | CivicDesk', requiresAuth: true } },
-    { path: '/worker/tasks', name: 'WorkerAssignedTasks', component: WorkerAssignedTasks, meta: { title: 'Assigned Tasks | CivicDesk', requiresAuth: true } },
-    { path: '/worker/task/:id', name: 'WorkerTaskDetails', component: WorkerTaskDetails, meta: { title: 'Task Details | CivicDesk', requiresAuth: true }, props: true },
-    { path: '/worker/update/:id', name: 'WorkerUpdateComplaint', component: WorkerUpdateComplaint, meta: { title: 'Update Complaint | CivicDesk', requiresAuth: true }, props: true },
-    { path: '/worker/completed', name: 'WorkerCompletedTasks', component: WorkerCompletedTasks, meta: { title: 'Completed Tasks | CivicDesk', requiresAuth: true } },
-    { path: '/worker/notifications', name: 'WorkerNotifications', component: WorkerNotifications, meta: { title: 'Notifications | CivicDesk', requiresAuth: true } },
-    { path: '/worker/profile', name: 'WorkerProfile', component: WorkerProfile, meta: { title: 'Profile | CivicDesk', requiresAuth: true } },
-    { path: '/worker/departmentapplications', name: 'DepartmentApplications', component: DepartmentApplications, meta: { title: 'Department Applications | CivicDesk', requiresAuth: true } },
 
     // --- Fallback ---
     { path: '/:pathMatch(.*)*', redirect: '/' }
