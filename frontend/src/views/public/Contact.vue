@@ -43,6 +43,11 @@
             <h2 class="text-2xl font-bold text-slate-900 mb-2">Send Us a Message</h2>
             <p class="text-slate-600 mb-8">We'll get back to you as soon as possible.</p>
             
+            <!-- Global API error banner -->
+            <div v-if="globalError" class="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg text-red-700 text-sm">
+              {{ globalError }}
+            </div>
+
             <form @submit.prevent="handleSubmit" class="space-y-6">
               <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div>
@@ -120,9 +125,11 @@ import { ref, reactive } from 'vue'
 import Navbar from '@/components/Navbar.vue'
 import Footer from '@/components/Footer.vue'
 import { Mail, Phone, MapPin, Clock, CheckCircle } from 'lucide-vue-next'
+import axios from 'axios'
 
 const isSubmitting = ref(false)
 const showSuccess = ref(false)
+const globalError = ref('')
 const form = reactive({ name: '', email: '', subject: 'General Inquiry', message: '', agreed: false })
 const errors = reactive({})
 
@@ -147,18 +154,40 @@ const inputClasses = (hasError) => [
 ]
 
 const handleSubmit = async () => {
+  // Clear previous errors
   Object.keys(errors).forEach(key => delete errors[key])
-  if(form.name.length < 3) errors.name = 'Minimum 3 characters required'
-  if(!form.email.includes('@')) errors.email = 'Valid email required'
-  if(form.message.length < 20) errors.message = 'Minimum 20 characters required'
-  if(!form.agreed) errors.agreed = 'You must agree to the terms'
-  
-  if (Object.keys(errors).length === 0) {
-    isSubmitting.value = true
-    await new Promise(resolve => setTimeout(resolve, 1500))
+  globalError.value = ''
+
+  // Client-side validation (mirrors backend rules)
+  if (form.name.length < 3)     errors.name    = 'Minimum 3 characters required'
+  if (!form.email.includes('@')) errors.email   = 'Valid email required'
+  if (form.message.length < 20)  errors.message = 'Minimum 20 characters required'
+  if (!form.agreed)              errors.agreed  = 'You must agree to the terms'
+
+  if (Object.keys(errors).length > 0) return
+
+  isSubmitting.value = true
+
+  try {
+    const response = await axios.post('http://127.0.0.1:5000/api/contact', {
+      name:    form.name.trim(),
+      email:   form.email.trim().toLowerCase(),
+      subject: form.subject.trim(),
+      message: form.message.trim()
+    })
+
+    if (response.data.success) {
+      showSuccess.value = true
+      Object.assign(form, { name: '', email: '', subject: 'General Inquiry', message: '', agreed: false })
+    }
+  } catch (err) {
+    if (err.response && err.response.data && err.response.data.message) {
+      globalError.value = err.response.data.message
+    } else {
+      globalError.value = 'Something went wrong. Please try again later.'
+    }
+  } finally {
     isSubmitting.value = false
-    showSuccess.value = true
-    Object.assign(form, { name: '', email: '', message: '', agreed: false })
   }
 }
 </script>

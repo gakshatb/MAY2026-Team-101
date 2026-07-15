@@ -1,5 +1,5 @@
 from functools import wraps
-from models import db, User
+from models import db, User, ContactMessage
 from datetime import datetime, timedelta
 from flask import jsonify, request # type: ignore
 from werkzeug.security import check_password_hash, generate_password_hash # type: ignore
@@ -272,6 +272,7 @@ def init_routes(app):
             "otp":        otp,
             "expires_at": datetime.now() + timedelta(minutes=10)
         }
+        print(f"[DEBUG] OTP for {email}: {otp} (valid for 10 minutes)")
         return jsonify(
             success=True,
             message="OTP sent successfully."
@@ -367,3 +368,55 @@ def init_routes(app):
         ), 200
 
 
+    # ─────────────────────────────────────────────────────────────────────────
+    # Public endpoint — no auth required.
+    # Saves a contact form submission to the contact_messages table.
+    # ─────────────────────────────────────────────────────────────────────────
+    @app.route('/api/contact', methods=['POST'])
+    def contact():
+        data = request.get_json()
+        if not data:
+            return jsonify(message="Request body must be JSON."), 400
+ 
+        name    = data.get("name",    "").strip()
+        email   = data.get("email",   "").strip().lower()
+        subject = data.get("subject", "General Inquiry").strip()
+        message = data.get("message", "").strip()
+ 
+        # ── validation ───────────────────────────────────────────────────────
+        if len(name) < 3:
+            return jsonify(message="Name must be at least 3 characters."), 400
+ 
+        if not is_valid_email(email):
+            return jsonify(message="Valid email address is required."), 400
+ 
+        if not subject:
+            return jsonify(message="Subject is required."), 400
+ 
+        if len(message) < 20:
+            return jsonify(message="Message must be at least 20 characters."), 400
+ 
+        # ── save to DB ───────────────────────────────────────────────────────
+        new_message = ContactMessage(
+            name=name,
+            email=email,
+            subject=subject,
+            message=message
+        )
+        print(f"[DEBUG] Saving contact message: {new_message}")
+        db.session.add(new_message)
+        db.session.commit()
+ 
+        return jsonify(
+            success=True,
+            message="Your message has been received. We'll get back to you shortly."
+        ), 201
+ 
+    # =========================================================================
+    # ── Add your future routes below this line ────────────────────────────────
+    # Example:
+    #   @app.route('/api/complaints', methods=['GET', 'POST'])
+    #   @jwt_required()
+    #   @token_not_revoked
+    #   def complaints(): ...
+    # =========================================================================
