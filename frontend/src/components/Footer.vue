@@ -32,7 +32,7 @@
             <li><router-link to="/" class="hover:text-[#2563EB] transition-colors relative group">Home<span class="absolute -bottom-1 left-0 w-0 h-[1px] bg-[#2563EB] transition-all group-hover:w-full"></span></router-link></li>
             <li><router-link to="/about" class="hover:text-[#2563EB] transition-colors relative group">About<span class="absolute -bottom-1 left-0 w-0 h-[1px] bg-[#2563EB] transition-all group-hover:w-full"></span></router-link></li>
             <li><router-link to="/services" class="hover:text-[#2563EB] transition-colors relative group">Services<span class="absolute -bottom-1 left-0 w-0 h-[1px] bg-[#2563EB] transition-all group-hover:w-full"></span></router-link></li>
-            <li><router-link to="/faqs" class="hover:text-[#2563EB] transition-colors relative group">FAQs<span class="absolute -bottom-1 left-0 w-0 h-[1px] bg-[#2563EB] transition-all group-hover:w-full"></span></router-link></li>
+            <li><router-link to="/faq" class="hover:text-[#2563EB] transition-colors relative group">FAQs<span class="absolute -bottom-1 left-0 w-0 h-[1px] bg-[#2563EB] transition-all group-hover:w-full"></span></router-link></li>
             <li><router-link to="/contact" class="hover:text-[#2563EB] transition-colors relative group">Contact<span class="absolute -bottom-1 left-0 w-0 h-[1px] bg-[#2563EB] transition-all group-hover:w-full"></span></router-link></li>
           </ul>
         </div>

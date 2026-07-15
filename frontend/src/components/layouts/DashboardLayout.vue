@@ -14,6 +14,7 @@
       <!-- Top Navbar -->
       <DashboardNavbar 
         :userRole="currentUserRole" 
+        :user="currentUser"
         :pageTitle="currentPageTitle"
         :breadcrumb="currentBreadcrumb"
         @toggle-sidebar="isSidebarOpen = !isSidebarOpen" 
@@ -33,17 +34,32 @@
 </template>
 
 <script setup>
-import { ref } from 'vue'
+import { ref, computed } from 'vue'
+import { useRoute } from 'vue-router'
 import Sidebar from '../components/dashboard/Sidebar.vue'
 import DashboardNavbar from '../components/dashboard/DashboardNavbar.vue'
+
+const route = useRoute()
 
 // Local state for layout mechanics
 const isSidebarOpen = ref(false)
 
-// Simulated Authentication / Global State
-const currentUserRole = ref('Citizen') // Change to 'Civic Officer' or 'Field Worker' to see dynamic menus
-const currentPageTitle = ref('My Profile')
-const currentBreadcrumb = ref('Profile Settings')
+// The logged-in user, as stored by Login.vue after a successful /api/login
+// call. This same object backs the DashboardNavbar profile display and the
+// role shown there — Sidebar.vue separately derives role from the URL,
+// which is fine as long as route guards keep users on their own section.
+const currentUser = computed(() => {
+  const stored = localStorage.getItem('user')
+  return stored ? JSON.parse(stored) : null
+})
+
+const currentUserRole = computed(() => currentUser.value?.role || 'Citizen')
+
+// Page title/breadcrumb come from each route's meta fields, e.g.:
+//   { path: '/citizen/submit', meta: { title: 'Submit Complaint', breadcrumb: 'New Complaint' } }
+// Falls back to sensible defaults if a route hasn't set meta yet.
+const currentPageTitle = computed(() => route.meta?.title || 'Dashboard')
+const currentBreadcrumb = computed(() => route.meta?.breadcrumb || '')
 </script>
 
 <style>

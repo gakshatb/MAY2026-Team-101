@@ -1,6 +1,6 @@
 from datetime import datetime
-from flask_sqlalchemy import SQLAlchemy
-from werkzeug.security import generate_password_hash
+from flask_sqlalchemy import SQLAlchemy # type: ignore
+from werkzeug.security import generate_password_hash # type: ignore
 
 db = SQLAlchemy()
 
@@ -166,7 +166,7 @@ class ContactMessage(db.Model):
     subject    = db.Column(db.String(255), nullable=False, default='General Inquiry')
     message    = db.Column(db.Text,        nullable=False)
     is_read    = db.Column(db.Boolean,     nullable=False, default=False)
-    created_at = db.Column(db.DateTime,    nullable=False, default=datetime.now())
+    created_at = db.Column(db.DateTime,    nullable=False, default=datetime.utcnow)
 
     def __repr__(self):
         return f'<ContactMessage id={self.name} email={self.email} subject={self.subject!r} message={self.message!r}>'

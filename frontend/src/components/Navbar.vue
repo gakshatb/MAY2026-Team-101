@@ -82,8 +82,8 @@
                 class="absolute right-0 mt-3 w-56 bg-white border border-slate-100 rounded-xl shadow-lg py-2 flex flex-col z-50"
               >
                 <div class="px-4 py-2 border-b border-slate-100 mb-1">
-                  <p class="text-sm font-semibold text-slate-900">John Doe</p>
-                  <p class="text-xs text-slate-500">Citizen Account</p>
+                  <p class="text-sm font-semibold text-slate-900">{{ currentUser?.name || 'User' }}</p>
+                  <p class="text-xs text-slate-500">{{ currentUser?.role || 'Citizen' }} Account</p>
                 </div>
                 
                 <router-link to="/dashboard" class="flex items-center gap-3 px-4 py-2 text-sm text-slate-600 hover:bg-slate-50 hover:text-[#2563EB] transition-colors" @click="isProfileDropdownOpen = false">
@@ -165,17 +165,33 @@
 </template>
 
 <script setup>
-import { ref, onMounted, onUnmounted } from 'vue'
+import { ref, onMounted, onUnmounted, watch } from 'vue'
+import { useRouter, useRoute } from 'vue-router'
+import axios from 'axios'
 import { 
   ShieldCheck, Menu, X, Bell, User, 
   Settings, LogOut, LayoutDashboard 
 } from 'lucide-vue-next'
 
+const router = useRouter()
+const route = useRoute()
+
 // State
 const isScrolled = ref(false)
 const isMobileMenuOpen = ref(false)
 const isProfileDropdownOpen = ref(false)
-const isLoggedIn = ref(false) // Hardcoded for frontend structure
+const isLoggedIn = ref(false)
+const currentUser = ref(null)
+
+// Reads the auth state that Login.vue/Register.vue write to localStorage.
+// Re-checked on every route change so the navbar updates right after
+// login/logout without needing a full page reload.
+const checkAuthState = () => {
+  const token = localStorage.getItem('token')
+  const storedUser = localStorage.getItem('user')
+  isLoggedIn.value = !!token
+  currentUser.value = storedUser ? JSON.parse(storedUser) : null
+}
 
 // Navigation configuration
 const navLinks = [
@@ -196,21 +212,49 @@ const toggleProfileDropdown = () => {
   isProfileDropdownOpen.value = !isProfileDropdownOpen.value
 }
 
-const handleLogout = () => {
+const handleLogout = async () => {
+  const token = localStorage.getItem('token')
+
+  // Best-effort: tell the backend to blacklist this token. Proceed with
+  // local cleanup regardless of whether this succeeds (e.g. token already
+  // expired) so the user is never stuck unable to log out.
+  if (token) {
+    try {
+      await axios.post(
+        'http://127.0.0.1:5000/api/logout',
+        {},
+        { headers: { Authorization: `Bearer ${token}` } }
+      )
+    } catch (err) {
+      // Ignore — we clear local state below no matter what.
+    }
+  }
+
+  localStorage.removeItem('token')
+  localStorage.removeItem('refresh_token')
+  localStorage.removeItem('user')
+
   isLoggedIn.value = false
+  currentUser.value = null
   isProfileDropdownOpen.value = false
   isMobileMenuOpen.value = false
-  // Router push to login would go here
+
+  router.push('/login')
 }
 
 // Lifecycle Hooks
 onMounted(() => {
   window.addEventListener('scroll', handleScroll)
+  checkAuthState()
 })
 
 onUnmounted(() => {
   window.removeEventListener('scroll', handleScroll)
 })
+
+// Re-check auth state on every navigation (e.g. right after Login.vue
+// redirects post-login, or after visiting /logout-adjacent pages).
+watch(() => route.fullPath, checkAuthState)
 </script>
 
 <style scoped>

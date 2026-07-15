@@ -1,5 +1,15 @@
 <template>
-  <aside class="w-64 bg-[#0F172A] text-white flex flex-col h-screen overflow-y-auto border-r border-slate-800">
+  <!-- Mobile backdrop: only rendered when the sidebar is open on small screens -->
+  <div
+    v-if="isOpen"
+    class="fixed inset-0 bg-slate-900/50 z-30 lg:hidden"
+    @click="$emit('close-sidebar')"
+  ></div>
+
+  <aside
+    class="w-64 bg-[#0F172A] text-white flex flex-col h-screen overflow-y-auto border-r border-slate-800 fixed inset-y-0 left-0 z-40 transform transition-transform duration-300 lg:static lg:translate-x-0"
+    :class="isOpen ? 'translate-x-0' : '-translate-x-full'"
+  >
     <!-- Logo -->
     <div class="p-6 flex items-center gap-3">
       <div class="w-8 h-8 bg-[#2563EB] rounded-lg flex items-center justify-center">
@@ -23,6 +33,7 @@
             ? 'bg-[#2563EB] text-white shadow-md' 
             : 'text-slate-300 hover:bg-slate-800 hover:text-white'
         ]"
+        @click="$emit('close-sidebar')"
       >
         <component :is="item.icon" class="w-5 h-5" />
         {{ item.name }}
@@ -35,6 +46,7 @@
         :to="`/${rolePrefix}/profile`" 
         class="flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-medium transition-all duration-200"
         :class="[$route.path.includes('/profile') ? 'bg-[#2563EB] text-white shadow-md' : 'text-slate-300 hover:bg-slate-800 hover:text-white']"
+        @click="$emit('close-sidebar')"
       >
         <User class="w-5 h-5" /> Profile
       </router-link>
@@ -49,6 +61,7 @@
 <script setup>
 import { computed } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
+import axios from 'axios'
 import { 
   LayoutDashboard, PlusCircle, FolderOpen, 
   MapPin, Bell, MessageSquare, User, 
@@ -58,6 +71,23 @@ import {
   HardHat, Briefcase, ListTodo, Wrench, 
   CheckSquare, PieChart
 } from 'lucide-vue-next'
+
+defineProps({
+  isOpen: {
+    type: Boolean,
+    default: false
+  },
+  // Accepted for API parity with DashboardLayout, but intentionally unused:
+  // role is derived from the URL below so the sidebar always matches the
+  // section the user is actually viewing. Note this is *not* a security
+  // boundary — it doesn't stop someone from typing /officer/dashboard into
+  // the address bar. That needs a router navigation guard checking the
+  // stored user's real role, which isn't wired up yet.
+  userRole: {
+    type: String,
+    default: ''
+  }
+})
 
 const router = useRouter()
 const route = useRoute()
@@ -131,8 +161,23 @@ const menuItems = computed(() => {
   }
 })
 
-const handleLogout = () => {
+const handleLogout = async () => {
+  const token = localStorage.getItem('token')
+
+  if (token) {
+    try {
+      await axios.post(
+        'http://127.0.0.1:5000/api/logout',
+        {},
+        { headers: { Authorization: `Bearer ${token}` } }
+      )
+    } catch (err) {
+      // Ignore — clear local state regardless so the user isn't stuck.
+    }
+  }
+
   localStorage.removeItem('token')
+  localStorage.removeItem('refresh_token')
   localStorage.removeItem('user')
   router.push('/login')
 }

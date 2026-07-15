@@ -53,7 +53,7 @@ def init_routes(app):
                 if jti in blocklist:
                     return jsonify(message="Token has been revoked. Please log in again."), 401
                 user_id = get_jwt_identity()
-                user = User.query.get(user_id)
+                user = User.query.get(int(user_id))
                 if not user:
                     return jsonify(message="User not found."), 404
                 if user.role not in roles:
@@ -74,7 +74,7 @@ def init_routes(app):
     def is_valid_phone(phone):
         return re.match(r'^\d{10}$', phone) is not None
 
-    VALID_ROLES = {'Admin', 'Citizen', 'Official', 'Worker'}
+    VALID_ROLES = {'Admin', 'Citizen', 'Officer', 'Worker'}
 
     # =========================================================================
     # AUTH ROUTES
@@ -273,10 +273,10 @@ def init_routes(app):
             "expires_at": datetime.now() + timedelta(minutes=10)
         }
         print(f"[DEBUG] OTP for {email}: {otp} (valid for 10 minutes)")
-        return jsonify(
-            success=True,
-            message="OTP sent successfully."
-        ), 200
+        response_data = dict(success=True, message="OTP sent successfully.")
+        if app.debug:
+            response_data["dev_otp"] = otp
+        return jsonify(**response_data), 200
 
 
     # ─────────────────────────────────────────────────────────────────────────

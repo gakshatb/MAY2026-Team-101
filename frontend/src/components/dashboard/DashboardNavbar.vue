@@ -4,7 +4,10 @@
       <button @click="$emit('toggle-sidebar')" class="lg:hidden p-2 text-slate-500 hover:bg-slate-100 rounded-lg">
         <Menu class="w-6 h-6" />
       </button>
-      <h2 class="text-xl font-bold text-slate-800 hidden sm:block">{{ pageTitle }}</h2>
+      <div class="hidden sm:block">
+        <h2 class="text-xl font-bold text-slate-800">{{ pageTitle }}</h2>
+        <p v-if="breadcrumb" class="text-xs text-slate-400">{{ breadcrumb }}</p>
+      </div>
     </div>
 
     <div class="flex items-center gap-3 sm:gap-6">
@@ -19,7 +22,7 @@
       </div>
 
       <!-- Notifications -->
-      <button @click="router.push('/notifications')" class="relative p-2 text-slate-500 hover:bg-slate-100 rounded-full transition-colors">
+      <button @click="router.push(`/${rolePrefix}/notifications`)" class="relative p-2 text-slate-500 hover:bg-slate-100 rounded-full transition-colors">
         <Bell class="w-6 h-6" />
         <span class="absolute top-1.5 right-1.5 w-2.5 h-2.5 bg-red-500 border-2 border-white rounded-full"></span>
       </button>
@@ -27,10 +30,12 @@
       <div class="w-px h-8 bg-slate-200 hidden sm:block"></div>
 
       <!-- Profile Dropdown -->
-      <button @click="router.push('/profile')" class="flex items-center gap-3 hover:bg-slate-50 p-1.5 rounded-lg transition-colors text-left">
-        <img src="https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?ixlib=rb-1.2.1&auto=format&fit=facearea&facepad=2&w=256&h=256&q=80" alt="Avatar" class="w-10 h-10 rounded-full object-cover border border-slate-200" />
+      <button @click="router.push(`/${rolePrefix}/profile`)" class="flex items-center gap-3 hover:bg-slate-50 p-1.5 rounded-lg transition-colors text-left">
+        <div class="w-10 h-10 rounded-full bg-slate-100 border border-slate-200 flex items-center justify-center text-slate-500 font-semibold text-sm shrink-0">
+          {{ initials }}
+        </div>
         <div class="hidden sm:block">
-          <p class="text-sm font-bold text-slate-900 leading-none mb-1">Jane Doe</p>
+          <p class="text-sm font-bold text-slate-900 leading-none mb-1">{{ user?.name || 'User' }}</p>
           <p class="text-xs font-medium text-[#2563EB] leading-none">{{ userRole }}</p>
         </div>
         <ChevronDown class="w-4 h-4 text-slate-400 hidden sm:block" />
@@ -40,19 +45,46 @@
 </template>
 
 <script setup>
+import { computed } from 'vue'
 import { useRouter } from 'vue-router'
 import { Menu, Bell, Search, ChevronDown } from 'lucide-vue-next'
 
 const router = useRouter()
 
-defineProps({
+const props = defineProps({
   userRole: {
     type: String,
     default: 'Citizen'
   },
+  user: {
+    type: Object,
+    default: null
+  },
   pageTitle: {
     type: String,
     default: 'Dashboard'
+  },
+  breadcrumb: {
+    type: String,
+    default: ''
   }
+})
+
+// Mirrors the role-prefix logic in Sidebar.vue so "Profile" and
+// "Notifications" here land on the same routes the sidebar links to.
+const rolePrefix = computed(() => {
+  switch (props.userRole) {
+    case 'Administrator':
+    case 'Admin': return 'admin'
+    case 'Officer': return 'officer'
+    case 'Worker': return 'worker'
+    default: return 'citizen'
+  }
+})
+
+const initials = computed(() => {
+  const name = props.user?.name
+  if (!name) return '?'
+  return name.trim().split(/\s+/).slice(0, 2).map(n => n[0]?.toUpperCase()).join('')
 })
 </script>

@@ -57,7 +57,7 @@ const router = createRouter({
   history: createWebHistory(import.meta.env.BASE_URL),
   routes: [
     // --- Public Routes ---
-    { path: '/', name: 'Home', component: LandingPage, meta: { title: 'CivicDesk | Home' } },
+    { path: '/', name: 'Home', component: LandingPage, meta: { title: 'CivicDesk | Home', guestOnly: true } },
     { path: '/about', name: 'About', component: About, meta: { title: 'About | CivicDesk' } },
     { path: '/services', name: 'Services', component: Services, meta: { title: 'Services | CivicDesk' } },
     { path: '/how-it-works', name: 'HowItWorks', component: HowItWorks, meta: { title: 'How It Works | CivicDesk' } },
@@ -65,9 +65,9 @@ const router = createRouter({
     { path: '/faq', name: 'FAQs', component: FAQs, meta: { title: 'FAQs | CivicDesk' } },
 
     // --- Auth Routes ---
-    { path: '/login', name: 'Login', component: Login, meta: { title: 'Login | CivicDesk' } },
-    { path: '/register', name: 'Register', component: Register, meta: { title: 'Register | CivicDesk' } },
-    { path: '/forgot-password', name: 'ForgotPassword', component: ForgotPassword, meta: { title: 'Reset Password | CivicDesk' } },
+    { path: '/login', name: 'Login', component: Login, meta: { title: 'Login | CivicDesk', guestOnly: true } },
+    { path: '/register', name: 'Register', component: Register, meta: { title: 'Register | CivicDesk', guestOnly: true } },
+    { path: '/forgot-password', name: 'ForgotPassword', component: ForgotPassword, meta: { title: 'Reset Password | CivicDesk', guestOnly: true } },
 
     // --- Citizen Routes ---
     { path: '/citizen/dashboard', name: 'CitizenDashboard', component: Dashboard, meta: { title: 'Dashboard | CivicDesk', requiresAuth: true } },
@@ -117,8 +117,60 @@ const router = createRouter({
   }
 })
 
+// Maps a backend role string to the URL prefix used across the dashboard
+// routes above. Mirrors the same mapping used in Sidebar.vue / DashboardNavbar.vue
+// — keep these in sync if you ever rename a role or a route prefix.
+function getRolePrefix(role) {
+  switch (role) {
+    case 'Admin':
+    case 'Administrator': return 'admin'
+    case 'Officer': return 'officer'
+    case 'Worker': return 'worker'
+    case 'Citizen':
+    default: return 'citizen'
+  }
+}
+
 router.beforeEach((to, from, next) => {
   document.title = to.meta.title || 'CivicDesk'
+
+  const token = localStorage.getItem('token')
+  const isLoggedIn = !!token
+
+  let user = null
+  if (isLoggedIn) {
+    try {
+      user = JSON.parse(localStorage.getItem('user'))
+    } catch (err) {
+      // Corrupted/stale localStorage — treat as logged out rather than crash.
+      user = null
+    }
+  }
+
+  const rolePrefix = user ? getRolePrefix(user.role) : null
+
+  // 1. Guest-only pages (Landing, Login, Register, Forgot Password):
+  //    a logged-in user gets bounced straight to their own dashboard.
+  if (to.meta.guestOnly && isLoggedIn && rolePrefix) {
+    return next(`/${rolePrefix}/dashboard`)
+  }
+
+  // 2. Protected pages: no valid session -> send to Login, remembering
+  //    where they were headed so Login.vue can send them back after auth.
+  if (to.meta.requiresAuth && !isLoggedIn) {
+    return next({ path: '/login', query: { redirect: to.fullPath } })
+  }
+
+  // 3. Protected pages: logged in, but the URL's role section doesn't match
+  //    their actual role (e.g. a Citizen typing /officer/dashboard).
+  //    Bounce them to their own dashboard instead of letting them in.
+  if (to.meta.requiresAuth && isLoggedIn) {
+    const sectionPrefix = to.path.split('/')[1]
+    if (sectionPrefix !== rolePrefix) {
+      return next(`/${rolePrefix}/dashboard`)
+    }
+  }
+
   next()
 })
 
