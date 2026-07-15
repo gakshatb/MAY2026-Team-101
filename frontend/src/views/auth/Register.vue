@@ -46,6 +46,16 @@
             <p class="text-slate-500 text-sm">Register to access CivicDesk services.</p>
           </div>
 
+          <!-- Global error banner -->
+          <div v-if="globalError" class="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg text-red-700 text-sm">
+            {{ globalError }}
+          </div>
+
+          <!-- Global success banner -->
+          <div v-if="globalSuccess" class="mb-4 p-3 bg-green-50 border border-green-200 rounded-lg text-green-700 text-sm">
+            {{ globalSuccess }}
+          </div>
+
           <form @submit.prevent="handleRegister" class="grid grid-cols-1 sm:grid-cols-2 gap-x-5 gap-y-5" novalidate>
             
             <!-- Full Name -->
@@ -296,6 +306,7 @@
 
 <script setup>
 import { ref, reactive, computed } from 'vue'
+import { useRouter } from 'vue-router'
 import Navbar from '../../components/Navbar.vue' // Adjust path based on your folder structure
 import Footer from '../../components/Footer.vue' // Adjust path based on your folder structure
 import { 
@@ -329,6 +340,9 @@ const errors = reactive({})
 const showPassword = ref(false)
 const showConfirmPassword = ref(false)
 const isLoading = ref(false)
+const globalError = ref('')
+const globalSuccess = ref('')
+const router = useRouter()
 
 // --- Computed & Helpers ---
 
@@ -456,25 +470,37 @@ const handleRegister = async () => {
   if (!validateForm()) return
 
   isLoading.value = true
-  
-  try {
-    isLoading.value = true
+  globalError.value = ''
+  globalSuccess.value = ''
 
+  try {
     const response = await axios.post(
-        "http://127.0.0.1:5000/api/register",
-        form
+      'http://127.0.0.1:5000/api/register',
+      {
+        fullName:  form.fullName,
+        email:     form.email,
+        mobile:    form.mobile,
+        address:   form.address,
+        city:      form.city,
+        pincode:   form.pincode,
+        password:  form.password,
+        role:      form.role,
+      }
     )
 
-    console.log(response.data)
-    } catch (err) {
-      console.error(err)
-    } finally {
-        isLoading.value = false
+    if (response.data.success) {
+      globalSuccess.value = 'Registration successful! Redirecting to login...'
+      setTimeout(() => router.push('/login'), 1500)
     }
-  
-  isLoading.value = false
-  
-  // In real app: Navigate to success page or dashboard using vue-router based on form.role
+  } catch (err) {
+    if (err.response && err.response.data && err.response.data.message) {
+      globalError.value = err.response.data.message
+    } else {
+      globalError.value = 'An unexpected error occurred. Please try again.'
+    }
+  } finally {
+    isLoading.value = false
+  }
 }
 </script>
 

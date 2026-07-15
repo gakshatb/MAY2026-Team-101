@@ -222,10 +222,10 @@ const handleLogin = async () => {
     })
 
     if (response.data.success) {
-      const { token, user } = response.data
+      const { access_token, refresh_token, user } = response.data
 
-      // Save token and user details in localStorage
-      localStorage.setItem('token', token)
+      localStorage.setItem('token', access_token)
+      localStorage.setItem('refresh_token', refresh_token)
       localStorage.setItem('user', JSON.stringify(user))
 
       // Direct users to their specific dashboard based on their role

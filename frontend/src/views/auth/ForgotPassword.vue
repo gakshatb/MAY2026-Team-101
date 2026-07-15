@@ -66,8 +66,13 @@
             <div class="mb-8">
               <h3 class="text-2xl font-bold text-slate-900 mb-2">Forgot Password</h3>
               <p class="text-slate-500 text-sm leading-relaxed">
-                Enter your registered email address to receive password reset instructions.
+                Enter your registered email address to receive a one-time password (OTP).
               </p>
+            </div>
+
+            <!-- Global error -->
+            <div v-if="globalError" class="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg text-red-700 text-sm">
+              {{ globalError }}
             </div>
 
             <form @submit.prevent="handleSubmit" novalidate class="space-y-6">
@@ -100,7 +105,7 @@
                   class="w-full bg-[#2563EB] hover:bg-[#1E40AF] text-white font-medium py-2.5 rounded-lg transition-all duration-200 flex items-center justify-center gap-2 disabled:opacity-70 disabled:cursor-not-allowed shadow-sm hover:shadow"
                 >
                   <Loader2 v-if="isLoading" class="w-5 h-5 animate-spin" />
-                  <span>{{ isLoading ? 'Sending...' : 'Send Reset Link' }}</span>
+                  <span>{{ isLoading ? 'Sending...' : 'Send OTP' }}</span>
                 </button>
                 
                 <a 
@@ -114,21 +119,98 @@
             </form>
           </div>
 
-          <!-- Success State -->
-          <div v-else class="text-center py-6 animate-fade-in flex flex-col items-center">
-            <div class="w-16 h-16 bg-[#22C55E]/10 rounded-full flex items-center justify-center mb-6">
-              <CheckCircle2 class="w-8 h-8 text-[#22C55E]" />
+          <!-- Step 2: OTP + New Password -->
+          <div v-else class="animate-fade-in">
+
+            <!-- Final success state -->
+            <div v-if="resetSuccess" class="text-center py-6 flex flex-col items-center">
+              <div class="w-16 h-16 bg-[#22C55E]/10 rounded-full flex items-center justify-center mb-6">
+                <CheckCircle2 class="w-8 h-8 text-[#22C55E]" />
+              </div>
+              <h3 class="text-2xl font-bold text-slate-900 mb-3">Password Reset!</h3>
+              <p class="text-slate-600 text-sm leading-relaxed mb-4">
+                Your password has been updated. Redirecting to login...
+              </p>
             </div>
-            <h3 class="text-2xl font-bold text-slate-900 mb-3">Check Your Inbox</h3>
-            <p class="text-slate-600 text-sm leading-relaxed mb-8">
-              If an account exists with this email address, password reset instructions will be sent.
-            </p>
-            <a 
-              href="/login" 
-              class="w-full flex items-center justify-center bg-[#2563EB] hover:bg-[#1E40AF] text-white font-medium py-2.5 rounded-lg transition-all duration-200 shadow-sm hover:shadow"
-            >
-              Return to Login
-            </a>
+
+            <!-- OTP + reset form -->
+            <div v-else>
+              <div class="mb-6">
+                <h3 class="text-2xl font-bold text-slate-900 mb-2">Enter OTP</h3>
+                <p class="text-slate-500 text-sm leading-relaxed">
+                  An OTP was sent to <strong>{{ email }}</strong>. Enter it below along with your new password.
+                </p>
+              </div>
+
+              <form @submit.prevent="handleReset" class="space-y-5" novalidate>
+
+                <!-- OTP field -->
+                <div>
+                  <label class="block text-sm font-medium text-slate-700 mb-1.5">OTP</label>
+                  <input
+                    v-model="otp"
+                    type="text"
+                    maxlength="6"
+                    placeholder="6-digit OTP"
+                    :class="[
+                      'w-full px-4 py-2.5 bg-slate-50 border rounded-lg text-sm focus:outline-none focus:ring-2 transition-all tracking-widest text-center font-mono',
+                      otpError ? 'border-red-500 focus:ring-red-200 bg-red-50/50' : 'border-slate-200 focus:border-[#2563EB] focus:ring-[#2563EB]/20 focus:bg-white'
+                    ]"
+                  />
+                  <span v-if="otpError" class="text-red-500 text-xs mt-1.5 block">{{ otpError }}</span>
+                </div>
+
+                <!-- New password -->
+                <div>
+                  <label class="block text-sm font-medium text-slate-700 mb-1.5">New Password</label>
+                  <input
+                    v-model="newPassword"
+                    type="password"
+                    placeholder="Min. 8 characters"
+                    :class="[
+                      'w-full px-4 py-2.5 bg-slate-50 border rounded-lg text-sm focus:outline-none focus:ring-2 transition-all',
+                      passwordError ? 'border-red-500 focus:ring-red-200 bg-red-50/50' : 'border-slate-200 focus:border-[#2563EB] focus:ring-[#2563EB]/20 focus:bg-white'
+                    ]"
+                  />
+                </div>
+
+                <!-- Confirm password -->
+                <div>
+                  <label class="block text-sm font-medium text-slate-700 mb-1.5">Confirm New Password</label>
+                  <input
+                    v-model="confirmPassword"
+                    type="password"
+                    placeholder="Repeat new password"
+                    :class="[
+                      'w-full px-4 py-2.5 bg-slate-50 border rounded-lg text-sm focus:outline-none focus:ring-2 transition-all',
+                      passwordError ? 'border-red-500 focus:ring-red-200 bg-red-50/50' : 'border-slate-200 focus:border-[#2563EB] focus:ring-[#2563EB]/20 focus:bg-white'
+                    ]"
+                  />
+                  <span v-if="passwordError" class="text-red-500 text-xs mt-1.5 block">{{ passwordError }}</span>
+                </div>
+
+                <div class="space-y-3 pt-1">
+                  <button
+                    type="submit"
+                    :disabled="isResetting"
+                    class="w-full bg-[#2563EB] hover:bg-[#1E40AF] text-white font-medium py-2.5 rounded-lg transition-all duration-200 flex items-center justify-center gap-2 disabled:opacity-70 disabled:cursor-not-allowed shadow-sm"
+                  >
+                    <Loader2 v-if="isResetting" class="w-5 h-5 animate-spin" />
+                    <span>{{ isResetting ? 'Resetting...' : 'Reset Password' }}</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    @click="isSuccess = false; globalError = ''"
+                    class="w-full flex items-center justify-center gap-2 bg-white border border-slate-300 text-slate-700 hover:bg-slate-50 font-medium py-2.5 rounded-lg transition-all duration-200"
+                  >
+                    <ArrowLeft class="w-4 h-4" />
+                    <span>Use different email</span>
+                  </button>
+                </div>
+
+              </form>
+            </div>
           </div>
 
         </div>
@@ -143,6 +225,8 @@
 
 <script setup>
 import { ref } from 'vue'
+import { useRouter } from 'vue-router'
+import axios from 'axios'
 import Navbar from '../../components/Navbar.vue' // Adjust path based on your folder structure
 import Footer from '../../components/Footer.vue' // Adjust path based on your folder structure
 import { 
@@ -151,40 +235,110 @@ import {
 } from 'lucide-vue-next'
 
 // State
-const email = ref('')
-const emailError = ref('')
-const isLoading = ref(false)
-const isSuccess = ref(false)
+const router = useRouter()
 
-// Validation
+// ── Step 1: Email ─────────────────────────────────────────────────────────
+const email      = ref('')
+const emailError = ref('')
+const isLoading  = ref(false)
+const isSuccess  = ref(false)   // controls step 1 → step 2 transition
+const globalError = ref('')
+
+// ── Step 2: OTP + new password ────────────────────────────────────────────
+const otp             = ref('')
+const newPassword     = ref('')
+const confirmPassword = ref('')
+const otpError        = ref('')
+const passwordError   = ref('')
+const isResetting     = ref(false)
+const resetSuccess    = ref(false)
+
+// ── Validation helpers ────────────────────────────────────────────────────
 const validateEmail = () => {
   emailError.value = ''
-  
   if (!email.value.trim()) {
     emailError.value = 'Email address is required'
     return false
   }
-  
   const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
   if (!emailRegex.test(email.value)) {
     emailError.value = 'Please enter a valid email address'
     return false
   }
-  
   return true
 }
 
-// Submission
+// ── Step 1: Request OTP ───────────────────────────────────────────────────
 const handleSubmit = async () => {
   if (!validateEmail()) return
 
   isLoading.value = true
-  
-  // Simulate network delay of 2 seconds
-  await new Promise(resolve => setTimeout(resolve, 2000))
-  
-  isLoading.value = false
-  isSuccess.value = true
+  globalError.value = ''
+
+  try {
+    const response = await axios.post('http://127.0.0.1:5000/api/forgot-password', {
+      email: email.value.trim().toLowerCase()
+    })
+
+    if (response.data.success) {
+      isSuccess.value = true   // move to step 2
+
+      // Dev only: auto-fill OTP from response so testers don't need email
+      if (response.data.dev_otp) {
+        otp.value = response.data.dev_otp
+      }
+    }
+  } catch (err) {
+    if (err.response && err.response.data && err.response.data.message) {
+      globalError.value = err.response.data.message
+    } else {
+      globalError.value = 'Something went wrong. Please try again.'
+    }
+  } finally {
+    isLoading.value = false
+  }
+}
+
+// ── Step 2: Verify OTP and reset password ────────────────────────────────
+const handleReset = async () => {
+  otpError.value      = ''
+  passwordError.value = ''
+
+  if (!otp.value.trim()) {
+    otpError.value = 'OTP is required'
+    return
+  }
+  if (newPassword.value.length < 8) {
+    passwordError.value = 'Password must be at least 8 characters'
+    return
+  }
+  if (newPassword.value !== confirmPassword.value) {
+    passwordError.value = 'Passwords do not match'
+    return
+  }
+
+  isResetting.value = true
+
+  try {
+    const response = await axios.post('http://127.0.0.1:5000/api/reset-password', {
+      email:       email.value.trim().toLowerCase(),
+      otp:         otp.value.trim(),
+      newPassword: newPassword.value
+    })
+
+    if (response.data.success) {
+      resetSuccess.value = true
+      setTimeout(() => router.push('/login'), 2000)
+    }
+  } catch (err) {
+    if (err.response && err.response.data && err.response.data.message) {
+      otpError.value = err.response.data.message
+    } else {
+      otpError.value = 'Something went wrong. Please try again.'
+    }
+  } finally {
+    isResetting.value = false
+  }
 }
 </script>
 
