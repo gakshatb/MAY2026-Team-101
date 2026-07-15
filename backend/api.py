@@ -1,5 +1,5 @@
 from functools import wraps
-from models import db, User, ContactMessage
+from models import db, User, ContactMessage, Complaint
 from datetime import datetime, timedelta
 from flask import jsonify, request # type: ignore
 from werkzeug.security import check_password_hash, generate_password_hash # type: ignore
@@ -273,9 +273,13 @@ def init_routes(app):
             "expires_at": datetime.now() + timedelta(minutes=10)
         }
         print(f"[DEBUG] OTP for {email}: {otp} (valid for 10 minutes)")
+
         response_data = dict(success=True, message="OTP sent successfully.")
         if app.debug:
+            # Dev convenience only — lets the frontend auto-fill the OTP
+            # so testers don't need a real email/SMS provider hooked up.
             response_data["dev_otp"] = otp
+
         return jsonify(**response_data), 200
 
 
@@ -411,7 +415,44 @@ def init_routes(app):
             success=True,
             message="Your message has been received. We'll get back to you shortly."
         ), 201
- 
+    # ─────────────────────────────────────────────────────────────────────────
+    # Public endpoint — no auth required.
+    # Powers the "Statistics" section on the public landing page with real
+    # numbers instead of hardcoded placeholders. Complaint counts will
+    # legitimately read 0 until the complaint submission feature is built —
+    # that's expected, not a bug.
+    # ─────────────────────────────────────────────────────────────────────────
+    @app.route('/api/public-stats', methods=['GET'])
+    def public_stats():
+        total_complaints = Complaint.query.count()
+        resolved_complaints = Complaint.query.filter_by(status='Resolved').count()
+        active_citizens = User.query.filter_by(role='Citizen', status='active').count()
+        # Average resolution time (in hours) across complaints that have
+        # actually been resolved and have both timestamps populated.
+        resolved_rows = Complaint.query.filter(
+            Complaint.status == 'Resolved',
+            Complaint.updated_at.isnot(None)
+        ).all()
+
+        if resolved_rows:
+            total_seconds = sum(
+                (c.updated_at - c.created_at).total_seconds() for c in resolved_rows
+            )
+            avg_resolution_hours = round((total_seconds / len(resolved_rows)) / 3600, 1)
+        else:
+            avg_resolution_hours = 0
+
+        return jsonify(
+            success=True,
+            stats={
+                "total_complaints":     total_complaints,
+                "resolved_complaints":  resolved_complaints,
+                "active_citizens":      active_citizens,
+                "avg_resolution_hours": avg_resolution_hours
+            }
+        ), 200
+
+
     # =========================================================================
     # ── Add your future routes below this line ────────────────────────────────
     # Example:

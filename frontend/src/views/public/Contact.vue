@@ -96,7 +96,7 @@
         <h2 class="text-3xl font-bold text-slate-900 text-center mb-12">Meet The Core Team</h2>
         <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-6">
           <div v-for="member in team" :key="member.name" class="bg-white p-6 rounded-[14px] border border-slate-100 text-center hover:shadow-md transition-all">
-            <div class="w-20 h-20 bg-slate-100 rounded-full mx-auto mb-4 border-2 border-slate-50"></div>
+            <img :src="member.image" :alt="member.name" class="w-20 h-20 bg-slate-100 rounded-full mx-auto mb-4 border-2 border-slate-50"/>
             <h4 class="font-bold text-slate-900">{{ member.name }}</h4>
             <p class="text-sm text-[#2563EB] font-medium">{{ member.role }}</p>
           </div>
@@ -141,11 +141,11 @@ const contactInfo = [
 ]
 
 const team = [
-  { name: 'Student A', role: 'Project Manager' },
-  { name: 'Student B', role: 'Frontend Dev' },
-  { name: 'Student C', role: 'Backend Dev' },
-  { name: 'Student D', role: 'Database' },
-  { name: 'Student E', role: 'QA & Testing' }
+  { name: 'Guhan M R', role: 'Project Manager', image: '/Team/guhan.jpg' },
+  { name: 'Gupta Shivam Rakesh', role: 'Frontend Dev', image: '/Team/gupta.jpg' },
+  { name: 'Akshat B Gupta', role: 'Backend Dev', image: '/Team/akshat.jpg' },
+  { name: 'Akash Maurya', role: 'QA & Testing', image: '/Team/akash.jpg' },
+  { name: 'Girish M', role: 'Code Reviewer', image: '/Team/girish.jpg' }
 ]
 
 const inputClasses = (hasError) => [

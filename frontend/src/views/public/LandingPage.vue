@@ -230,6 +230,7 @@
 
 <script setup>
 import { ref, onMounted } from 'vue'
+import axios from 'axios'
 import Navbar from '../../components/Navbar.vue' // Adjust path based on your folder structure
 import Footer from '../../components/Footer.vue' // Adjust path based on your folder structure
 import { 
@@ -280,13 +281,31 @@ const steps = [
   { title: 'Citizen Updates', icon: MessageSquare },
 ]
 
-const stats = [
-  { label: 'Total Complaints', target: 24500, suffix: '+' },
-  { label: 'Resolved Complaints', target: 22100, suffix: '+' },
-  { label: 'Active Citizens', target: 15000, suffix: '+' },
-  { label: 'Avg Resolution Time', target: 48, suffix: 'h' },
-]
-const animatedStats = ref(stats.map(() => 0))
+// Targets start at 0 and are filled in from the backend once fetchStats()
+// resolves — no hardcoded/fake numbers. If the request fails, they stay at
+// 0 rather than silently showing made-up figures.
+const stats = ref([
+  { label: 'Total Complaints', target: 0, suffix: '+' },
+  { label: 'Resolved Complaints', target: 0, suffix: '+' },
+  { label: 'Active Citizens', target: 0, suffix: '+' },
+  { label: 'Avg Resolution Time', target: 0, suffix: 'h' },
+])
+const animatedStats = ref([0, 0, 0, 0])
+
+const fetchStats = async () => {
+  try {
+    const response = await axios.get('http://127.0.0.1:5000/api/public-stats')
+    if (response.data.success) {
+      const s = response.data.stats
+      stats.value[0].target = s.total_complaints
+      stats.value[1].target = s.resolved_complaints
+      stats.value[2].target = s.active_citizens
+      stats.value[3].target = s.avg_resolution_hours
+    }
+  } catch (err) {
+    // Backend unreachable — leave targets at 0 rather than guessing.
+  }
+}
 
 const benefits = [
   'Faster Complaint Reporting directly from your phone',
@@ -320,7 +339,7 @@ const animateCounters = () => {
   if (statsAnimated.value) return
   statsAnimated.value = true
   
-  stats.forEach((stat, index) => {
+  stats.value.forEach((stat, index) => {
     const duration = 2000 // 2 seconds
     const steps = 60
     const increment = stat.target / steps
@@ -338,7 +357,11 @@ const animateCounters = () => {
   })
 }
 
-onMounted(() => {
+onMounted(async () => {
+  // Fetch real numbers before the scroll-triggered animation can fire,
+  // so it never animates toward stale zero targets.
+  await fetchStats()
+
   // Intersection Observer for Stats Animation
   const observer = new IntersectionObserver((entries) => {
     if (entries[0].isIntersecting) {

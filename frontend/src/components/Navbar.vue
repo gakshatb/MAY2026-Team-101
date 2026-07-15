@@ -59,7 +59,7 @@
 
         <!-- Logged In State -->
         <template v-else>
-          <button class="relative p-2 text-slate-500 hover:text-[#2563EB] hover:bg-blue-50 rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-[#2563EB]" aria-label="Notifications">
+          <button @click="router.push(`/${rolePrefix}/notifications`)" class="relative p-2 text-slate-500 hover:text-[#2563EB] hover:bg-blue-50 rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-[#2563EB]" aria-label="Notifications">
             <Bell class="w-5 h-5" />
             <span class="absolute top-1.5 right-1.5 w-2 h-2 bg-[#22C55E] rounded-full border border-white"></span>
           </button>
@@ -86,14 +86,11 @@
                   <p class="text-xs text-slate-500">{{ currentUser?.role || 'Citizen' }} Account</p>
                 </div>
                 
-                <router-link to="/dashboard" class="flex items-center gap-3 px-4 py-2 text-sm text-slate-600 hover:bg-slate-50 hover:text-[#2563EB] transition-colors" @click="isProfileDropdownOpen = false">
+                <router-link :to="`/${rolePrefix}/dashboard`" class="flex items-center gap-3 px-4 py-2 text-sm text-slate-600 hover:bg-slate-50 hover:text-[#2563EB] transition-colors" @click="isProfileDropdownOpen = false">
                   <LayoutDashboard class="w-4 h-4" /> Dashboard
                 </router-link>
-                <router-link to="/profile" class="flex items-center gap-3 px-4 py-2 text-sm text-slate-600 hover:bg-slate-50 hover:text-[#2563EB] transition-colors" @click="isProfileDropdownOpen = false">
+                <router-link :to="`/${rolePrefix}/profile`" class="flex items-center gap-3 px-4 py-2 text-sm text-slate-600 hover:bg-slate-50 hover:text-[#2563EB] transition-colors" @click="isProfileDropdownOpen = false">
                   <User class="w-4 h-4" /> Profile
-                </router-link>
-                <router-link to="/settings" class="flex items-center gap-3 px-4 py-2 text-sm text-slate-600 hover:bg-slate-50 hover:text-[#2563EB] transition-colors" @click="isProfileDropdownOpen = false">
-                  <Settings class="w-4 h-4" /> Settings
                 </router-link>
                 
                 <div class="h-px bg-slate-100 my-1"></div>
@@ -148,10 +145,10 @@
           </template>
           
           <template v-else>
-            <router-link to="/dashboard" class="flex items-center gap-3 text-base font-medium text-slate-700 hover:text-[#2563EB] py-2" @click="isMobileMenuOpen = false">
+            <router-link :to="`/${rolePrefix}/dashboard`" class="flex items-center gap-3 text-base font-medium text-slate-700 hover:text-[#2563EB] py-2" @click="isMobileMenuOpen = false">
               <LayoutDashboard class="w-5 h-5 text-slate-400" /> Dashboard
             </router-link>
-            <router-link to="/profile" class="flex items-center gap-3 text-base font-medium text-slate-700 hover:text-[#2563EB] py-2" @click="isMobileMenuOpen = false">
+            <router-link :to="`/${rolePrefix}/profile`" class="flex items-center gap-3 text-base font-medium text-slate-700 hover:text-[#2563EB] py-2" @click="isMobileMenuOpen = false">
               <User class="w-5 h-5 text-slate-400" /> Profile
             </router-link>
             <button @click="handleLogout" class="flex items-center gap-3 text-base font-medium text-red-600 hover:text-red-700 py-2 w-full text-left">
@@ -165,12 +162,12 @@
 </template>
 
 <script setup>
-import { ref, onMounted, onUnmounted, watch } from 'vue'
+import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import axios from 'axios'
 import { 
   ShieldCheck, Menu, X, Bell, User, 
-  Settings, LogOut, LayoutDashboard 
+  LogOut, LayoutDashboard 
 } from 'lucide-vue-next'
 
 const router = useRouter()
@@ -192,6 +189,18 @@ const checkAuthState = () => {
   isLoggedIn.value = !!token
   currentUser.value = storedUser ? JSON.parse(storedUser) : null
 }
+
+// Mirrors the role-prefix logic in Sidebar.vue / DashboardNavbar.vue so
+// Dashboard/Profile/Notifications links here land on real routes.
+const rolePrefix = computed(() => {
+  switch (currentUser.value?.role) {
+    case 'Admin':
+    case 'Administrator': return 'admin'
+    case 'Officer': return 'officer'
+    case 'Worker': return 'worker'
+    default: return 'citizen'
+  }
+})
 
 // Navigation configuration
 const navLinks = [

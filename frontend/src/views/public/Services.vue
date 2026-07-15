@@ -11,7 +11,7 @@
             <p class="text-lg text-slate-600 mb-8 max-w-2xl lg:mx-0 mx-auto">CivicDesk provides a complete digital platform for reporting, managing, tracking, and resolving civic complaints efficiently.</p>
             <div class="flex gap-4 justify-center lg:justify-start">
               <router-link to="/citizen/submit" class="bg-[#2563EB] hover:bg-[#1E40AF] text-white px-8 py-3 rounded-lg font-medium transition-all">Report Complaint</router-link>
-              <button class="bg-slate-100 hover:bg-slate-200 text-slate-700 px-8 py-3 rounded-lg font-medium transition-all">Contact Us</button>
+              <router-link to="/contact" class="bg-slate-100 hover:bg-slate-200 text-slate-700 px-8 py-3 rounded-lg font-medium transition-all">Contact Us</router-link>
             </div>
           </div>
           <div class="flex-1 w-full h-80 bg-slate-100 rounded-2xl flex items-center justify-center border-2 border-dashed border-slate-300">

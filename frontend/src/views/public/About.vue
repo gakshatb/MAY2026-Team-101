@@ -15,7 +15,7 @@
             </p>
             <div class="flex gap-4">
               <button class="bg-[#2563EB] hover:bg-[#1E40AF] text-white px-8 py-3 rounded-lg font-medium transition-all shadow-md">Learn More</button>
-              <button class="bg-slate-100 hover:bg-slate-200 text-slate-700 px-8 py-3 rounded-lg font-medium transition-all">Contact Us</button>
+              <router-link to="/contact" class="bg-slate-100 hover:bg-slate-200 text-slate-700 px-8 py-3 rounded-lg font-medium transition-all">Contact Us</router-link>
             </div>
           </div>
           <div class="flex-1 w-full h-80 bg-slate-100 rounded-2xl flex items-center justify-center border-2 border-dashed border-slate-300">
@@ -71,7 +71,7 @@
           <h2 class="text-3xl font-bold text-slate-900 mb-12 text-center">Meet The Team</h2>
           <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-6">
             <div v-for="member in team" :key="member.name" class="text-center">
-              <div class="w-32 h-32 bg-slate-200 rounded-full mx-auto mb-4 border-4 border-slate-50"></div>
+              <img :src="member.image" :alt="member.name" class="w-20 h-20 bg-slate-100 rounded-full mx-auto mb-4 border-2 border-slate-50"/>
               <h4 class="font-bold text-slate-900">{{ member.name }}</h4>
               <p class="text-sm text-[#2563EB] font-medium">{{ member.role }}</p>
             </div>
@@ -117,11 +117,11 @@ const users = [
 ]
 
 const team = [
-  { name: 'Student A', role: 'Project Manager' },
-  { name: 'Student B', role: 'Frontend Dev' },
-  { name: 'Student C', role: 'Backend Dev' },
-  { name: 'Student D', role: 'Database' },
-  { name: 'Student E', role: 'QA & Testing' }
+  { name: 'Guhan M R', role: 'Project Manager', image: '/Team/guhan.jpg' },
+  { name: 'Gupta Shivam Rakesh', role: 'Frontend Dev', image: '/Team/gupta.jpg' },
+  { name: 'Akshat B Gupta', role: 'Backend Dev', image: '/Team/akshat.jpg' },
+  { name: 'Akash Maurya', role: 'QA & Testing', image: '/Team/akash.jpg' },
+  { name: 'Girish M', role: 'Code Reviewer', image: '/Team/girish.jpg' }
 ]
 </script>
 
