@@ -1,8 +1,8 @@
 from functools import wraps
 import re
 
-from flask import jsonify
-from flask_jwt_extended import (
+from flask import jsonify # type: ignore
+from flask_jwt_extended import ( # type: ignore
     get_jwt, get_jwt_identity, jwt_required, verify_jwt_in_request
 )
 

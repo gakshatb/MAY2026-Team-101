@@ -10,8 +10,13 @@ class User(db.Model):
     id         = db.Column(db.Integer, primary_key=True, autoincrement=True)
     name       = db.Column(db.String(255), nullable=False)
     email      = db.Column(db.String(255), unique=True, nullable=False)
-    password   = db.Column(db.String(255), nullable=False)
     phone      = db.Column(db.String(20),  nullable=True)
+    password   = db.Column(db.String(255), nullable=False)
+    address    = db.Column(db.String(255), nullable=True)
+    city       = db.Column(db.String(100), nullable=True)
+    state      = db.Column(db.String(100), nullable=True)
+    pincode    = db.Column(db.String(20),  nullable=True)
+    gender     = db.Column(db.String(20),  nullable=True)
     role       = db.Column(db.String(20),  nullable=False)          # citizen | officer | worker
     status     = db.Column(db.String(20),  nullable=False, default='active')
     created_at = db.Column(db.DateTime,    nullable=False, default=datetime.utcnow)  # FIX: was datetime.now (local time + missing parens)
@@ -169,7 +174,7 @@ class ContactMessage(db.Model):
     created_at = db.Column(db.DateTime,    nullable=False, default=datetime.utcnow)
 
     def __repr__(self):
-        return f'<ContactMessage id={self.name} email={self.email} subject={self.subject!r} message={self.message!r}>'
+        return f'<ContactMessage Name={self.name} email={self.email} subject={self.subject!r} message={self.message!r}>'
 
 
 def init_db(app):

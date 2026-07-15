@@ -69,8 +69,13 @@ def register():
     new_user = User(
         name=name,
         email=email,
-        password=generate_password_hash(password),
         phone=mobile,
+        password=generate_password_hash(password),
+        address=address,
+        city=city,
+        state=data.get("state", "").strip() or None,
+        pincode=pincode,
+        gender=data.get("gender", "").strip() or None,
         role=role,
         status='active'
     )
@@ -202,9 +207,8 @@ def forgot_password():
     otp = str(secrets.randbelow(900000) + 100000)   # 100000–999999
     otp_store[email] = {
         "otp":        otp,
-        "expires_at": datetime.now() + timedelta(minutes=10)
+        "expires_at": datetime.utcnow() + timedelta(minutes=10)
     }
-    print(f"[DEBUG] OTP for {email}: {otp} (valid for 10 minutes)")
 
     response_data = dict(success=True, message="OTP sent successfully.")
     if current_app.debug:
@@ -238,7 +242,7 @@ def reset_password():
     if not record:
         return jsonify(message="No OTP request found for this email."), 400
 
-    if datetime.now() > record["expires_at"]:
+    if datetime.utcnow() > record["expires_at"]:
         otp_store.pop(email, None)
         return jsonify(message="OTP has expired. Please request a new one."), 400
 
