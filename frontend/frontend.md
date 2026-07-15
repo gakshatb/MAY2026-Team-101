@@ -52,75 +52,69 @@ Below is the complete list of routes available in the CivicDesk frontend.
 
 ---
 
-## Public Pages
+## Pages and Routes
 
-| Page | Route |
-|------|-------|
-| Home | `/` |
-| About | `/about` |
-| Services | `/services` |
-| How It Works | `/how-it-works` |
-| Contact Us | `/contact` |
-| FAQs | `/faq` |
+### Public (no login required)
+| Route | Page |
+|---|---|
+| `/` | Landing Page |
+| `/about` | About CivicDesk |
+| `/services` | Services |
+| `/how-it-works` | How It Works |
+| `/contact` | Contact Us |
+| `/faq` | FAQs |
 
----
+### Auth
+| Route | Page |
+|---|---|
+| `/login` | Login |
+| `/register` | Register |
+| `/forgot-password` | Reset Password |
 
-## Authentication
+### Citizen (requires login)
+| Route | Page |
+|---|---|
+| `/citizen/dashboard` | Dashboard |
+| `/citizen/complaints` | My Complaints |
+| `/citizen/submit` | Submit Complaint |
+| `/citizen/complaintdetails/:id` | Complaint Details |
+| `/citizen/track/:id` | Track Complaint |
+| `/citizen/feedback/:id` | Submit Feedback |
+| `/citizen/notifications` | Notifications |
+| `/citizen/profile` | Profile |
 
-| Page | Route |
-|------|-------|
-| Login | `/login` |
-| Register | `/register` |
-| Forgot Password | `/forgot-password` |
+### Officer (requires login)
+| Route | Page |
+|---|---|
+| `/officer/dashboard` | Officer Dashboard |
+| `/officer/complaints` | Complaint Management |
+| `/officer/complaintdetails/:id` | Complaint Details |
+| `/officer/workers` | Manage Workers |
+| `/officer/assign/:id` | Assign Worker |
+| `/officer/analytics` | Analytics & Reports |
+| `/officer/notifications` | Notifications |
+| `/officer/profile` | Profile |
 
----
+### Worker (requires login)
+| Route | Page |
+|---|---|
+| `/worker/dashboard` | Worker Dashboard |
+| `/worker/tasks` | Assigned Tasks |
+| `/worker/task/:id` | Task Details |
+| `/worker/update/:id` | Update Complaint |
+| `/worker/completed` | Completed Tasks |
+| `/worker/notifications` | Notifications |
+| `/worker/profile` | Profile |
+| `/worker/departmentapplications` | Department Applications |
 
-## Citizen Portal
-
-| Page | Route |
-|------|-------|
-| Dashboard | `/citizen/dashboard` |
-| My Complaints | `/citizen/complaints` |
-| Submit Complaint | `/citizen/submit` |
-| Complaint Details | `/citizen/details/:id` |
-| Track Complaint | `/citizen/track/:id` |
-| Provide Feedback | `/citizen/feedback/:id` |
-| Notifications | `/citizen/notifications` |
-| Profile | `/citizen/profile` |
-
-> **Note:** Replace `:id` with the appropriate complaint ID.
-
----
-
-## Officer Portal
-
-| Page | Route |
-|------|-------|
-| Dashboard | `/officer/dashboard` |
-| Complaint Management | `/officer/complaints` |
-| Complaint Details | `/officer/details/:id` |
-| Manage Workers | `/officer/workers` |
-| Assign Worker | `/officer/assign/:id` |
-| Analytics & Reports | `/officer/analytics` |
-| Notifications | `/officer/notifications` |
-| Profile | `/officer/profile` |
-
-> **Note:** Replace `:id` with the appropriate complaint or task ID.
-
----
-
-## Field Worker Portal
-
-| Page | Route |
-|------|-------|
-| Dashboard | `/worker/dashboard` |
-| Assigned Tasks | `/worker/tasks` |
-| Task Details | `/worker/task/:id` |
-| Update Complaint | `/worker/update/:id` |
-| Completed Tasks | `/worker/completed` |
-| Notifications | `/worker/notifications` |
-| Profile | `/worker/profile` |
-
-> **Note:** Replace `:id` with the appropriate task ID.
-
----
+### Admin (requires login)
+| Route | Page |
+|---|---|
+| `/admin/dashboard` | Admin Dashboard |
+| `/admin/departmentmanagement` | Department Management |
+| `/admin/officerdetails` | Officer Details |
+| `/admin/officermanagement` | Officer Management |
+| `/admin/profile` | Profile |
+| `/admin/systemanalytics` | System Analytics |
+| `/admin/activitylogs` | Activity Logs |
+| `/admin/announcements` | Announcements |
