@@ -300,6 +300,8 @@
 
 <script setup>
 import { ref, reactive, computed } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
+import axios from 'axios'
 import Sidebar from '@/components/dashboard/Sidebar.vue'
 import DashboardNavbar from '@/components/dashboard/DashboardNavbar.vue'
 import { 
@@ -383,13 +385,36 @@ const validate = () => {
   return isValid
 }
 
+const route  = useRoute()
+const router = useRouter()
+
 const submitFeedback = async () => {
   if (!validate()) return
-
   isSubmitting.value = true
-  await new Promise(resolve => setTimeout(resolve, 1500))
-  isSubmitting.value = false
-  showSuccess.value = true
+  try {
+    const token = localStorage.getItem('token')
+    const id    = route.params.id
+    const { data } = await axios.post(
+      `http://127.0.0.1:5000/api/citizen/complaints/${id}/feedback`,
+      {
+        overallRating:  form.overallRating,
+        serviceRatings: serviceRatings.map(r => ({ id: r.id, rating: r.rating })),
+        categories:     form.categories,
+        comment:        form.comment,
+        improvement:    form.improvement,
+        recommend:      form.recommend,
+        anonymous:      form.anonymous,
+      },
+      { headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' } }
+    )
+    if (data.success) showSuccess.value = true
+  } catch (err) {
+    if (err.response?.status === 401) router.push('/login')
+    const msg = err.response?.data?.message || 'Submission failed. Please try again.'
+    errors.submit = msg
+  } finally {
+    isSubmitting.value = false
+  }
 }
 </script>
 

@@ -346,6 +346,8 @@
 
 <script setup>
 import { ref, reactive, computed } from 'vue'
+import { useRouter } from 'vue-router'
+import axios from 'axios'
 import Sidebar from '../../components/dashboard/Sidebar.vue'
 import DashboardNavbar from '../../components/dashboard/DashboardNavbar.vue'
 import { 
@@ -492,17 +494,46 @@ const validateForm = () => {
   return isValid
 }
 
+const router = useRouter()
+
 const handleSubmit = async () => {
   if (!validateForm()) return
-
   isSubmitting.value = true
-  
-  // Simulate API Call
-  await new Promise(resolve => setTimeout(resolve, 2000))
-  
-  isSubmitting.value = false
-  generatedId.value = `CMP-2026-${Math.floor(10000 + Math.random() * 90000)}`
-  showSuccessModal.value = true
+  try {
+    const token = localStorage.getItem('token')
+
+    // Use FormData to support image upload
+    const payload = new FormData()
+    payload.append('title',        form.title)
+    payload.append('category',     form.category)
+    payload.append('priority',     form.priority)
+    payload.append('description',  form.description)
+    payload.append('city',         form.city)
+    payload.append('ward',         form.ward)
+    payload.append('area',         form.area)
+    payload.append('street',       form.street)
+    payload.append('landmark',     form.landmark || '')
+    payload.append('incidentDate', form.incidentDate || '')
+    payload.append('visitTime',    form.visitTime || '')
+    payload.append('urgencyNote',  form.urgencyNote || '')
+    if (form.image) payload.append('image', form.image)
+
+    const { data } = await axios.post(
+      'http://127.0.0.1:5000/api/citizen/complaints',
+      payload,
+      { headers: { Authorization: `Bearer ${token}` } }
+    )
+
+    generatedId.value = `CMP-2026-${data.complaint_id}`
+    showSuccessModal.value = true
+
+  } catch (err) {
+    if (err.response?.status === 401) router.push('/login')
+    const msg = err.response?.data?.message || 'Submission failed. Please try again.'
+    errors.submit = msg
+  } finally {
+    isSubmitting.value = false
+  }
 }
 
 const clearForm = () => {

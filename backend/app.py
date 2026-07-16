@@ -21,6 +21,9 @@ CORS(app)
 app.config["SQLALCHEMY_DATABASE_URI"]  = os.environ.get("DATABASE_URL", "sqlite:///civicdesk.db")
 app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
 app.config["JWT_SECRET_KEY"] = os.environ.get("JWT_SECRET_KEY", "super-secret-key")
+app.config["UPLOAD_FOLDER"] = os.environ.get(
+    "UPLOAD_FOLDER", os.path.join(BASE_DIR, 'Uploads')
+)
 
 jwt = JWTManager(app)
 

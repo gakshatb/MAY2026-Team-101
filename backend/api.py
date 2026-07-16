@@ -1,4 +1,4 @@
-from flask import Blueprint, jsonify, request # type: ignore
+from flask import Blueprint, jsonify, request, send_from_directory, current_app # type: ignore
 
 from models import db, ContactMessage, Complaint, User
 from api_auth_utils import is_valid_email
@@ -83,6 +83,14 @@ def public_stats():
             "avg_resolution_hours": avg_resolution_hours
         }
     ), 200
+
+
+# ─────────────────────────────────────────────────────────────────────────
+# Serves files saved by _save_uploaded_image() in api_citizen.py.
+# ─────────────────────────────────────────────────────────────────────────
+@general_bp.route('/uploads/<path:filename>', methods=['GET'])
+def serve_upload(filename):
+    return send_from_directory(current_app.config['UPLOAD_FOLDER'], filename)
 
 
 def init_routes(app):

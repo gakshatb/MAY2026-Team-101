@@ -73,9 +73,19 @@ class Complaint(db.Model):
 
     id               = db.Column(db.Integer,    primary_key=True, autoincrement=True)
     title            = db.Column(db.String(255), nullable=False)
+    category         = db.Column(db.String(100), nullable=False)
     description      = db.Column(db.Text,        nullable=False)
-    department       = db.Column(db.String(100), nullable=False)
-    location         = db.Column(db.String(255), nullable=False)
+    priority         = db.Column(db.String(20),  nullable=False, default='Medium')
+    department       = db.Column(db.String(100), nullable=False)  # auto-derived from category, see CATEGORY_DEPARTMENT_MAP
+    location         = db.Column(db.String(255), nullable=False)  # human-readable summary, auto-composed from the fields below
+    city             = db.Column(db.String(100), nullable=True)
+    ward             = db.Column(db.String(50),  nullable=True)
+    area             = db.Column(db.String(150), nullable=True)
+    street           = db.Column(db.String(150), nullable=True)
+    landmark         = db.Column(db.String(200), nullable=True)
+    incident_date    = db.Column(db.Date,        nullable=True)
+    visit_time       = db.Column(db.String(20),  nullable=True)   # 'Morning' | 'Afternoon' | 'Evening' | ''
+    urgency_note     = db.Column(db.String(500), nullable=True)
     created_by       = db.Column(db.Integer,     db.ForeignKey('users.id'), nullable=False)
     assigned_officer = db.Column(db.Integer,     db.ForeignKey('users.id'), nullable=True)
     status           = db.Column(db.String(50),  nullable=False, default='Pending')
@@ -122,11 +132,16 @@ class ComplaintImages(db.Model):
 class Feedback(db.Model):
     __tablename__ = 'feedback'
 
-    id           = db.Column(db.Integer,      primary_key=True, autoincrement=True)
-    complaint_id = db.Column(db.Integer,      db.ForeignKey('complaints.id'), nullable=False, unique=True)
-    rating       = db.Column(db.Integer,      nullable=False)
-    comments     = db.Column(db.String(1000), nullable=True)
-    submitted_at = db.Column(db.DateTime,     nullable=False, default=datetime.utcnow)
+    id               = db.Column(db.Integer,      primary_key=True, autoincrement=True)
+    complaint_id     = db.Column(db.Integer,      db.ForeignKey('complaints.id'), nullable=False, unique=True)
+    rating           = db.Column(db.Integer,      nullable=False)               # overall rating, 1-5
+    service_ratings  = db.Column(db.Text,          nullable=True)               # JSON: {"quality":5,"response":4,...}
+    categories       = db.Column(db.Text,          nullable=True)               # JSON list: ["Quick response", ...]
+    comments         = db.Column(db.String(1000),  nullable=True)
+    improvement      = db.Column(db.Text,          nullable=True)
+    would_recommend  = db.Column(db.String(10),    nullable=True)               # 'Yes' | 'No' | 'Maybe'
+    is_anonymous     = db.Column(db.Boolean,       nullable=False, default=False)
+    submitted_at     = db.Column(db.DateTime,      nullable=False, default=datetime.utcnow)
 
     def __repr__(self):
         return f'<Feedback id={self.id} complaint_id={self.complaint_id} rating={self.rating}>'
@@ -136,12 +151,18 @@ class Notification(db.Model):
     __tablename__ = 'notifications'
 
     id           = db.Column(db.Integer,     primary_key=True, autoincrement=True)
+    user_id      = db.Column(db.Integer,     db.ForeignKey('users.id'), nullable=False)
     complaint_id = db.Column(db.Integer,     db.ForeignKey('complaints.id'), nullable=True)
+    title        = db.Column(db.String(150), nullable=False)
     message      = db.Column(db.String(500), nullable=False)
+    type         = db.Column(db.String(30),  nullable=False, default='info')  # submitted|verified|assigned|resolved|system
+    is_read      = db.Column(db.Boolean,     nullable=False, default=False)
     created_at   = db.Column(db.DateTime,    nullable=False, default=datetime.utcnow)
 
+    user = db.relationship('User', backref='notifications', lazy=True)
+
     def __repr__(self):
-        return f'<Notification id={self.id} complaint_id={self.complaint_id}>'
+        return f'<Notification id={self.id} user_id={self.user_id} complaint_id={self.complaint_id}>'
 
 
 class Assignment(db.Model):
@@ -174,7 +195,7 @@ class ContactMessage(db.Model):
     created_at = db.Column(db.DateTime,    nullable=False, default=datetime.utcnow)
 
     def __repr__(self):
-        return f'<ContactMessage Name={self.name} email={self.email} subject={self.subject!r} message={self.message!r}>'
+        return f'<ContactMessage id={self.name} email={self.email} subject={self.subject!r} message={self.message!r}>'
 
 
 def init_db(app):

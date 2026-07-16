@@ -106,7 +106,9 @@
 </template>
 
 <script setup>
-import { ref, computed } from 'vue'
+import { ref, computed, onMounted, watch } from 'vue'
+import { useRouter } from 'vue-router'
+import axios from 'axios'
 import Sidebar from '@/components/dashboard/Sidebar.vue'
 import DashboardNavbar from '@/components/dashboard/DashboardNavbar.vue'
 import { 
@@ -116,9 +118,11 @@ import {
 } from 'lucide-vue-next'
 
 const userRole = ref('Citizen') // Simulate different roles
+const router   = useRouter()
 const isSidebarOpen = ref(false)
-const activeFilter = ref('All')
+const activeFilter  = ref('All')
 const selectedNotification = ref(null)
+const isLoading = ref(true)
 
 const summaryCards = [
   { title: 'All', count: 12, icon: Bell, iconBg: 'bg-blue-50', iconColor: 'text-[#2563EB]' },
@@ -129,23 +133,63 @@ const summaryCards = [
 
 const filters = ['All', 'Unread', 'Complaint Updates', 'System Messages']
 
-const allNotifications = ref([
-  { id: 1, title: 'Complaint Submitted', message: 'Your complaint CMP-2026-00125 has been successfully submitted.', complaintId: '00125', time: '2m ago', isRead: false, icon: CheckCircle, iconBg: 'bg-green-50', iconColor: 'text-green-500' },
-  { id: 2, title: 'Complaint Verified', message: 'Your complaint has been verified by the Civic Officer.', complaintId: '00124', time: '1h ago', isRead: false, icon: Shield, iconBg: 'bg-blue-50', iconColor: 'text-blue-500' },
-  { id: 3, title: 'Worker Assigned', message: 'A field worker has been assigned to your complaint.', complaintId: '00120', time: '3h ago', isRead: true, icon: User, iconBg: 'bg-purple-50', iconColor: 'text-purple-500' },
-  { id: 4, title: 'Maintenance Alert', message: 'Scheduled maintenance on Sunday 2 AM to 4 AM.', complaintId: 'SYS', time: '1d ago', isRead: true, icon: AlertCircle, iconBg: 'bg-red-50', iconColor: 'text-red-500' }
-])
+const allNotifications = ref([])
 
-const filteredNotifications = computed(() => {
-  if (activeFilter.value === 'Unread') return allNotifications.value.filter(n => !n.isRead)
-  if (activeFilter.value === 'System Messages') return allNotifications.value.filter(n => n.complaintId === 'SYS')
-  if (activeFilter.value === 'Complaint Updates') return allNotifications.value.filter(n => n.complaintId !== 'SYS')
-  return allNotifications.value
-})
+const filteredNotifications = computed(() => allNotifications.value)
 
-const openDrawer = (note) => {
-  selectedNotification.value = note
+const fetchNotifications = async () => {
+  isLoading.value = true
+  try {
+    const token = localStorage.getItem('token')
+    const { data } = await axios.get('http://127.0.0.1:5000/api/citizen/notifications', {
+      headers: { Authorization: `Bearer ${token}` },
+      params: { filter: activeFilter.value }
+    })
+    allNotifications.value = data.notifications.map(n => ({
+      id:          n.id,
+      title:       n.title,
+      message:     n.message,
+      complaintId: n.complaint_id ? String(n.complaint_id) : 'SYS',
+      time:        new Date(n.created_at).toLocaleString(),
+      isRead:      n.is_read,
+      icon:        CheckCircle,
+      iconBg:      n.type === 'system' ? 'bg-red-50'    : 'bg-green-50',
+      iconColor:   n.type === 'system' ? 'text-red-500' : 'text-green-500',
+    }))
+  } catch (err) {
+    if (err.response?.status === 401) router.push('/login')
+  } finally { isLoading.value = false }
 }
+
+const openDrawer = async (note) => {
+  selectedNotification.value = note
+  if (!note.isRead) {
+    try {
+      const token = localStorage.getItem('token')
+      await axios.patch(
+        `http://127.0.0.1:5000/api/citizen/notifications/${note.id}/read`,
+        {},
+        { headers: { Authorization: `Bearer ${token}` } }
+      )
+      note.isRead = true
+    } catch (err) { console.error(err) }
+  }
+}
+
+const markAllRead = async () => {
+  try {
+    const token = localStorage.getItem('token')
+    await axios.patch(
+      'http://127.0.0.1:5000/api/citizen/notifications/read-all',
+      {},
+      { headers: { Authorization: `Bearer ${token}` } }
+    )
+    allNotifications.value.forEach(n => n.isRead = true)
+  } catch (err) { console.error(err) }
+}
+
+watch(activeFilter, fetchNotifications)
+onMounted(fetchNotifications)
 </script>
 
 <style scoped>

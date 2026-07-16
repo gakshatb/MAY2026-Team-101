@@ -134,7 +134,9 @@
 </template>
 
 <script setup>
-import { ref } from 'vue'
+import { ref, onMounted } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
+import axios from 'axios'
 import Sidebar from '@/components/dashboard/Sidebar.vue'
 import DashboardNavbar from '@/components/dashboard/DashboardNavbar.vue'
 import { 
@@ -142,33 +144,45 @@ import {
   User, HardHat, ShieldCheck 
 } from 'lucide-vue-next'
 
+const route    = useRoute()
+const router   = useRouter()
 const isSidebarOpen = ref(false)
+const isLoading = ref(true)
 
-const complaint = ref({
-  id: 'CMP-2026-00125',
-  title: 'Large Pothole causing traffic hazards',
-  category: 'Road Damage',
-  status: 'In Progress',
-  priority: 'High',
-  submittedAt: 'July 05, 2026',
-  description: 'There is a large pothole measuring approximately 2 feet in diameter located right at the entrance of the society gate. It is causing severe traffic congestion and poses a safety risk to two-wheeler riders, especially during night hours as the streetlight nearby is also not functioning.'
+const complaint      = ref(null)
+const locationDetails = ref({})
+const timeline       = ref([])
+
+onMounted(async () => {
+  try {
+    const token = localStorage.getItem('token')
+    const id    = route.params.id
+    const { data } = await axios.get(
+      `http://127.0.0.1:5000/api/citizen/complaints/${id}`,
+      { headers: { Authorization: `Bearer ${token}` } }
+    )
+    const c = data.complaint
+    complaint.value = {
+      id:          `CMP-${c.id}`,
+      title:       c.title,
+      category:    c.category,
+      status:      c.status,
+      priority:    c.priority,
+      submittedAt: c.created_at ? new Date(c.created_at).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: '2-digit' }) : '',
+      description: c.description,
+      image_urls:  c.image_urls || [],
+      has_feedback: c.has_feedback,
+      assignment:  c.assignment,
+    }
+    locationDetails.value = c.location_details || {}
+    timeline.value = c.timeline || []
+  } catch (err) {
+    if (err.response?.status === 401) router.push('/login')
+    console.error('ComplaintDetails fetch error:', err)
+  } finally {
+    isLoading.value = false
+  }
 })
-
-const locationDetails = {
-  City: 'Bhiwandi',
-  Ward: 'Ward 12',
-  Area: 'Kalyan Naka',
-  Street: 'Agra Road',
-  Landmark: 'Near City Hospital'
-}
-
-const timeline = [
-  { title: 'Complaint Submitted', date: 'July 05, 2026', completed: true },
-  { title: 'Verified', date: 'July 05, 2026', completed: true },
-  { title: 'Assigned', date: 'July 06, 2026', completed: true },
-  { title: 'In Progress', date: 'July 06, 2026', completed: true },
-  { title: 'Resolved', date: 'Pending', completed: false }
-]
 </script>
 
 <style scoped>

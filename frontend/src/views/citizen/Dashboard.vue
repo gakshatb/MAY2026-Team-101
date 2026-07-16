@@ -241,6 +241,8 @@
 
 <script setup>
 import { ref, onMounted, onUnmounted } from 'vue'
+import { useRouter } from 'vue-router'
+import axios from 'axios'
 import Sidebar from '@/components/dashboard/Sidebar.vue'
 import DashboardNavbar from '@/components/dashboard/DashboardNavbar.vue'
 import Chart from 'chart.js/auto'
@@ -251,19 +253,24 @@ import {
   PlusCircle, Navigation, LayoutDashboard
 } from 'lucide-vue-next'
 
+const router = useRouter()
 const isSidebarOpen = ref(false)
-const currentDate = 'Thursday, July 09, 2026'
-const hasPendingFeedback = ref(true)
+const isLoading = ref(true)
+const currentDate = new Date().toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })
+
+// ── reactive data (replaces hardcoded values) ─────────────────────────
+const hasPendingFeedback = ref(false)
+const pendingFeedbackId  = ref(null)
 
 // --- Dummy Data ---
-const summaryStats = [
-  { title: 'Total Complaints', value: '12', icon: ClipboardList, iconBg: 'bg-blue-50', iconColor: 'text-[#2563EB]' },
-  { title: 'Pending', value: '2', icon: Clock, iconBg: 'bg-amber-50', iconColor: 'text-amber-500' },
-  { title: 'In Progress', value: '1', icon: Activity, iconBg: 'bg-purple-50', iconColor: 'text-purple-500' },
-  { title: 'Resolved', value: '8', icon: CheckCircle, trend: 'up', iconBg: 'bg-green-50', iconColor: 'text-[#22C55E]' },
-  { title: 'Closed', value: '1', icon: FileText, iconBg: 'bg-slate-100', iconColor: 'text-slate-600' },
-  { title: 'Unread Alerts', value: '3', icon: Bell, iconBg: 'bg-red-50', iconColor: 'text-red-500' }
-]
+const summaryStats = ref([
+  { title: 'Total Complaints', value: '0', icon: ClipboardList, iconBg: 'bg-blue-50', iconColor: 'text-[#2563EB]' },
+  { title: 'Pending', value: '0', icon: Clock, iconBg: 'bg-amber-50', iconColor: 'text-amber-500' },
+  { title: 'In Progress', value: '0', icon: Activity, iconBg: 'bg-purple-50', iconColor: 'text-purple-500' },
+  { title: 'Resolved', value: '0', icon: CheckCircle, trend: 'up', iconBg: 'bg-green-50', iconColor: 'text-[#22C55E]' },
+  { title: 'Closed', value: '0', icon: FileText, iconBg: 'bg-slate-100', iconColor: 'text-slate-600' },
+  { title: 'Unread Alerts', value: '0', icon: Bell, iconBg: 'bg-red-50', iconColor: 'text-red-500' }
+])
 
 const quickActions = [
   { title: 'New Complaint', desc: 'Report an issue', icon: PlusCircle, route: '/citizen/submit' },
@@ -273,33 +280,65 @@ const quickActions = [
   { title: 'My Profile', desc: 'Manage account', icon: User, route: '/citizen/profile' }
 ]
 
-const recentComplaints = [
-  { id: 'CMP-8875', title: 'Deep Pothole on Main Road causing traffic', category: 'Road Damage', status: 'In Progress', submittedDate: 'Jul 05, 2026', progress: 65 },
-  { id: 'CMP-8902', title: 'Streetlight not working near park', category: 'Electrical', status: 'Assigned', submittedDate: 'Jul 08, 2026', progress: 30 },
-  { id: 'CMP-8799', title: 'Overflowing dustbin outside society', category: 'Garbage', status: 'Resolved', submittedDate: 'Jul 01, 2026', progress: 100 }
-]
+const recentComplaints = ref([])
+const notifications    = ref([])
+const categories       = ref([])
 
-const notifications = [
-  { text: 'Worker assigned to CMP-8902', time: '2 hours ago', icon: User, bg: 'bg-blue-100', color: 'text-blue-600' },
-  { text: 'Complaint CMP-8799 marked as Resolved', time: '1 day ago', icon: CheckCircle, bg: 'bg-green-100', color: 'text-green-600' },
-  { text: 'Officer requested more details for CMP-8875', time: '2 days ago', icon: AlertTriangle, bg: 'bg-amber-100', color: 'text-amber-600' }
-]
+// ── API fetch ─────────────────────────────────────────────────────────
+const fetchDashboard = async () => {
+  isLoading.value = true
+  try {
+    const token = localStorage.getItem('token')
+    const { data } = await axios.get('http://127.0.0.1:5000/api/citizen/dashboard', {
+      headers: { Authorization: `Bearer ${token}` }
+    })
 
-const timeline = [
-  { action: 'Work Started by Technician', date: 'Jul 09, 2026', time: '09:15 AM', id: 'CMP-8875' },
-  { action: 'Worker Assigned', date: 'Jul 08, 2026', time: '04:30 PM', id: 'CMP-8902' },
-  { action: 'Complaint Submitted', date: 'Jul 08, 2026', time: '10:00 AM', id: 'CMP-8902' },
-  { action: 'Feedback Submitted', date: 'Jul 02, 2026', time: '11:20 AM', id: 'CMP-8750' }
-]
+    // Update summary stats values from API
+    const s = data.stats
+    summaryStats.value[0].value = String(s.total)
+    summaryStats.value[1].value = String(s.pending)
+    summaryStats.value[2].value = String(s.in_progress)
+    summaryStats.value[3].value = String(s.resolved)
+    summaryStats.value[4].value = String(s.closed)
+    summaryStats.value[5].value = String(s.unread_notifications)
 
-const categories = [
-  { name: 'Garbage', count: 4, icon: Trash2 },
-  { name: 'Roads', count: 3, icon: Construction },
-  { name: 'Electrical', count: 2, icon: Lightbulb },
-  { name: 'Water', count: 2, icon: Droplets },
-  { name: 'Drainage', count: 1, icon: AlertTriangle },
-  { name: 'Property', count: 0, icon: ShieldCheck }
-]
+    recentComplaints.value = data.recent_complaints.map(c => ({
+      id:            `CMP-${c.id}`,
+      title:         c.title,
+      category:      c.category,
+      status:        c.status,
+      submittedDate: c.created_at ? new Date(c.created_at).toLocaleDateString('en-US', { month: 'short', day: '2-digit', year: 'numeric' }) : '',
+      progress:      c.status === 'Resolved' || c.status === 'Closed' ? 100
+                     : c.status === 'In Progress' ? 65
+                     : c.status === 'Assigned' ? 30 : 5,
+    }))
+
+    notifications.value = data.recent_notifications.map(n => ({
+      text:  n.message,
+      time:  new Date(n.created_at).toLocaleString(),
+      icon:  CheckCircle,
+      bg:    'bg-blue-100',
+      color: 'text-blue-600',
+    }))
+
+    if (data.pending_feedback && data.pending_feedback.length > 0) {
+      hasPendingFeedback.value = true
+      pendingFeedbackId.value  = data.pending_feedback[0].id
+    }
+
+    // Category breakdown
+    const catIcons = { Garbage: Trash2, Roads: Construction, Electrical: Lightbulb, Water: Droplets, Drainage: AlertTriangle }
+    categories.value = Object.entries(data.category_breakdown || {}).map(([name, count]) => ({
+      name, count, icon: catIcons[name] || ShieldCheck
+    }))
+
+  } catch (err) {
+    if (err.response?.status === 401) router.push('/login')
+    console.error('Dashboard fetch error:', err)
+  } finally {
+    isLoading.value = false
+  }
+}
 
 // --- Visual Helpers ---
 const statusBadge = (status) => {
@@ -320,6 +359,7 @@ const doughnutChartRef = ref(null)
 let lineChart, doughnutChart
 
 onMounted(() => {
+  fetchDashboard()
   // 1. Monthly Activity Line Chart
   if (lineChartRef.value) {
     lineChart = new Chart(lineChartRef.value, {

@@ -418,7 +418,9 @@
 </template>
 
 <script setup>
-import { ref, reactive } from 'vue'
+import { ref, reactive, onMounted } from 'vue'
+import { useRouter } from 'vue-router'
+import axios from 'axios'
 import DashboardNavbar from '../../components/dashboard/DashboardNavbar.vue'
 import Sidebar from '../../components/dashboard/Sidebar.vue'
 import { 
@@ -429,25 +431,46 @@ import {
 
 // --- State ---
 const userRole = ref('Citizen') // Options: 'Citizen', 'Civic Officer', 'Field Worker'
-const isEditingProfile = ref(false)
-const isSavingProfile = ref(false)
+const router = useRouter()
+const isEditingProfile   = ref(false)
+const isSavingProfile    = ref(false)
 const isUpdatingPassword = ref(false)
+const profileSuccess     = ref('')
+const passwordSuccess    = ref('')
 
 // Original data to revert changes on cancel
 let originalProfileData = {}
 
 const profileForm = reactive({
-  fullName: 'John Doe',
-  email: 'john.doe@example.com',
-  mobile: '9876543210',
-  address: '102, Shanti Nagar, Main Road',
-  city: 'Pune',
-  state: 'Maharashtra',
-  pincode: '411001',
-  gender: 'Male',
-  accountId: 'CVC-USR-9812',
-  memberSince: 'January 15, 2026'
+  fullName: '', email: '', mobile: '',
+  address: '', city: '', state: '', pincode: '', gender: '',
+  accountId: '', memberSince: ''
 })
+
+const fetchProfile = async () => {
+  try {
+    const token = localStorage.getItem('token')
+    const { data } = await axios.get('http://127.0.0.1:5000/api/citizen/profile', {
+      headers: { Authorization: `Bearer ${token}` }
+    })
+    const u = data.user
+    Object.assign(profileForm, {
+      fullName:    u.fullName    || '',
+      email:       u.email       || '',
+      mobile:      u.mobile      || '',
+      address:     u.address     || '',
+      city:        u.city        || '',
+      state:       u.state       || '',
+      pincode:     u.pincode     || '',
+      gender:      u.gender      || '',
+      accountId:   u.account_id  || '',
+      memberSince: u.member_since || '',
+    })
+  } catch (err) {
+    if (err.response?.status === 401) router.push('/login')
+  }
+}
+onMounted(fetchProfile)
 
 const passwordForm = reactive({
   current: '',
@@ -523,11 +546,27 @@ const validateProfile = () => {
 
 const saveProfile = async () => {
   if (!validateProfile()) return
-
   isSavingProfile.value = true
-  await new Promise(resolve => setTimeout(resolve, 1000)) // Simulate API
-  isSavingProfile.value = false
-  isEditingProfile.value = false
+  profileSuccess.value = ''
+  try {
+    const token = localStorage.getItem('token')
+    await axios.patch('http://127.0.0.1:5000/api/citizen/profile', {
+      fullName: profileForm.fullName,
+      mobile:   profileForm.mobile,
+      address:  profileForm.address,
+      city:     profileForm.city,
+      state:    profileForm.state,
+      pincode:  profileForm.pincode,
+      gender:   profileForm.gender,
+    }, { headers: { Authorization: `Bearer ${token}` } })
+    isEditingProfile.value = false
+    profileSuccess.value = 'Profile updated successfully.'
+  } catch (err) {
+    if (err.response?.status === 401) router.push('/login')
+    profileErrors.submit = err.response?.data?.message || 'Update failed.'
+  } finally {
+    isSavingProfile.value = false
+  }
 }
 
 const validatePassword = () => {
@@ -555,11 +594,25 @@ const validatePassword = () => {
 
 const updatePassword = async () => {
   if (!validatePassword()) return
-
   isUpdatingPassword.value = true
-  await new Promise(resolve => setTimeout(resolve, 1000)) // Simulate API
-  isUpdatingPassword.value = false
-  resetPasswordForm()
+  passwordSuccess.value = ''
+  try {
+    const token = localStorage.getItem('token')
+    await axios.post('http://127.0.0.1:5000/api/change-password', {
+      currentPassword: passwordForm.current,
+      newPassword:     passwordForm.new,
+    }, { headers: { Authorization: `Bearer ${token}` } })
+    passwordSuccess.value = 'Password updated successfully.'
+    resetPasswordForm()
+  } catch (err) {
+    if (err.response?.status === 401 && err.response?.data?.message?.includes('incorrect')) {
+      passwordErrors.current = 'Current password is incorrect.'
+    } else {
+      passwordErrors.submit = err.response?.data?.message || 'Password update failed.'
+    }
+  } finally {
+    isUpdatingPassword.value = false
+  }
 }
 
 const resetPasswordForm = () => {

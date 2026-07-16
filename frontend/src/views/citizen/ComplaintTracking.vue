@@ -154,7 +154,9 @@
 </template>
 
 <script setup>
-import { ref } from 'vue'
+import { ref, onMounted } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
+import axios from 'axios'
 import Sidebar from '../../components/dashboard/Sidebar.vue'
 import DashboardNavbar from '../../components/dashboard/DashboardNavbar.vue'
 import { 
@@ -162,29 +164,33 @@ import {
   Printer 
 } from 'lucide-vue-next'
 
+const route    = useRoute()
+const router   = useRouter()
 const isSidebarOpen = ref(false)
-const complaint = ref({
-  id: 'CMP-2026-00125',
-  title: 'Large Pothole on Main Road',
-  description: 'Reported deep pothole at sector 4 entrance.'
+const isLoading = ref(true)
+
+const complaint     = ref(null)
+const timelineSteps = ref([])
+const activityLog   = ref([])
+
+onMounted(async () => {
+  try {
+    const token = localStorage.getItem('token')
+    const id    = route.params.id
+    const { data } = await axios.get(
+      `http://127.0.0.1:5000/api/citizen/complaints/${id}/tracking`,
+      { headers: { Authorization: `Bearer ${token}` } }
+    )
+    complaint.value     = data.complaint
+    timelineSteps.value = data.timeline_steps
+    activityLog.value   = data.activity_log
+  } catch (err) {
+    if (err.response?.status === 401) router.push('/login')
+    console.error('Tracking fetch error:', err)
+  } finally {
+    isLoading.value = false
+  }
 })
-
-const timelineSteps = [
-  { title: 'Complaint Submitted', status: 'completed', date: '21 Jul, 10:00 AM' },
-  { title: 'Complaint Verified', status: 'completed', date: '22 Jul, 09:00 AM' },
-  { title: 'Assigned to Dept', status: 'completed', date: '23 Jul, 11:00 AM' },
-  { title: 'Assigned to Worker', status: 'completed', date: '23 Jul, 02:00 PM' },
-  { title: 'Work Started', status: 'active', date: '24 Jul, 08:00 AM' },
-  { title: 'Issue Resolved', status: 'pending', date: '' },
-  { title: 'Complaint Closed', status: 'pending', date: '' },
-]
-
-const activityLog = [
-  { id: 1, date: '24 Jul', status: 'Repair In Progress', officer: 'Amit Singh', remarks: 'Started filling the pothole' },
-  { id: 2, date: '23 Jul', status: 'Assigned', officer: 'Mr. Rajesh', remarks: 'Worker assigned to site' },
-  { id: 3, date: '22 Jul', status: 'Verified', officer: 'System', remarks: 'Site inspection confirmed' },
-  { id: 4, date: '21 Jul', status: 'Submitted', officer: 'Citizen', remarks: 'Initial report' },
-]
 </script>
 
 <style scoped>

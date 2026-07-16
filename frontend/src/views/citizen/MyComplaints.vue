@@ -134,7 +134,9 @@
 </template>
 
 <script setup>
-import { ref, computed } from 'vue'
+import { ref, computed, onMounted, watch } from 'vue'
+import { useRouter } from 'vue-router'
+import axios from 'axios'
 import Sidebar from '../../components/dashboard/Sidebar.vue'
 import DashboardNavbar from '../../components/dashboard/DashboardNavbar.vue'
 import { 
@@ -142,32 +144,51 @@ import {
   CheckCircle, Clock, Plus, Inbox 
 } from 'lucide-vue-next'
 
+const router      = useRouter()
 const isSidebarOpen = ref(false)
+const isLoading   = ref(true)
 const searchQuery = ref('')
 const filterStatus = ref('All')
 
-// Dummy Data
-const complaints = ref([
-  { id: 'CMP-2026-001', title: 'Streetlight broken', category: 'Broken Streetlight', status: 'Resolved', priority: 'Medium' },
-  { id: 'CMP-2026-002', title: 'Large Pothole', category: 'Potholes', status: 'Pending', priority: 'High' },
-  { id: 'CMP-2026-003', title: 'Garbage Overflow', category: 'Garbage', status: 'In Progress', priority: 'Low' },
-  { id: 'CMP-2026-004', title: 'Drainage Clog', category: 'Blocked Drainage', status: 'Pending', priority: 'Emergency' },
+const complaints = ref([])
+const stats = ref([
+  { title: 'Total',       count: 0, icon: ClipboardList, bgClass: 'bg-blue-50',  textClass: 'text-[#2563EB]' },
+  { title: 'Pending',     count: 0, icon: Clock,         bgClass: 'bg-amber-50', textClass: 'text-amber-600' },
+  { title: 'In Progress', count: 0, icon: AlertTriangle, bgClass: 'bg-blue-50',  textClass: 'text-[#2563EB]' },
+  { title: 'Resolved',    count: 0, icon: CheckCircle,   bgClass: 'bg-green-50', textClass: 'text-[#22C55E]' },
 ])
 
-const stats = [
-  { title: 'Total', count: 12, icon: ClipboardList, bgClass: 'bg-blue-50', textClass: 'text-[#2563EB]' },
-  { title: 'Pending', count: 3, icon: Clock, bgClass: 'bg-amber-50', textClass: 'text-amber-600' },
-  { title: 'In Progress', count: 5, icon: AlertTriangle, bgClass: 'bg-blue-50', textClass: 'text-[#2563EB]' },
-  { title: 'Resolved', count: 4, icon: CheckCircle, bgClass: 'bg-green-50', textClass: 'text-[#22C55E]' },
-]
+const filteredComplaints = computed(() => complaints.value)
 
-const filteredComplaints = computed(() => {
-  return complaints.value.filter(c => {
-    const matchesSearch = c.title.toLowerCase().includes(searchQuery.value.toLowerCase()) || c.id.toLowerCase().includes(searchQuery.value.toLowerCase())
-    const matchesStatus = filterStatus.value === 'All' || c.status === filterStatus.value
-    return matchesSearch && matchesStatus
-  })
-})
+const fetchComplaints = async () => {
+  isLoading.value = true
+  try {
+    const token = localStorage.getItem('token')
+    const params = {}
+    if (filterStatus.value !== 'All')  params.status = filterStatus.value
+    if (searchQuery.value.trim())      params.search = searchQuery.value.trim()
+
+    const { data } = await axios.get('http://127.0.0.1:5000/api/citizen/complaints', {
+      headers: { Authorization: `Bearer ${token}` }, params
+    })
+    complaints.value = data.complaints.map(c => ({
+      id: `CMP-${c.id}`, rawId: c.id,
+      title: c.title, category: c.category,
+      status: c.status, priority: c.priority,
+    }))
+    stats.value[0].count = data.stats.total
+    stats.value[1].count = data.stats.pending
+    stats.value[2].count = data.stats.in_progress
+    stats.value[3].count = data.stats.resolved
+  } catch (err) {
+    if (err.response?.status === 401) router.push('/login')
+  } finally { isLoading.value = false }
+}
+
+let searchTimer = null
+watch(searchQuery, () => { clearTimeout(searchTimer); searchTimer = setTimeout(fetchComplaints, 400) })
+watch(filterStatus, fetchComplaints)
+onMounted(fetchComplaints)
 
 const statusColors = (status) => {
   switch(status) {
