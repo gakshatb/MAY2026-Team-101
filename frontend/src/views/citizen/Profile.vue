@@ -2,11 +2,11 @@
   <div class="flex h-screen bg-[#F8FAFC] font-sans text-slate-800 animate-fade-in overflow-hidden">
     
     <!-- Reusable Sidebar -->
-    <Sidebar :role="userRole" />
+    <Sidebar :userRole="userRole" :isOpen="isSidebarOpen" @close-sidebar="isSidebarOpen = false" />
 
     <div class="flex-1 flex flex-col h-screen overflow-hidden">
       <!-- Reusable Dashboard Navbar -->
-      <DashboardNavbar />
+      <DashboardNavbar :userRole="userRole" :user="currentUser" pageTitle="Profile" breadcrumb="Profile" @toggle-sidebar="isSidebarOpen = !isSidebarOpen" />
 
       <!-- Main Scrollable Content -->
       <main class="flex-1 overflow-x-hidden overflow-y-auto bg-[#F8FAFC] p-6 lg:p-8">
@@ -22,19 +22,19 @@
           <div v-if="userRole === 'Citizen'" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
             <div class="bg-white p-5 rounded-[14px] shadow-sm border border-slate-100 flex flex-col">
               <span class="text-sm font-medium text-slate-500 mb-1">Total Complaints</span>
-              <span class="text-3xl font-bold text-slate-900">12</span>
+              <span class="text-3xl font-bold text-slate-900">{{ complaintStats.total }}</span>
             </div>
             <div class="bg-white p-5 rounded-[14px] shadow-sm border border-slate-100 flex flex-col">
               <span class="text-sm font-medium text-slate-500 mb-1">Pending</span>
-              <span class="text-3xl font-bold text-amber-500">3</span>
+              <span class="text-3xl font-bold text-amber-500">{{ complaintStats.pending }}</span>
             </div>
             <div class="bg-white p-5 rounded-[14px] shadow-sm border border-slate-100 flex flex-col">
               <span class="text-sm font-medium text-slate-500 mb-1">Resolved</span>
-              <span class="text-3xl font-bold text-[#22C55E]">8</span>
+              <span class="text-3xl font-bold text-[#22C55E]">{{ complaintStats.resolved }}</span>
             </div>
             <div class="bg-white p-5 rounded-[14px] shadow-sm border border-slate-100 flex flex-col">
               <span class="text-sm font-medium text-slate-500 mb-1">Closed</span>
-              <span class="text-3xl font-bold text-slate-400">1</span>
+              <span class="text-3xl font-bold text-slate-400">{{ complaintStats.closed }}</span>
             </div>
           </div>
 
@@ -418,7 +418,7 @@
 </template>
 
 <script setup>
-import { ref, reactive, onMounted } from 'vue'
+import { ref, reactive, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import axios from 'axios'
 import DashboardNavbar from '../../components/dashboard/DashboardNavbar.vue'
@@ -432,11 +432,36 @@ import {
 // --- State ---
 const userRole = ref('Citizen') // Options: 'Citizen', 'Civic Officer', 'Field Worker'
 const router = useRouter()
+const isSidebarOpen = ref(false)
 const isEditingProfile   = ref(false)
 const isSavingProfile    = ref(false)
 const isUpdatingPassword = ref(false)
 const profileSuccess     = ref('')
 const passwordSuccess    = ref('')
+
+const currentUser = computed(() => {
+  const stored = localStorage.getItem('user')
+  return stored ? JSON.parse(stored) : null
+})
+
+const complaintStats = reactive({ total: 0, pending: 0, resolved: 0, closed: 0 })
+
+const fetchComplaintStats = async () => {
+  try {
+    const token = localStorage.getItem('token')
+    const { data } = await axios.get('http://127.0.0.1:5000/api/citizen/complaints/summary', {
+      headers: { Authorization: `Bearer ${token}` }
+    })
+    Object.assign(complaintStats, {
+      total:    data.summary.total,
+      pending:  data.summary.pending,
+      resolved: data.summary.resolved,
+      closed:   data.summary.closed,
+    })
+  } catch (err) {
+    console.error('Complaint stats fetch error:', err)
+  }
+}
 
 // Original data to revert changes on cancel
 let originalProfileData = {}
@@ -470,7 +495,10 @@ const fetchProfile = async () => {
     if (err.response?.status === 401) router.push('/login')
   }
 }
-onMounted(fetchProfile)
+onMounted(() => {
+  fetchProfile()
+  if (userRole.value === 'Citizen') fetchComplaintStats()
+})
 
 const passwordForm = reactive({
   current: '',

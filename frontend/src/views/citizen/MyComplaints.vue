@@ -8,6 +8,7 @@
       <!-- Reusable Dashboard Navbar -->
       <DashboardNavbar 
         userRole="Citizen" 
+        :user="currentUser"
         pageTitle="My Complaints"
         breadcrumb="My Complaints"
         @toggle-sidebar="isSidebarOpen = !isSidebarOpen"
@@ -146,6 +147,10 @@ import {
 
 const router      = useRouter()
 const isSidebarOpen = ref(false)
+const currentUser = computed(() => {
+  const stored = localStorage.getItem('user')
+  return stored ? JSON.parse(stored) : null
+})
 const isLoading   = ref(true)
 const searchQuery = ref('')
 const filterStatus = ref('All')

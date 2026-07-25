@@ -89,6 +89,8 @@ defineProps({
   }
 })
 
+defineEmits(['close-sidebar'])
+
 const router = useRouter()
 const route = useRoute()
 

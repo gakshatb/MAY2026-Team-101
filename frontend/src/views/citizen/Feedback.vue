@@ -3,7 +3,7 @@
     <Sidebar :userRole="userRole" :isOpen="isSidebarOpen" @close-sidebar="isSidebarOpen = false" />
 
     <div class="flex-1 flex flex-col h-screen overflow-hidden">
-      <DashboardNavbar :userRole="userRole" pageTitle="Complaint Feedback" @toggle-sidebar="isSidebarOpen = !isSidebarOpen" />
+      <DashboardNavbar :userRole="userRole" :user="currentUser" pageTitle="Complaint Feedback" @toggle-sidebar="isSidebarOpen = !isSidebarOpen" />
 
       <main class="flex-1 overflow-x-hidden overflow-y-auto p-4 sm:p-6 lg:p-8">
         <div class="max-w-7xl mx-auto space-y-6">
@@ -23,47 +23,65 @@
             <p class="text-slate-500 mt-1">Share your experience to help us improve civic services.</p>
           </div>
 
+          <!-- Loading State -->
+          <div v-if="isLoadingComplaint" class="py-24 text-center text-slate-400">
+            Loading complaint...
+          </div>
+
+          <!-- Not eligible for feedback -->
+          <div v-else-if="!complaint || complaint.status !== 'Resolved' || complaint.has_feedback" class="bg-white rounded-[14px] shadow-sm border border-slate-100 p-10 text-center">
+            <p class="text-slate-700 font-bold text-lg mb-2">
+              {{ !complaint ? "We couldn't load this complaint." : complaint.has_feedback ? 'Feedback already submitted.' : 'Feedback isn\'t available yet.' }}
+            </p>
+            <p class="text-slate-500 text-sm mb-6">
+              {{ !complaint ? 'It may not exist, or you may not have access to it.' : complaint.has_feedback ? 'You\'ve already reviewed this complaint.' : 'Feedback can only be submitted once a complaint is marked Resolved.' }}
+            </p>
+            <button @click="router.push('/citizen/complaints')" class="px-5 py-2.5 bg-[#2563EB] text-white rounded-lg text-sm font-medium hover:bg-[#1E40AF]">
+              Back to My Complaints
+            </button>
+          </div>
+
           <!-- Main Layout Grid -->
-          <div class="grid grid-cols-1 lg:grid-cols-12 gap-8">
+          <div v-else class="grid grid-cols-1 lg:grid-cols-12 gap-8">
             
             <!-- Left Column: Form Area -->
             <div class="lg:col-span-8 space-y-6">
               
               <!-- Complaint Summary Card -->
               <div class="bg-white rounded-[14px] shadow-sm border border-slate-100 p-6 flex flex-col sm:flex-row gap-6 items-start">
-                <div class="w-full sm:w-32 h-24 rounded-lg overflow-hidden shrink-0 border border-slate-200">
-                  <img src="https://images.unsplash.com/photo-1515162816999-a0c47dc192f7?auto=format&fit=crop&q=80&w=400" alt="Complaint Thumbnail" class="w-full h-full object-cover" />
+                <div v-if="complaint.images?.length" class="w-full sm:w-32 h-24 rounded-lg overflow-hidden shrink-0 border border-slate-200">
+                  <img :src="`http://127.0.0.1:5000${complaint.images[0]}`" alt="Complaint Thumbnail" class="w-full h-full object-cover" />
                 </div>
                 <div class="flex-1">
                   <div class="flex flex-wrap items-start justify-between gap-3 mb-2">
                     <div>
                       <div class="flex items-center gap-3 mb-1">
-                        <span class="text-xs font-bold text-slate-500 bg-slate-100 px-2 py-1 rounded tracking-wide uppercase">CMP-2026-00125</span>
+                        <span class="text-xs font-bold text-slate-500 bg-slate-100 px-2 py-1 rounded tracking-wide uppercase">{{ complaint.id }}</span>
                         <span class="text-xs font-bold text-green-700 bg-green-100 px-2 py-1 rounded flex items-center gap-1">
                           <CheckCircle class="w-3 h-3" /> Resolved
                         </span>
                       </div>
-                      <h3 class="text-lg font-bold text-slate-900">Deep Pothole on Main Street</h3>
+                      <h3 class="text-lg font-bold text-slate-900">{{ complaint.title }}</h3>
                     </div>
-                    <button class="text-sm font-medium text-[#2563EB] hover:underline whitespace-nowrap">View Details</button>
+                    <button @click="router.push(`/citizen/complaintdetails/${complaint.raw_id}`)" class="text-sm font-medium text-[#2563EB] hover:underline whitespace-nowrap">View Details</button>
                   </div>
                   
                   <div class="grid grid-cols-1 sm:grid-cols-2 gap-y-2 gap-x-6 text-sm mt-4">
                     <div class="flex items-center gap-2 text-slate-600">
                       <MapPin class="w-4 h-4 text-slate-400 shrink-0" />
-                      <span class="truncate">MG Road, Near Central Plaza</span>
+                      <span class="truncate">{{ complaint.location }}</span>
                     </div>
                     <div class="flex items-center gap-2 text-slate-600">
                       <Clock class="w-4 h-4 text-slate-400 shrink-0" />
-                      <span>Resolved: Jul 08, 2026</span>
+                      <span>Resolved: {{ complaint.updated_at ? new Date(complaint.updated_at).toLocaleDateString('en-US', { month: 'short', day: '2-digit', year: 'numeric' }) : '—' }}</span>
                     </div>
                     <div class="flex items-center gap-2 text-slate-600">
                       <Building class="w-4 h-4 text-slate-400 shrink-0" />
-                      <span>Roads & Infrastructure</span>
+                      <span>{{ complaint.department }}</span>
                     </div>
                     <div class="flex items-center gap-2 text-slate-600">
                       <User class="w-4 h-4 text-slate-400 shrink-0" />
-                      <span>Worker: Rajesh K.</span>
+                      <span>Worker: Not tracked yet</span>
                     </div>
                   </div>
                 </div>
@@ -214,7 +232,7 @@
 
                   <!-- Actions -->
                   <div class="flex items-center justify-end gap-4 pt-4">
-                    <button type="button" class="px-6 py-3 text-sm font-medium text-slate-600 bg-white border border-slate-300 rounded-lg hover:bg-slate-50 transition-colors">
+                    <button type="button" @click="router.push(`/citizen/complaintdetails/${complaint.raw_id}`)" class="px-6 py-3 text-sm font-medium text-slate-600 bg-white border border-slate-300 rounded-lg hover:bg-slate-50 transition-colors">
                       Cancel
                     </button>
                     <button 
@@ -267,7 +285,7 @@
                       <span class="text-xs text-slate-400 font-medium">{{ fb.date }}</span>
                     </div>
                     <p class="text-sm text-slate-600 mb-2 line-clamp-2">"{{ fb.comment }}"</p>
-                    <p class="text-[10px] font-bold text-slate-400 uppercase tracking-wide">CMP-2026-{{ fb.id }}</p>
+                    <p class="text-[10px] font-bold text-slate-400 uppercase tracking-wide">{{ fb.id }}</p>
                   </div>
                 </div>
               </div>
@@ -290,8 +308,8 @@
           <Star v-for="i in form.overallRating" :key="i" class="w-6 h-6 text-amber-400 fill-amber-400" />
         </div>
         <div class="space-y-3">
-          <button @click="showSuccess = false" class="w-full bg-[#2563EB] hover:bg-[#1E40AF] text-white py-3 rounded-lg font-bold transition-colors">Return to Dashboard</button>
-          <button @click="showSuccess = false" class="w-full bg-slate-100 hover:bg-slate-200 text-slate-700 py-3 rounded-lg font-bold transition-colors">View My Complaints</button>
+          <button @click="router.push('/citizen/dashboard')" class="w-full bg-[#2563EB] hover:bg-[#1E40AF] text-white py-3 rounded-lg font-bold transition-colors">Return to Dashboard</button>
+          <button @click="router.push('/citizen/complaints')" class="w-full bg-slate-100 hover:bg-slate-200 text-slate-700 py-3 rounded-lg font-bold transition-colors">View My Complaints</button>
         </div>
       </div>
     </div>
@@ -310,9 +328,17 @@ import {
 } from 'lucide-vue-next'
 
 const userRole = ref('Citizen')
+const route  = useRoute()
+const router = useRouter()
 const isSidebarOpen = ref(false)
 const isSubmitting = ref(false)
 const showSuccess = ref(false)
+const isLoadingComplaint = ref(true)
+const complaint = ref(null)
+const currentUser = computed(() => {
+  const stored = localStorage.getItem('user')
+  return stored ? JSON.parse(stored) : null
+})
 
 // State
 const hoverOverall = ref(0)
@@ -360,7 +386,28 @@ const fetchPastFeedback = async () => {
     console.error('Past feedback fetch error:', err)
   }
 }
-onMounted(fetchPastFeedback)
+const fetchComplaint = async () => {
+  isLoadingComplaint.value = true
+  try {
+    const token = localStorage.getItem('token')
+    const id = route.params.id
+    const { data } = await axios.get(`http://127.0.0.1:5000/api/citizen/complaints/${id}`, {
+      headers: { Authorization: `Bearer ${token}` }
+    })
+    complaint.value = data.complaint
+  } catch (err) {
+    if (err.response?.status === 401) router.push('/login')
+    complaint.value = null
+    console.error('Complaint fetch error:', err)
+  } finally {
+    isLoadingComplaint.value = false
+  }
+}
+
+onMounted(() => {
+  fetchComplaint()
+  fetchPastFeedback()
+})
 
 const ratingText = computed(() => {
   const val = hoverOverall.value || form.overallRating
@@ -399,9 +446,6 @@ const validate = () => {
 
   return isValid
 }
-
-const route  = useRoute()
-const router = useRouter()
 
 const submitFeedback = async () => {
   if (!validate()) return

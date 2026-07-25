@@ -3,9 +3,9 @@ import os
 import uuid
 from datetime import datetime
 
-from flask import Blueprint, current_app, jsonify, request
-from flask_jwt_extended import get_jwt_identity
-from werkzeug.utils import secure_filename
+from flask import Blueprint, current_app, jsonify, request # type: ignore
+from flask_jwt_extended import get_jwt_identity # type: ignore
+from werkzeug.utils import secure_filename # type: ignore
 
 from models import db, User, Complaint, StatusLog, ComplaintImages, Feedback, Notification
 from api_auth_utils import role_required
@@ -554,8 +554,17 @@ def dashboard():
         .first()
     )
 
+    # Category breakdown for the Dashboard's "Issues by Category" widget.
+    category_counts = (
+        db.session.query(Complaint.category, db.func.count(Complaint.id))
+        .filter(Complaint.created_by == user_id)
+        .group_by(Complaint.category)
+        .all()
+    )
+
     return jsonify(
         success=True,
+        category_breakdown={cat: count for cat, count in category_counts},
         summary={
             "total":       base.count(),
             "pending":     base.filter_by(status='Pending').count(),

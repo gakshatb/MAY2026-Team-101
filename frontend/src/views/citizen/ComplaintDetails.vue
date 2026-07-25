@@ -7,6 +7,7 @@
       <!-- Reusable Dashboard Navbar -->
       <DashboardNavbar 
         userRole="Citizen" 
+        :user="currentUser"
         pageTitle="Complaint Details"
         breadcrumb="My Complaints > Details"
         @toggle-sidebar="isSidebarOpen = !isSidebarOpen"
@@ -150,7 +151,7 @@
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import axios from 'axios'
 import Sidebar from '@/components/dashboard/Sidebar.vue'
@@ -163,6 +164,10 @@ import {
 const route    = useRoute()
 const router   = useRouter()
 const isSidebarOpen = ref(false)
+const currentUser = computed(() => {
+  const stored = localStorage.getItem('user')
+  return stored ? JSON.parse(stored) : null
+})
 const isLoading = ref(true)
 
 const complaint       = ref(null)

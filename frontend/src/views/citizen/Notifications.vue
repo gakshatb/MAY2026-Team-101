@@ -7,6 +7,7 @@
       <!-- Reusable Dashboard Navbar -->
       <DashboardNavbar 
         :userRole="userRole" 
+        :user="currentUser"
         pageTitle="Notifications"
         breadcrumb="Dashboard > Notifications"
         @toggle-sidebar="isSidebarOpen = !isSidebarOpen"
@@ -40,7 +41,7 @@
               </button>
             </div>
             <div class="flex gap-2 w-full lg:w-auto">
-              <button class="flex-1 lg:flex-none flex items-center justify-center gap-2 px-4 py-2.5 bg-slate-50 hover:bg-slate-100 text-slate-700 text-sm font-medium rounded-lg transition-colors">
+              <button @click="markAllRead" class="flex-1 lg:flex-none flex items-center justify-center gap-2 px-4 py-2.5 bg-slate-50 hover:bg-slate-100 text-slate-700 text-sm font-medium rounded-lg transition-colors">
                 <Check class="w-4 h-4" /> Mark All Read
               </button>
             </div>
@@ -65,8 +66,9 @@
                   <span class="text-xs text-slate-400 font-medium whitespace-nowrap ml-4">{{ note.time }}</span>
                 </div>
                 <div class="flex items-center justify-between mt-3">
-                  <span class="text-[10px] font-bold uppercase tracking-wider text-slate-500 bg-slate-100 px-2 py-1 rounded">CMP-2026-{{ note.complaintId }}</span>
-                  <button class="text-sm font-medium text-[#2563EB] hover:underline">View Complaint</button>
+                  <span v-if="note.complaintId !== 'SYS'" class="text-[10px] font-bold uppercase tracking-wider text-slate-500 bg-slate-100 px-2 py-1 rounded">{{ note.complaintId }}</span>
+                  <span v-else></span>
+                  <button v-if="note.complaintId !== 'SYS'" @click.stop="goToComplaint(note)" class="text-sm font-medium text-[#2563EB] hover:underline">View Complaint</button>
                 </div>
               </div>
             </div>
@@ -91,12 +93,12 @@
         <div class="bg-white w-full max-w-md shadow-2xl h-full p-8 overflow-y-auto">
           <button @click="selectedNotification = null" class="mb-8 p-2 hover:bg-slate-100 rounded-lg"><X /></button>
           <h2 class="text-2xl font-bold text-slate-900 mb-4">{{ selectedNotification.title }}</h2>
-          <div class="bg-blue-50 p-4 rounded-xl mb-6">
-            <p class="text-sm text-[#2563EB] font-medium">Complaint #CMP-2026-{{ selectedNotification.complaintId }}</p>
+          <div v-if="selectedNotification.complaintId !== 'SYS'" class="bg-blue-50 p-4 rounded-xl mb-6">
+            <p class="text-sm text-[#2563EB] font-medium">Complaint #{{ selectedNotification.complaintId }}</p>
           </div>
           <p class="text-slate-600 leading-relaxed mb-8">{{ selectedNotification.message }}</p>
           <div class="flex gap-3">
-            <button class="flex-1 px-4 py-3 bg-[#2563EB] text-white rounded-lg font-medium">View Complaint</button>
+            <button v-if="selectedNotification.complaintId !== 'SYS'" @click="goToComplaint(selectedNotification)" class="flex-1 px-4 py-3 bg-[#2563EB] text-white rounded-lg font-medium">View Complaint</button>
             <button @click="selectedNotification = null" class="px-4 py-3 border border-slate-200 rounded-lg font-medium">Close</button>
           </div>
         </div>
@@ -123,6 +125,10 @@ const isSidebarOpen = ref(false)
 const activeFilter  = ref('All')
 const selectedNotification = ref(null)
 const isLoading = ref(true)
+const currentUser = computed(() => {
+  const stored = localStorage.getItem('user')
+  return stored ? JSON.parse(stored) : null
+})
 
 const summaryCards = ref([
   { title: 'All', count: 0, icon: Bell, iconBg: 'bg-blue-50', iconColor: 'text-[#2563EB]' },
@@ -156,7 +162,7 @@ const fetchNotifications = async () => {
       id:          n.id,
       title:       n.title,
       message:     n.message,
-      complaintId: n.complaint_id ? String(n.complaint_id) : 'SYS',
+      complaintId: n.complaint_id || 'SYS',
       time:        new Date(n.created_at).toLocaleString(),
       isRead:      n.is_read,
       icon:        CheckCircle,
@@ -198,6 +204,12 @@ const markAllRead = async () => {
     )
     allNotifications.value.forEach(n => n.isRead = true)
   } catch (err) { console.error(err) }
+}
+
+const goToComplaint = (note) => {
+  if (note.complaintId === 'SYS') return
+  const rawId = parseInt(note.complaintId.replace('CMP-', ''), 10)
+  router.push(`/citizen/complaintdetails/${rawId}`)
 }
 
 onMounted(fetchNotifications)

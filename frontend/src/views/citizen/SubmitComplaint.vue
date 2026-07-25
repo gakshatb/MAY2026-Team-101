@@ -8,6 +8,7 @@
       <!-- Reusable Dashboard Navbar -->
       <DashboardNavbar 
         :userRole="userRole" 
+        :user="currentUser"
         pageTitle="Submit Complaint"
         breadcrumb="Submit Complaint"
         @toggle-sidebar="isSidebarOpen = !isSidebarOpen"
@@ -359,6 +360,10 @@ import {
 // State
 const userRole = ref('Citizen')
 const isSidebarOpen = ref(false)
+const currentUser = computed(() => {
+  const stored = localStorage.getItem('user')
+  return stored ? JSON.parse(stored) : null
+})
 const isSubmitting = ref(false)
 const isLocating = ref(false)
 const isDragging = ref(false)

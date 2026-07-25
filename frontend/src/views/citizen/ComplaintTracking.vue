@@ -7,6 +7,7 @@
       <!-- Navbar -->
       <DashboardNavbar 
         userRole="Citizen" 
+        :user="currentUser"
         pageTitle="Complaint Tracking"
         breadcrumb="My Complaints > Tracking"
         @toggle-sidebar="isSidebarOpen = !isSidebarOpen"
@@ -15,8 +16,13 @@
       <!-- Main Scrollable Content -->
       <main class="flex-1 overflow-x-hidden overflow-y-auto p-4 sm:p-6 lg:p-8">
         
+        <!-- Loading State -->
+        <div v-if="isLoading" class="h-full flex items-center justify-center text-slate-400">
+          Loading tracking details...
+        </div>
+
         <!-- Complaint Not Found State -->
-        <div v-if="!complaint" class="h-full flex items-center justify-center">
+        <div v-else-if="!complaint" class="h-full flex items-center justify-center">
           <div class="text-center">
             <div class="w-24 h-24 bg-slate-100 rounded-full flex items-center justify-center mx-auto mb-6">
               <SearchX class="w-10 h-10 text-slate-400" />
@@ -153,7 +159,7 @@
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import axios from 'axios'
 import Sidebar from '../../components/dashboard/Sidebar.vue'
@@ -167,6 +173,10 @@ const route    = useRoute()
 const router   = useRouter()
 const isSidebarOpen = ref(false)
 const isLoading = ref(true)
+const currentUser = computed(() => {
+  const stored = localStorage.getItem('user')
+  return stored ? JSON.parse(stored) : null
+})
 
 const complaint     = ref(null)
 const timelineSteps = ref([])

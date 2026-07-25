@@ -7,7 +7,7 @@
     <div class="flex-1 flex flex-col h-screen overflow-hidden">
       
       <!-- Navbar Placeholder -->
-      <DashboardNavbar userRole="Citizen" pageTitle="Dashboard" @toggle-sidebar="isSidebarOpen = !isSidebarOpen" />
+      <DashboardNavbar userRole="Citizen" :user="currentUser" pageTitle="Dashboard" @toggle-sidebar="isSidebarOpen = !isSidebarOpen" />
 
       <main class="flex-1 overflow-x-hidden overflow-y-auto p-4 sm:p-6 lg:p-8 custom-scrollbar">
         <div class="max-w-[1600px] mx-auto space-y-6 animate-fade-in">
@@ -15,7 +15,7 @@
           <!-- Welcome Header -->
           <div class="flex flex-col sm:flex-row sm:items-end justify-between gap-4">
             <div>
-              <h1 class="text-2xl sm:text-3xl font-bold text-slate-900 tracking-tight">Good Morning, Shivam Gupta</h1>
+              <h1 class="text-2xl sm:text-3xl font-bold text-slate-900 tracking-tight">{{ greeting }}, {{ currentUser?.name || 'Citizen' }}</h1>
               <p class="text-slate-500 mt-1">Track your complaints and stay updated with the latest progress.</p>
             </div>
             <div class="flex gap-2">
@@ -241,7 +241,7 @@
 </template>
 
 <script setup>
-import { ref, onMounted, onUnmounted } from 'vue'
+import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { useRouter } from 'vue-router'
 import axios from 'axios'
 import Sidebar from '@/components/dashboard/Sidebar.vue'
@@ -256,6 +256,18 @@ import {
 
 const router = useRouter()
 const isSidebarOpen = ref(false)
+
+// The logged-in user, as stored by Login.vue after a successful /api/login call.
+const currentUser = computed(() => {
+  const stored = localStorage.getItem('user')
+  return stored ? JSON.parse(stored) : null
+})
+const greeting = computed(() => {
+  const hour = new Date().getHours()
+  if (hour < 12) return 'Good Morning'
+  if (hour < 17) return 'Good Afternoon'
+  return 'Good Evening'
+})
 const isLoading = ref(true)
 const currentDate = new Date().toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })
 
@@ -339,7 +351,17 @@ const fetchDashboard = async () => {
     }
 
     // Category breakdown
-    const catIcons = { Garbage: Trash2, Roads: Construction, Electrical: Lightbulb, Water: Droplets, Drainage: AlertTriangle }
+    const catIcons = {
+      'Garbage Collection':     Trash2,
+      'Overflowing Dustbin':    Trash2,
+      'Illegal Waste Dumping':  Trash2,
+      'Potholes':               Construction,
+      'Road Damage':            Construction,
+      'Public Property Damage': Construction,
+      'Broken Streetlight':     Lightbulb,
+      'Water Leakage':          Droplets,
+      'Blocked Drainage':       AlertTriangle,
+    }
     categories.value = Object.entries(data.category_breakdown || {}).map(([name, count]) => ({
       name, count, icon: catIcons[name] || ShieldCheck
     }))
