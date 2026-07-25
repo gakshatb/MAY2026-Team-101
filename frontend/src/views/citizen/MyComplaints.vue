@@ -86,7 +86,7 @@
                       </span>
                     </td>
                     <td class="px-6 py-4 text-right">
-                      <button class="text-[#2563EB] font-medium hover:underline text-sm">View Details</button>
+                      <button @click="$router.push(`/citizen/complaintdetails/${c.rawId}`)" class="text-[#2563EB] font-medium hover:underline text-sm">View Details</button>
                     </td>
                   </tr>
                 </tbody>
@@ -101,7 +101,7 @@
                   <span :class="['px-2 py-0.5 rounded text-[10px] font-bold', statusColors(c.status)]">{{ c.status }}</span>
                 </div>
                 <p class="text-xs text-slate-500">ID: {{ c.id }} | {{ c.category }}</p>
-                <button class="w-full py-2 bg-slate-50 rounded-lg text-sm font-medium text-slate-700">View Details</button>
+                <button @click="$router.push(`/citizen/complaintdetails/${c.rawId}`)" class="w-full py-2 bg-slate-50 rounded-lg text-sm font-medium text-slate-700">View Details</button>
               </div>
             </div>
 
@@ -168,18 +168,23 @@ const fetchComplaints = async () => {
     if (filterStatus.value !== 'All')  params.status = filterStatus.value
     if (searchQuery.value.trim())      params.search = searchQuery.value.trim()
 
-    const { data } = await axios.get('http://127.0.0.1:5000/api/citizen/complaints', {
-      headers: { Authorization: `Bearer ${token}` }, params
-    })
+    const [{ data }, { data: summaryData }] = await Promise.all([
+      axios.get('http://127.0.0.1:5000/api/citizen/complaints', {
+        headers: { Authorization: `Bearer ${token}` }, params
+      }),
+      axios.get('http://127.0.0.1:5000/api/citizen/complaints/summary', {
+        headers: { Authorization: `Bearer ${token}` }
+      })
+    ])
     complaints.value = data.complaints.map(c => ({
-      id: `CMP-${c.id}`, rawId: c.id,
+      id: c.id, rawId: c.raw_id,
       title: c.title, category: c.category,
       status: c.status, priority: c.priority,
     }))
-    stats.value[0].count = data.stats.total
-    stats.value[1].count = data.stats.pending
-    stats.value[2].count = data.stats.in_progress
-    stats.value[3].count = data.stats.resolved
+    stats.value[0].count = summaryData.summary.total
+    stats.value[1].count = summaryData.summary.pending
+    stats.value[2].count = summaryData.summary.in_progress
+    stats.value[3].count = summaryData.summary.resolved
   } catch (err) {
     if (err.response?.status === 401) router.push('/login')
   } finally { isLoading.value = false }

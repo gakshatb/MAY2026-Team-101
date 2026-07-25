@@ -453,7 +453,7 @@ const fetchProfile = async () => {
     const { data } = await axios.get('http://127.0.0.1:5000/api/citizen/profile', {
       headers: { Authorization: `Bearer ${token}` }
     })
-    const u = data.user
+    const u = data.profile
     Object.assign(profileForm, {
       fullName:    u.fullName    || '',
       email:       u.email       || '',
@@ -463,8 +463,8 @@ const fetchProfile = async () => {
       state:       u.state       || '',
       pincode:     u.pincode     || '',
       gender:      u.gender      || '',
-      accountId:   u.account_id  || '',
-      memberSince: u.member_since || '',
+      accountId:   u.accountId   || '',
+      memberSince: u.memberSince || '',
     })
   } catch (err) {
     if (err.response?.status === 401) router.push('/login')
@@ -550,8 +550,9 @@ const saveProfile = async () => {
   profileSuccess.value = ''
   try {
     const token = localStorage.getItem('token')
-    await axios.patch('http://127.0.0.1:5000/api/citizen/profile', {
+    await axios.put('http://127.0.0.1:5000/api/citizen/profile', {
       fullName: profileForm.fullName,
+      email:    profileForm.email,
       mobile:   profileForm.mobile,
       address:  profileForm.address,
       city:     profileForm.city,

@@ -524,7 +524,7 @@ const handleSubmit = async () => {
       { headers: { Authorization: `Bearer ${token}` } }
     )
 
-    generatedId.value = `CMP-2026-${data.complaint_id}`
+    generatedId.value = data.complaint.id
     showSuccessModal.value = true
 
   } catch (err) {

@@ -113,20 +113,20 @@
               <div class="bg-white p-6 rounded-[14px] shadow-sm border border-slate-100">
                 <div class="flex items-center justify-between mb-6">
                   <h3 class="font-bold text-slate-900">Current Overview</h3>
-                  <span class="px-3 py-1 bg-blue-50 text-[#2563EB] text-xs font-bold rounded-full uppercase">IN PROGRESS</span>
+                  <span class="px-3 py-1 bg-blue-50 text-[#2563EB] text-xs font-bold rounded-full uppercase">{{ complaint.status }}</span>
                 </div>
                 <div class="space-y-4">
                   <div class="flex justify-between border-b border-slate-50 pb-2">
                     <span class="text-sm text-slate-500">Department</span>
-                    <span class="text-sm font-semibold">Road Maintenance</span>
+                    <span class="text-sm font-semibold">{{ complaint.department }}</span>
                   </div>
                   <div class="flex justify-between border-b border-slate-50 pb-2">
                     <span class="text-sm text-slate-500">Assigned To</span>
-                    <span class="text-sm font-semibold">Amit Singh</span>
+                    <span class="text-sm font-semibold">Not yet assigned</span>
                   </div>
                   <div class="flex justify-between border-b border-slate-50 pb-2">
-                    <span class="text-sm text-slate-500">Expected</span>
-                    <span class="text-sm font-semibold text-[#22C55E]">25 Jul 2026</span>
+                    <span class="text-sm text-slate-500">Priority</span>
+                    <span class="text-sm font-semibold">{{ complaint.priority }}</span>
                   </div>
                 </div>
               </div>
@@ -141,9 +141,8 @@
 
               <!-- Summary -->
               <div class="bg-white p-6 rounded-[14px] shadow-sm border border-slate-100">
-                <h3 class="font-bold text-slate-900 mb-2">Pothole on Main Road</h3>
-                <p class="text-sm text-slate-600 mb-4">Deep pothole causing risk to motorists.</p>
-                <img src="https://images.unsplash.com/photo-1516905042453-2947f637f991?w=400" class="rounded-lg w-full h-32 object-cover" />
+                <h3 class="font-bold text-slate-900 mb-2">{{ complaint.title }}</h3>
+                <p class="text-sm text-slate-600">{{ complaint.location }}</p>
               </div>
             </div>
           </div>
@@ -173,6 +172,14 @@ const complaint     = ref(null)
 const timelineSteps = ref([])
 const activityLog   = ref([])
 
+// The backend's /tracking endpoint returns the complaint plus the real
+// StatusLog history (activity_log) — it does not yet return a pre-built
+// stage timeline or an assigned-officer name (no assignment feature exists
+// yet). We derive the 4-stage progress tracker from the complaint's actual
+// status vocabulary and the real log dates instead.
+const STAGE_ORDER  = ['Pending', 'In Progress', 'Resolved', 'Closed']
+const STAGE_LABELS = { Pending: 'Submitted', 'In Progress': 'In Progress', Resolved: 'Resolved', Closed: 'Closed' }
+
 onMounted(async () => {
   try {
     const token = localStorage.getItem('token')
@@ -181,9 +188,27 @@ onMounted(async () => {
       `http://127.0.0.1:5000/api/citizen/complaints/${id}/tracking`,
       { headers: { Authorization: `Bearer ${token}` } }
     )
-    complaint.value     = data.complaint
-    timelineSteps.value = data.timeline_steps
-    activityLog.value   = data.activity_log
+    complaint.value = data.complaint
+
+    const currentIndex = STAGE_ORDER.indexOf(complaint.value.status)
+    timelineSteps.value = STAGE_ORDER.map((stage, index) => {
+      const logEntry = data.activity_log.find(l => l.new_status === stage)
+      return {
+        title:  STAGE_LABELS[stage],
+        status: index < currentIndex ? 'completed' : index === currentIndex ? 'active' : 'upcoming',
+        date:   logEntry?.changed_at
+          ? new Date(logEntry.changed_at).toLocaleDateString('en-US', { month: 'short', day: '2-digit', year: 'numeric' })
+          : null
+      }
+    })
+
+    activityLog.value = data.activity_log.map((log, index) => ({
+      id:      index,
+      date:    log.changed_at ? new Date(log.changed_at).toLocaleString() : '—',
+      status:  log.new_status,
+      officer: '—', // no officer/worker assignment feature yet on the backend
+      remarks: log.remark || '—',
+    }))
   } catch (err) {
     if (err.response?.status === 401) router.push('/login')
     console.error('Tracking fetch error:', err)

@@ -106,7 +106,7 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted, watch } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import axios from 'axios'
 import Sidebar from '@/components/dashboard/Sidebar.vue'
@@ -124,26 +124,33 @@ const activeFilter  = ref('All')
 const selectedNotification = ref(null)
 const isLoading = ref(true)
 
-const summaryCards = [
-  { title: 'All', count: 12, icon: Bell, iconBg: 'bg-blue-50', iconColor: 'text-[#2563EB]' },
-  { title: 'Unread', count: 3, icon: Mail, iconBg: 'bg-amber-50', iconColor: 'text-amber-500' },
-  { title: 'Read', count: 9, icon: CheckCircle, iconBg: 'bg-green-50', iconColor: 'text-[#22C55E]' },
-  { title: 'Important', count: 2, icon: Shield, iconBg: 'bg-red-50', iconColor: 'text-red-500' },
-]
+const summaryCards = ref([
+  { title: 'All', count: 0, icon: Bell, iconBg: 'bg-blue-50', iconColor: 'text-[#2563EB]' },
+  { title: 'Unread', count: 0, icon: Mail, iconBg: 'bg-amber-50', iconColor: 'text-amber-500' },
+  { title: 'Read', count: 0, icon: CheckCircle, iconBg: 'bg-green-50', iconColor: 'text-[#22C55E]' },
+  { title: 'System', count: 0, icon: Shield, iconBg: 'bg-red-50', iconColor: 'text-red-500' },
+])
 
 const filters = ['All', 'Unread', 'Complaint Updates', 'System Messages']
 
 const allNotifications = ref([])
 
-const filteredNotifications = computed(() => allNotifications.value)
+// The backend doesn't support server-side filtering on this endpoint —
+// it always returns the full list — so filtering happens client-side.
+const filteredNotifications = computed(() => {
+  if (activeFilter.value === 'All') return allNotifications.value
+  if (activeFilter.value === 'Unread') return allNotifications.value.filter(n => !n.isRead)
+  if (activeFilter.value === 'Complaint Updates') return allNotifications.value.filter(n => n.complaintId !== 'SYS')
+  if (activeFilter.value === 'System Messages') return allNotifications.value.filter(n => n.complaintId === 'SYS')
+  return allNotifications.value
+})
 
 const fetchNotifications = async () => {
   isLoading.value = true
   try {
     const token = localStorage.getItem('token')
     const { data } = await axios.get('http://127.0.0.1:5000/api/citizen/notifications', {
-      headers: { Authorization: `Bearer ${token}` },
-      params: { filter: activeFilter.value }
+      headers: { Authorization: `Bearer ${token}` }
     })
     allNotifications.value = data.notifications.map(n => ({
       id:          n.id,
@@ -156,6 +163,11 @@ const fetchNotifications = async () => {
       iconBg:      n.type === 'system' ? 'bg-red-50'    : 'bg-green-50',
       iconColor:   n.type === 'system' ? 'text-red-500' : 'text-green-500',
     }))
+
+    summaryCards.value[0].count = data.summary.all
+    summaryCards.value[1].count = data.summary.unread
+    summaryCards.value[2].count = data.summary.read
+    summaryCards.value[3].count = allNotifications.value.filter(n => n.complaintId === 'SYS').length
   } catch (err) {
     if (err.response?.status === 401) router.push('/login')
   } finally { isLoading.value = false }
@@ -188,7 +200,6 @@ const markAllRead = async () => {
   } catch (err) { console.error(err) }
 }
 
-watch(activeFilter, fetchNotifications)
 onMounted(fetchNotifications)
 </script>
 

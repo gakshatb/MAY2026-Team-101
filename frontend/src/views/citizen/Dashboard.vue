@@ -38,7 +38,7 @@
                 <p class="text-sm text-slate-600 mt-0.5">You have one completed complaint awaiting your feedback. Help us improve our services.</p>
               </div>
             </div>
-            <router-link to="/citizen/feedback/CMP-8799" class="px-5 py-2.5 bg-amber-500 hover:bg-amber-600 text-white text-sm font-bold rounded-lg shadow-sm transition-colors whitespace-nowrap text-center">
+            <router-link :to="`/citizen/feedback/${pendingFeedbackId}`" class="px-5 py-2.5 bg-amber-500 hover:bg-amber-600 text-white text-sm font-bold rounded-lg shadow-sm transition-colors whitespace-nowrap text-center">
               Give Feedback
             </router-link>
           </div>
@@ -106,10 +106,10 @@
                       
                       <!-- Action Buttons -->
                       <div class="flex items-center gap-2 md:self-end">
-                        <router-link :to="`/citizen/track/${comp.id}`" class="px-4 py-2 bg-slate-100 text-slate-700 hover:bg-slate-200 text-xs font-bold rounded-lg transition-colors flex items-center gap-2">
+                        <router-link :to="`/citizen/track/${comp.rawId}`" class="px-4 py-2 bg-slate-100 text-slate-700 hover:bg-slate-200 text-xs font-bold rounded-lg transition-colors flex items-center gap-2">
                           <Navigation class="w-3.5 h-3.5"/> Track
                         </router-link>
-                        <router-link :to="`/citizen/details/${comp.id}`" class="px-4 py-2 bg-white border border-slate-200 text-slate-700 hover:bg-slate-50 text-xs font-bold rounded-lg transition-colors">
+                        <router-link :to="`/citizen/complaintdetails/${comp.rawId}`" class="px-4 py-2 bg-white border border-slate-200 text-slate-700 hover:bg-slate-50 text-xs font-bold rounded-lg transition-colors">
                           Details
                         </router-link>
                       </div>
@@ -294,7 +294,7 @@ const fetchDashboard = async () => {
     })
 
     // Update summary stats values from API
-    const s = data.stats
+    const s = data.summary
     summaryStats.value[0].value = String(s.total)
     summaryStats.value[1].value = String(s.pending)
     summaryStats.value[2].value = String(s.in_progress)
@@ -303,7 +303,8 @@ const fetchDashboard = async () => {
     summaryStats.value[5].value = String(s.unread_notifications)
 
     recentComplaints.value = data.recent_complaints.map(c => ({
-      id:            `CMP-${c.id}`,
+      id:            c.id,
+      rawId:         c.raw_id,
       title:         c.title,
       category:      c.category,
       status:        c.status,
@@ -321,9 +322,9 @@ const fetchDashboard = async () => {
       color: 'text-blue-600',
     }))
 
-    if (data.pending_feedback && data.pending_feedback.length > 0) {
+    if (data.pending_feedback_complaint_id) {
       hasPendingFeedback.value = true
-      pendingFeedbackId.value  = data.pending_feedback[0].id
+      pendingFeedbackId.value  = parseInt(data.pending_feedback_complaint_id.replace('CMP-', ''), 10)
     }
 
     // Category breakdown

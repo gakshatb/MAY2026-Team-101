@@ -299,7 +299,7 @@
 </template>
 
 <script setup>
-import { ref, reactive, computed } from 'vue'
+import { ref, reactive, computed, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import axios from 'axios'
 import Sidebar from '@/components/dashboard/Sidebar.vue'
@@ -342,10 +342,25 @@ const feedbackCategories = [
   'Satisfied with service', 'Clean work', 'Workers were professional'
 ]
 
-const pastFeedback = [
-  { id: '00110', rating: 5, date: 'Jun 12, 2026', comment: 'Very quick response. The streetlight was fixed within 24 hours.' },
-  { id: '00085', rating: 4, date: 'May 04, 2026', comment: 'Good work, but the workers left some debris behind.' }
-]
+const pastFeedback = ref([])
+
+const fetchPastFeedback = async () => {
+  try {
+    const token = localStorage.getItem('token')
+    const { data } = await axios.get('http://127.0.0.1:5000/api/citizen/feedback', {
+      headers: { Authorization: `Bearer ${token}` }
+    })
+    pastFeedback.value = data.feedback.map(fb => ({
+      id:      fb.complaint_id.replace('CMP-', ''),
+      rating:  fb.rating,
+      date:    fb.submitted_at ? new Date(fb.submitted_at).toLocaleDateString('en-US', { month: 'short', day: '2-digit', year: 'numeric' }) : '',
+      comment: fb.comment,
+    }))
+  } catch (err) {
+    console.error('Past feedback fetch error:', err)
+  }
+}
+onMounted(fetchPastFeedback)
 
 const ratingText = computed(() => {
   const val = hoverOverall.value || form.overallRating

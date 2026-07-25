@@ -66,14 +66,15 @@
                 <h2 class="text-lg font-bold text-slate-900 mb-4 flex items-center gap-2">
                   <Camera class="w-5 h-5 text-slate-400" /> Uploaded Evidence
                 </h2>
-                <div class="grid grid-cols-2 gap-4">
-                  <div class="relative group cursor-pointer overflow-hidden rounded-lg h-32 border border-slate-200">
-                    <img src="https://images.unsplash.com/photo-1621451537084-482c73073a0f?q=80&w=400&auto=format" alt="Evidence" class="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110" />
+                <div v-if="images.length" class="grid grid-cols-2 gap-4">
+                  <div v-for="(img, i) in images" :key="i" class="relative group cursor-pointer overflow-hidden rounded-lg h-32 border border-slate-200">
+                    <img :src="`http://127.0.0.1:5000${img}`" alt="Evidence" class="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110" />
                     <div class="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity">
                       <Maximize2 class="w-6 h-6 text-white" />
                     </div>
                   </div>
                 </div>
+                <p v-else class="text-sm text-slate-400">No evidence images were attached to this complaint.</p>
               </div>
 
             </div>
@@ -84,7 +85,7 @@
               <!-- Status Card -->
               <div class="bg-white p-6 rounded-[14px] shadow-sm border border-slate-100 text-center">
                 <p class="text-xs font-medium text-slate-500 uppercase tracking-wider mb-2">Current Status</p>
-                <span class="inline-block px-4 py-2 rounded-full text-sm font-bold bg-blue-50 text-[#2563EB]">IN PROGRESS</span>
+                <span class="inline-block px-4 py-2 rounded-full text-sm font-bold bg-blue-50 text-[#2563EB] uppercase">{{ complaint.status }}</span>
               </div>
 
               <!-- Assigned Personnel Card -->
@@ -96,7 +97,7 @@
                       <User class="w-5 h-5 text-slate-500" />
                     </div>
                     <div>
-                      <p class="text-sm font-bold text-slate-900">Mr. Rajesh Kumar</p>
+                      <p class="text-sm font-bold text-slate-900">Not yet assigned</p>
                       <p class="text-xs text-slate-500">Civic Officer</p>
                     </div>
                   </div>
@@ -105,7 +106,7 @@
                       <HardHat class="w-5 h-5 text-slate-500" />
                     </div>
                     <div>
-                      <p class="text-sm font-bold text-slate-900">Amit Singh</p>
+                      <p class="text-sm font-bold text-slate-900">Not yet assigned</p>
                       <p class="text-xs text-slate-500">Field Worker</p>
                     </div>
                   </div>
@@ -122,7 +123,7 @@
                     <p class="text-[10px] text-slate-400">{{ step.date }}</p>
                   </div>
                 </div>
-                <button class="w-full mt-6 text-sm font-medium text-[#2563EB] hover:underline">View Complete Timeline</button>
+                <button @click="router.push(`/citizen/track/${rawId}`)" class="w-full mt-6 text-sm font-medium text-[#2563EB] hover:underline">View Complete Timeline</button>
               </div>
 
             </div>
@@ -149,33 +150,62 @@ const router   = useRouter()
 const isSidebarOpen = ref(false)
 const isLoading = ref(true)
 
-const complaint      = ref(null)
+const complaint       = ref(null)
 const locationDetails = ref({})
-const timeline       = ref([])
+const images          = ref([])
+const timeline        = ref([])
+const rawId           = ref(null)
+
+const STAGE_ORDER  = ['Pending', 'In Progress', 'Resolved', 'Closed']
+const STAGE_LABELS = { Pending: 'Submitted', 'In Progress': 'In Progress', Resolved: 'Resolved', Closed: 'Closed' }
 
 onMounted(async () => {
   try {
     const token = localStorage.getItem('token')
     const id    = route.params.id
-    const { data } = await axios.get(
-      `http://127.0.0.1:5000/api/citizen/complaints/${id}`,
-      { headers: { Authorization: `Bearer ${token}` } }
-    )
+
+    // The plain /complaints/:id endpoint has full complaint fields but no
+    // activity history — that lives on the separate /tracking endpoint, so
+    // fetch both for this page's details + timeline preview.
+    const [{ data }, { data: trackingData }] = await Promise.all([
+      axios.get(`http://127.0.0.1:5000/api/citizen/complaints/${id}`, {
+        headers: { Authorization: `Bearer ${token}` }
+      }),
+      axios.get(`http://127.0.0.1:5000/api/citizen/complaints/${id}/tracking`, {
+        headers: { Authorization: `Bearer ${token}` }
+      })
+    ])
     const c = data.complaint
+    rawId.value = c.raw_id
     complaint.value = {
-      id:          `CMP-${c.id}`,
-      title:       c.title,
-      category:    c.category,
-      status:      c.status,
-      priority:    c.priority,
-      submittedAt: c.created_at ? new Date(c.created_at).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: '2-digit' }) : '',
-      description: c.description,
-      image_urls:  c.image_urls || [],
+      id:           c.id,
+      title:        c.title,
+      category:     c.category,
+      status:       c.status,
+      priority:     c.priority,
+      submittedAt:  c.created_at ? new Date(c.created_at).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: '2-digit' }) : '',
+      description:  c.description,
       has_feedback: c.has_feedback,
-      assignment:  c.assignment,
     }
-    locationDetails.value = c.location_details || {}
-    timeline.value = c.timeline || []
+    images.value = c.images || []
+
+    locationDetails.value = Object.fromEntries(
+      Object.entries({
+        City: c.city, Ward: c.ward, Area: c.area, Street: c.street, Landmark: c.landmark
+      }).filter(([, val]) => !!val)
+    )
+
+    const currentIndex = STAGE_ORDER.indexOf(c.status)
+    timeline.value = STAGE_ORDER.map((stage, index) => {
+      const logEntry = trackingData.activity_log.find(l => l.new_status === stage)
+      return {
+        title: STAGE_LABELS[stage],
+        completed: index <= currentIndex,
+        date: logEntry?.changed_at
+          ? new Date(logEntry.changed_at).toLocaleDateString('en-US', { month: 'short', day: '2-digit', year: 'numeric' })
+          : ''
+      }
+    })
   } catch (err) {
     if (err.response?.status === 401) router.push('/login')
     console.error('ComplaintDetails fetch error:', err)
