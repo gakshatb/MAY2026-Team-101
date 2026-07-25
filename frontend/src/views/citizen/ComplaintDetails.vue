@@ -14,7 +14,22 @@
 
       <!-- Main Scrollable Content -->
       <main class="flex-1 overflow-x-hidden overflow-y-auto p-4 sm:p-6 lg:p-8">
-        <div class="max-w-7xl mx-auto space-y-6">
+
+        <!-- Loading state -->
+        <div v-if="isLoading" class="max-w-7xl mx-auto py-24 text-center text-slate-400">
+          Loading complaint details...
+        </div>
+
+        <!-- Error / not found state -->
+        <div v-else-if="!complaint" class="max-w-7xl mx-auto py-24 text-center">
+          <p class="text-slate-500 font-medium">We couldn't load this complaint.</p>
+          <p class="text-sm text-slate-400 mt-1">It may not exist, or you may not have access to it.</p>
+          <button @click="router.push('/citizen/complaints')" class="mt-4 px-4 py-2 bg-[#2563EB] text-white rounded-lg text-sm font-medium hover:bg-[#1E40AF] transition-colors">
+            Back to My Complaints
+          </button>
+        </div>
+
+        <div v-else class="max-w-7xl mx-auto space-y-6">
           
           <!-- Header Actions -->
           <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
@@ -207,6 +222,7 @@ onMounted(async () => {
       }
     })
   } catch (err) {
+    complaint.value = null
     if (err.response?.status === 401) router.push('/login')
     console.error('ComplaintDetails fetch error:', err)
   } finally {

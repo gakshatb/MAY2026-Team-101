@@ -188,14 +188,15 @@
               <!-- Activity Timeline -->
               <div class="bg-white rounded-[14px] shadow-sm border border-slate-100 p-5">
                 <h3 class="font-bold text-slate-900 flex items-center gap-2 mb-5"><Clock class="w-5 h-5 text-purple-500" /> Recent Activity</h3>
-                <div class="relative pl-4 border-l-2 border-slate-100 space-y-6">
+                <div v-if="timeline.length" class="relative pl-4 border-l-2 border-slate-100 space-y-6">
                   <div v-for="(event, idx) in timeline" :key="idx" class="relative">
                     <div class="absolute -left-[21px] w-2.5 h-2.5 rounded-full ring-4 ring-white border-2" :class="idx === 0 ? 'bg-[#2563EB] border-[#2563EB]' : 'bg-slate-300 border-slate-300'"></div>
                     <p class="text-sm font-bold text-slate-900">{{ event.action }}</p>
-                    <p class="text-[10px] font-medium text-slate-500 mt-0.5">{{ event.date }} • {{ event.time }}</p>
+                    <p class="text-[10px] font-medium text-slate-500 mt-0.5">{{ event.date }}<span v-if="event.time"> • {{ event.time }}</span></p>
                     <p class="text-xs text-slate-600 font-mono mt-1">{{ event.id }}</p>
                   </div>
                 </div>
+                <p v-else class="text-sm text-slate-400">No recent activity yet.</p>
               </div>
 
               <!-- Tips & Awareness -->
@@ -283,6 +284,7 @@ const quickActions = [
 const recentComplaints = ref([])
 const notifications    = ref([])
 const categories       = ref([])
+const timeline          = ref([])
 
 // ── API fetch ─────────────────────────────────────────────────────────
 const fetchDashboard = async () => {
@@ -320,6 +322,15 @@ const fetchDashboard = async () => {
       icon:  CheckCircle,
       bg:    'bg-blue-100',
       color: 'text-blue-600',
+    }))
+
+    // No separate activity-log endpoint for the dashboard, so build the
+    // "Recent Activity" timeline from the same recent-complaints data.
+    timeline.value = recentComplaints.value.slice(0, 5).map(c => ({
+      action: `${c.status}: ${c.title}`,
+      date:   c.submittedDate,
+      time:   '',
+      id:     c.id,
     }))
 
     if (data.pending_feedback_complaint_id) {
