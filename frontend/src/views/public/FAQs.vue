@@ -7,16 +7,23 @@
       <section class="py-20 px-6 bg-white border-b border-slate-100">
         <div class="max-w-7xl mx-auto flex flex-col lg:flex-row items-center gap-12">
           <div class="flex-1 text-center lg:text-left">
-            <h1 class="text-4xl lg:text-6xl font-extrabold text-slate-900 leading-tight mb-6">Frequently Asked Questions</h1>
+            <h1 class="text-4xl lg:text-6xl font-extrabold text-slate-900 leading-tight mb-6">Frequently Asked Questions
+            </h1>
             <p class="text-lg text-slate-600 mb-8 max-w-xl lg:mx-0 mx-auto leading-relaxed">
-              Find answers to the most common questions about CivicDesk and how our platform helps resolve civic issues in your city.
+              Find answers to the most common questions about CivicDesk and how our platform helps resolve civic issues
+              in your city.
             </p>
             <div class="flex gap-4 justify-center lg:justify-start">
-              <router-link to="/citizen/submit" class="bg-[#2563EB] hover:bg-[#1E40AF] text-white px-8 py-3.5 rounded-lg font-semibold transition-all shadow-md">Report Complaint</router-link>
-              <button class="bg-slate-100 hover:bg-slate-200 text-slate-700 px-8 py-3.5 rounded-lg font-semibold transition-all">Contact Support</button>
+              <router-link to="/citizen/submit"
+                class="bg-[#2563EB] hover:bg-[#1E40AF] text-white px-8 py-3.5 rounded-lg font-semibold transition-all shadow-md">Report
+                Complaint</router-link>
+              <button
+                class="bg-slate-100 hover:bg-slate-200 text-slate-700 px-8 py-3.5 rounded-lg font-semibold transition-all">Contact
+                Support</button>
             </div>
           </div>
-          <div class="flex-1 w-full h-80 bg-slate-50 rounded-2xl flex items-center justify-center border-2 border-dashed border-slate-200">
+          <div
+            class="flex-1 w-full h-80 bg-slate-50 rounded-2xl flex items-center justify-center border-2 border-dashed border-slate-200">
             <span class="text-slate-400 font-medium text-center p-4">[ Illustration: Help Center & Support ]</span>
           </div>
         </div>
@@ -27,12 +34,8 @@
         <div class="max-w-3xl mx-auto">
           <div class="relative group">
             <Search class="absolute left-4 top-4 text-slate-400 w-5 h-5" />
-            <input 
-              v-model="searchQuery" 
-              type="text" 
-              placeholder="Search your question..." 
-              class="w-full pl-12 pr-6 py-4 rounded-xl border border-slate-200 shadow-sm focus:ring-2 focus:ring-[#2563EB]/20 focus:border-[#2563EB] transition-all"
-            />
+            <input v-model="searchQuery" type="text" placeholder="Search your question..."
+              class="w-full pl-12 pr-6 py-4 rounded-xl border border-slate-200 shadow-sm focus:ring-2 focus:ring-[#2563EB]/20 focus:border-[#2563EB] transition-all" />
           </div>
         </div>
       </section>
@@ -40,11 +43,8 @@
       <!-- Category Navigation -->
       <section class="px-6 pb-12">
         <div class="max-w-5xl mx-auto flex flex-wrap gap-3 justify-center">
-          <button 
-            v-for="cat in categories" :key="cat.id"
-            @click="scrollToSection(cat.id)"
-            class="px-5 py-2.5 bg-white border border-slate-200 rounded-lg text-sm font-medium hover:border-[#2563EB] hover:text-[#2563EB] transition-colors"
-          >
+          <button v-for="cat in categories" :key="cat.id" @click="scrollToSection(cat.id)"
+            class="px-5 py-2.5 bg-white border border-slate-200 rounded-lg text-sm font-medium hover:border-[#2563EB] hover:text-[#2563EB] transition-colors">
             {{ cat.name }}
           </button>
         </div>
@@ -56,17 +56,14 @@
           <div v-for="cat in filteredSections" :key="cat.id" :id="cat.id" class="mb-12">
             <h2 class="text-2xl font-bold text-slate-900 mb-6">{{ cat.name }}</h2>
             <div class="space-y-4">
-              <div 
-                v-for="faq in cat.questions" :key="faq.q"
-                class="bg-white border border-slate-200 rounded-xl overflow-hidden transition-all"
-              >
-                <button 
-                  @click="toggleFaq(faq)" 
+              <div v-for="faq in cat.questions" :key="faq.q"
+                class="bg-white border border-slate-200 rounded-xl overflow-hidden transition-all">
+                <button @click="toggleFaq(faq)"
                   class="w-full p-6 text-left font-bold text-slate-900 flex justify-between items-center hover:bg-slate-50"
-                  :aria-expanded="faq.isOpen"
-                >
+                  :aria-expanded="faq.isOpen">
                   {{ faq.q }}
-                  <ChevronDown :class="['w-5 h-5 text-slate-400 transition-transform', faq.isOpen ? 'rotate-180' : '']" />
+                  <ChevronDown
+                    :class="['w-5 h-5 text-slate-400 transition-transform', faq.isOpen ? 'rotate-180' : '']" />
                 </button>
                 <div v-if="faq.isOpen" class="p-6 pt-0 text-slate-600 leading-relaxed border-t border-slate-50">
                   {{ faq.a }}
@@ -100,17 +97,23 @@ import { Search, ChevronDown } from 'lucide-vue-next'
 const searchQuery = ref('')
 
 const categories = ref([
-  { id: 'general', name: 'General', questions: [
-    { q: 'What is CivicDesk?', a: 'CivicDesk is a digital platform bridging citizens and municipal authorities to resolve civic issues transparently.', isOpen: false },
-    { q: 'Is CivicDesk free?', a: 'Yes, CivicDesk is completely free for all citizens to use.', isOpen: false }
-  ]},
-  { id: 'submission', name: 'Complaint Submission', questions: [
-    { q: 'How do I submit a complaint?', a: 'Navigate to the dashboard and click "Report Complaint". Fill out the form and submit.', isOpen: false },
-    { q: 'Can I upload photos?', a: 'Yes, uploading images is highly encouraged to help authorities assess the issue.', isOpen: false }
-  ]},
-  { id: 'tracking', name: 'Tracking', questions: [
-    { q: 'How do I track my complaint?', a: 'Visit "My Complaints" in your dashboard to see real-time status updates.', isOpen: false }
-  ]}
+  {
+    id: 'general', name: 'General', questions: [
+      { q: 'What is CivicDesk?', a: 'CivicDesk is a digital platform bridging citizens and municipal authorities to resolve civic issues transparently.', isOpen: false },
+      { q: 'Is CivicDesk free?', a: 'Yes, CivicDesk is completely free for all citizens to use.', isOpen: false }
+    ]
+  },
+  {
+    id: 'submission', name: 'Complaint Submission', questions: [
+      { q: 'How do I submit a complaint?', a: 'Navigate to the dashboard and click "Report Complaint". Fill out the form and submit.', isOpen: false },
+      { q: 'Can I upload photos?', a: 'Yes, uploading images is highly encouraged to help authorities assess the issue.', isOpen: false }
+    ]
+  },
+  {
+    id: 'tracking', name: 'Tracking', questions: [
+      { q: 'How do I track my complaint?', a: 'Visit "My Complaints" in your dashboard to see real-time status updates.', isOpen: false }
+    ]
+  }
 ])
 
 const stats = [
@@ -132,8 +135,8 @@ const filteredSections = computed(() => {
   if (!searchQuery.value) return categories.value
   return categories.value.map(cat => ({
     ...cat,
-    questions: cat.questions.filter(q => 
-      q.q.toLowerCase().includes(searchQuery.value.toLowerCase()) || 
+    questions: cat.questions.filter(q =>
+      q.q.toLowerCase().includes(searchQuery.value.toLowerCase()) ||
       q.a.toLowerCase().includes(searchQuery.value.toLowerCase())
     )
   })).filter(cat => cat.questions.length > 0)

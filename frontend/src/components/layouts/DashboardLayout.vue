@@ -34,38 +34,36 @@
 </template>
 
 <script setup>
-import { ref, computed } from 'vue'
+import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { useRoute } from 'vue-router'
-import Sidebar from '../components/dashboard/Sidebar.vue'
-import DashboardNavbar from '../components/dashboard/DashboardNavbar.vue'
+import Sidebar from '../dashboard/Sidebar.vue'
+import DashboardNavbar from '../dashboard/DashboardNavbar.vue'
 
 const route = useRoute()
 
-// Local state for layout mechanics
 const isSidebarOpen = ref(false)
 
-// The logged-in user, as stored by Login.vue after a successful /api/login
-// call. This same object backs the DashboardNavbar profile display and the
-// role shown there — Sidebar.vue separately derives role from the URL,
-// which is fine as long as route guards keep users on their own section.
-const currentUser = computed(() => {
+const currentUser = ref(readUser())
+
+function readUser() {
   const stored = localStorage.getItem('user')
   return stored ? JSON.parse(stored) : null
-})
+}
+
+function syncUser() {
+  currentUser.value = readUser()
+}
+
+onMounted(() => window.addEventListener('user-updated', syncUser))
+onUnmounted(() => window.removeEventListener('user-updated', syncUser))
 
 const currentUserRole = computed(() => currentUser.value?.role || 'Citizen')
 
-// Page title/breadcrumb come from each route's meta fields, e.g.:
-//   { path: '/citizen/submit', meta: { title: 'Submit Complaint', breadcrumb: 'New Complaint' } }
-// Falls back to sensible defaults if a route hasn't set meta yet.
-const currentPageTitle = computed(() => route.meta?.title || 'Dashboard')
+const currentPageTitle = computed(() => route.meta?.pageTitle || 'Dashboard')
 const currentBreadcrumb = computed(() => route.meta?.breadcrumb || '')
 </script>
 
 <style>
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
-
-.font-sans {
-  font-family: 'Inter', sans-serif;
-}
+.font-sans { font-family: 'Inter', sans-serif; }
 </style>

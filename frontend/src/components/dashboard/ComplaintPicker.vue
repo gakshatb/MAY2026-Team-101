@@ -1,13 +1,3 @@
-<!--
-  ComplaintPicker.vue
-
-  Shown by ComplaintDetails.vue / ComplaintTracking.vue / Feedback.vue whenever
-  those pages are opened without a specific complaint id in the URL (e.g. via
-  the sidebar links, which no longer carry a hardcoded id). Fetches the
-  citizen's own complaints, optionally filters them (status / feedback
-  eligibility), and lets them pick one — emitting `select` with the chosen
-  complaint's raw numeric id so the parent page can load its full data.
--->
 <template>
   <div class="bg-white rounded-[14px] shadow-sm border border-slate-100 overflow-hidden">
     <div class="px-6 py-5 border-b border-slate-100">
@@ -94,12 +84,9 @@ const props = defineProps({
   title:        { type: String, default: 'Select a Complaint' },
   subtitle:     { type: String, default: '' },
   actionLabel:  { type: String, default: 'Select' },
-  // feedback (c.has_feedback). Leave null to keep using actionLabel always.
   viewedLabel:  { type: String, default: null },
   emptyMessage: { type: String, default: 'No complaints available.' },
-  // Only show complaints in this status (e.g. 'Resolved' for the Feedback picker).
   statusFilter: { type: String, default: null },
-  // Hide complaints that already have feedback submitted (Feedback picker only).
   excludeWithFeedback: { type: Boolean, default: false },
 })
 
@@ -139,8 +126,6 @@ const fetchComplaints = async () => {
 
 onMounted(fetchComplaints)
 
-// Per-row action label: use viewedLabel when the complaint already has
-// feedback and a viewedLabel was provided, otherwise fall back to actionLabel.
 const rowLabel = (c) => (c.has_feedback && props.viewedLabel) ? props.viewedLabel : props.actionLabel
 
 const statusColors = (status) => {

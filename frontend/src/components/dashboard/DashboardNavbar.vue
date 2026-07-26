@@ -71,8 +71,6 @@ const props = defineProps({
   }
 })
 
-// Mirrors the role-prefix logic in Sidebar.vue so "Profile" and
-// "Notifications" here land on the same routes the sidebar links to.
 const rolePrefix = computed(() => {
   switch (props.userRole) {
     case 'Administrator':

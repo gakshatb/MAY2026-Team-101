@@ -8,13 +8,19 @@
         <div class="max-w-7xl mx-auto flex flex-col lg:flex-row items-center gap-12">
           <div class="flex-1 text-center lg:text-left">
             <h1 class="text-4xl lg:text-6xl font-extrabold text-slate-900 leading-tight mb-6">Our Services</h1>
-            <p class="text-lg text-slate-600 mb-8 max-w-2xl lg:mx-0 mx-auto">CivicDesk provides a complete digital platform for reporting, managing, tracking, and resolving civic complaints efficiently.</p>
+            <p class="text-lg text-slate-600 mb-8 max-w-2xl lg:mx-0 mx-auto">CivicDesk provides a complete digital
+              platform for reporting, managing, tracking, and resolving civic complaints efficiently.</p>
             <div class="flex gap-4 justify-center lg:justify-start">
-              <router-link to="/citizen/submit" class="bg-[#2563EB] hover:bg-[#1E40AF] text-white px-8 py-3 rounded-lg font-medium transition-all">Report Complaint</router-link>
-              <router-link to="/contact" class="bg-slate-100 hover:bg-slate-200 text-slate-700 px-8 py-3 rounded-lg font-medium transition-all">Contact Us</router-link>
+              <router-link to="/citizen/submit"
+                class="bg-[#2563EB] hover:bg-[#1E40AF] text-white px-8 py-3 rounded-lg font-medium transition-all">Report
+                Complaint</router-link>
+              <router-link to="/contact"
+                class="bg-slate-100 hover:bg-slate-200 text-slate-700 px-8 py-3 rounded-lg font-medium transition-all">Contact
+                Us</router-link>
             </div>
           </div>
-          <div class="flex-1 w-full h-80 bg-slate-100 rounded-2xl flex items-center justify-center border-2 border-dashed border-slate-300">
+          <div
+            class="flex-1 w-full h-80 bg-slate-100 rounded-2xl flex items-center justify-center border-2 border-dashed border-slate-300">
             <span class="text-slate-400 font-medium">[ Hero Illustration: Smart City Maintenance ]</span>
           </div>
         </div>
@@ -25,8 +31,10 @@
         <div class="max-w-4xl mx-auto text-center">
           <h2 class="text-3xl font-bold text-slate-900 mb-6">Making Civic Services Easier</h2>
           <p class="text-lg text-slate-600 leading-relaxed">
-            Communication between citizens and municipal authorities is often fragmented. CivicDesk removes these barriers by digitizing the entire complaint lifecycle. 
-            We replace confusion with <strong>transparency</strong>, ensuring every report is tracked, assigned, and resolved with <strong>efficiency</strong>. 
+            Communication between citizens and municipal authorities is often fragmented. CivicDesk removes these
+            barriers by digitizing the entire complaint lifecycle.
+            We replace confusion with <strong>transparency</strong>, ensuring every report is tracked, assigned, and
+            resolved with <strong>efficiency</strong>.
             By providing a single source of truth, we foster a culture of accountability and community care.
           </p>
         </div>
@@ -37,7 +45,8 @@
         <div class="max-w-7xl mx-auto">
           <h2 class="text-3xl font-bold text-slate-900 mb-12 text-center">Core Services</h2>
           <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-            <div v-for="service in coreServices" :key="service.title" class="p-8 bg-white border border-slate-100 rounded-[14px] shadow-sm hover:shadow-lg transition-all group">
+            <div v-for="service in coreServices" :key="service.title"
+              class="p-8 bg-white border border-slate-100 rounded-[14px] shadow-sm hover:shadow-lg transition-all group">
               <component :is="service.icon" class="w-10 h-10 text-[#2563EB] mb-6" />
               <h3 class="text-xl font-bold text-slate-900 mb-3">{{ service.title }}</h3>
               <p class="text-slate-600 mb-6">{{ service.desc }}</p>
@@ -51,7 +60,8 @@
       <section class="py-20 px-6 max-w-7xl mx-auto">
         <h2 class="text-3xl font-bold text-slate-900 mb-12 text-center">Services for Every User</h2>
         <div class="grid grid-cols-1 md:grid-cols-3 gap-8">
-          <div v-for="role in roleServices" :key="role.title" class="bg-white p-8 rounded-[14px] shadow-sm border border-slate-100">
+          <div v-for="role in roleServices" :key="role.title"
+            class="bg-white p-8 rounded-[14px] shadow-sm border border-slate-100">
             <h3 class="text-2xl font-bold text-slate-900 mb-6">{{ role.title }}</h3>
             <ul class="space-y-4">
               <li v-for="item in role.items" :key="item" class="flex items-center gap-3 text-slate-600">
@@ -76,9 +86,12 @@
       <section class="py-20 px-6 bg-white">
         <div class="max-w-3xl mx-auto">
           <h2 class="text-3xl font-bold text-slate-900 mb-12 text-center">Frequently Asked Questions</h2>
-          <div v-for="(faq, index) in faqs" :key="index" class="mb-4 border border-slate-200 rounded-lg overflow-hidden">
-            <button @click="toggleFaq(index)" class="w-full text-left p-6 font-bold text-slate-900 flex justify-between items-center">
-              {{ faq.q }} <ChevronDown class="w-5 h-5 text-slate-400" />
+          <div v-for="(faq, index) in faqs" :key="index"
+            class="mb-4 border border-slate-200 rounded-lg overflow-hidden">
+            <button @click="toggleFaq(index)"
+              class="w-full text-left p-6 font-bold text-slate-900 flex justify-between items-center">
+              {{ faq.q }}
+              <ChevronDown class="w-5 h-5 text-slate-400" />
             </button>
             <div v-if="activeFaq === index" class="p-6 pt-0 text-slate-600">{{ faq.a }}</div>
           </div>
@@ -88,9 +101,12 @@
       <!-- CTA -->
       <section class="py-24 px-6 text-center">
         <h2 class="text-4xl font-bold text-slate-900 mb-6">Start Reporting Civic Issues Today</h2>
-        <p class="text-slate-500 mb-10 max-w-lg mx-auto">Join CivicDesk and help create cleaner, safer, and smarter communities.</p>
+        <p class="text-slate-500 mb-10 max-w-lg mx-auto">Join CivicDesk and help create cleaner, safer, and smarter
+          communities.</p>
         <div class="flex gap-4 justify-center">
-          <router-link to="/register" class="bg-[#2563EB] text-white px-10 py-4 rounded-lg font-bold hover:bg-[#1E40AF]">Register Now</router-link>
+          <router-link to="/register"
+            class="bg-[#2563EB] text-white px-10 py-4 rounded-lg font-bold hover:bg-[#1E40AF]">Register
+            Now</router-link>
         </div>
       </section>
     </main>
@@ -103,9 +119,9 @@
 import { ref, onMounted } from 'vue'
 import Navbar from '@/components/Navbar.vue'
 import Footer from '@/components/Footer.vue'
-import { 
-  ClipboardList, Search, Bell, Shield, Users, 
-  MapPin, CheckCircle, ChevronDown, Clock, Layers 
+import {
+  ClipboardList, Search, Bell, Shield, Users,
+  MapPin, CheckCircle, ChevronDown, Clock, Layers
 } from 'lucide-vue-next'
 
 const isSidebarOpen = ref(false)

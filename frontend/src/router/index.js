@@ -1,5 +1,8 @@
 import { createRouter, createWebHistory } from 'vue-router'
 
+// --- Layout ---
+import DashboardLayout from '../components/layouts/DashboardLayout.vue'
+
 // --- Public Imports ---
 import LandingPage from '../views/public/LandingPage.vue'
 import About from '../views/public/About.vue'
@@ -69,45 +72,73 @@ const router = createRouter({
     { path: '/register', name: 'Register', component: Register, meta: { title: 'Register | CivicDesk', guestOnly: true } },
     { path: '/forgot-password', name: 'ForgotPassword', component: ForgotPassword, meta: { title: 'Reset Password | CivicDesk', guestOnly: true } },
 
-    // --- Citizen Routes ---
-    { path: '/citizen/dashboard', name: 'CitizenDashboard', component: Dashboard, meta: { title: 'Dashboard | CivicDesk', requiresAuth: true } },
-    { path: '/citizen/profile', name: 'CitizenProfile', component: Profile, meta: { title: 'Profile | CivicDesk', requiresAuth: true } },
-    { path: '/citizen/notifications', name: 'CitizenNotifications', component: Notifications, meta: { title: 'Notifications | CivicDesk', requiresAuth: true } },
-    { path: '/citizen/complaints', name: 'MyComplaints', component: MyComplaints, meta: { title: 'My Complaints | CivicDesk', requiresAuth: true } },
-    { path: '/citizen/submit', name: 'SubmitComplaint', component: SubmitComplaint, meta: { title: 'Submit Complaint | CivicDesk', requiresAuth: true } },
-    { path: '/citizen/complaintdetails/:id?', name: 'ComplaintDetails', component: ComplaintDetails, meta: { title: 'Details | CivicDesk', requiresAuth: true }, props: true },
-    { path: '/citizen/track/:id?', name: 'ComplaintTracking', component: ComplaintTracking, meta: { title: 'Track | CivicDesk', requiresAuth: true }, props: true },
-    { path: '/citizen/feedback/:id?', name: 'CitizenFeedback', component: Feedback, meta: { title: 'Feedback | CivicDesk', requiresAuth: true }, props: true },
+    // --- Citizen section ---
+    {
+      path: '/citizen',
+      component: DashboardLayout,
+      meta: { requiresAuth: true },
+      children: [
+        { path: 'dashboard', name: 'CitizenDashboard', component: Dashboard, meta: { title: 'Dashboard | CivicDesk', pageTitle: 'Dashboard' } },
+        { path: 'profile', name: 'CitizenProfile', component: Profile, meta: { title: 'Profile | CivicDesk', pageTitle: 'Profile' } },
+        { path: 'notifications', name: 'CitizenNotifications', component: Notifications, meta: { title: 'Notifications | CivicDesk', pageTitle: 'Notifications' } },
+        { path: 'complaints', name: 'MyComplaints', component: MyComplaints, meta: { title: 'My Complaints | CivicDesk', pageTitle: 'My Complaints' } },
+        { path: 'submit', name: 'SubmitComplaint', component: SubmitComplaint, meta: { title: 'Submit Complaint | CivicDesk', pageTitle: 'Submit Complaint' } },
+        { path: 'complaintdetails/:id?', name: 'ComplaintDetails', component: ComplaintDetails, meta: { title: 'Details | CivicDesk', pageTitle: 'Complaint Details' }, props: true },
+        { path: 'track/:id?', name: 'ComplaintTracking', component: ComplaintTracking, meta: { title: 'Track | CivicDesk', pageTitle: 'Complaint Tracking' }, props: true },
+        { path: 'feedback/:id?', name: 'CitizenFeedback', component: Feedback, meta: { title: 'Feedback | CivicDesk', pageTitle: 'Complaint Feedback' }, props: true },
+      ]
+    },
 
-    // --- Officer Routes ---
-    { path: '/officer/dashboard', name: 'OfficerDashboard', component: OfficerDashboard, meta: { title: 'Officer Dashboard | CivicDesk', requiresAuth: true } },
-    { path: '/officer/complaints', name: 'OfficerComplaintManagement', component: ComplaintManagement, meta: { title: 'Complaint Management | CivicDesk', requiresAuth: true } },
-    { path: '/officer/complaintdetails/:id', name: 'OfficerComplaintDetails', component: OfficerComplaintDetails, meta: { title: 'Complaint Details | CivicDesk', requiresAuth: true }, props: true },
-    { path: '/officer/workers', name: 'ManageWorkers', component: ManageWorkers, meta: { title: 'Manage Workers | CivicDesk', requiresAuth: true } },
-    { path: '/officer/assign/:id', name: 'AssignWorker', component: AssignWorker, meta: { title: 'Assign Worker | CivicDesk', requiresAuth: true }, props: true },
-    { path: '/officer/analytics', name: 'AnalyticsReports', component: AnalyticsReports, meta: { title: 'Analytics | CivicDesk', requiresAuth: true } },
-    { path: '/officer/notifications', name: 'OfficerNotifications', component: OfficerNotifications, meta: { title: 'Notifications | CivicDesk', requiresAuth: true } },
-    { path: '/officer/profile', name: 'OfficerProfile', component: OfficerProfile, meta: { title: 'Profile | CivicDesk', requiresAuth: true } },
+    // --- Officer section ---
+    {
+      path: '/officer',
+      component: DashboardLayout,
+      meta: { requiresAuth: true },
+      children: [
+        { path: 'dashboard', name: 'OfficerDashboard', component: OfficerDashboard, meta: { title: 'Officer Dashboard | CivicDesk', pageTitle: 'Dashboard' } },
+        { path: 'complaints', name: 'OfficerComplaintManagement', component: ComplaintManagement, meta: { title: 'Complaint Management | CivicDesk', pageTitle: 'Complaint Management' } },
+        { path: 'complaintdetails/:id', name: 'OfficerComplaintDetails', component: OfficerComplaintDetails, meta: { title: 'Complaint Details | CivicDesk', pageTitle: 'Complaint Details' }, props: true },
+        { path: 'workers', name: 'ManageWorkers', component: ManageWorkers, meta: { title: 'Manage Workers | CivicDesk', pageTitle: 'Manage Workers' } },
+        { path: 'assign/:id', name: 'AssignWorker', component: AssignWorker, meta: { title: 'Assign Worker | CivicDesk', pageTitle: 'Assign Worker' }, props: true },
+        { path: 'analytics', name: 'AnalyticsReports', component: AnalyticsReports, meta: { title: 'Analytics | CivicDesk', pageTitle: 'Analytics & Reports' } },
+        { path: 'notifications', name: 'OfficerNotifications', component: OfficerNotifications, meta: { title: 'Notifications | CivicDesk', pageTitle: 'Notifications' } },
+        { path: 'profile', name: 'OfficerProfile', component: OfficerProfile, meta: { title: 'Profile | CivicDesk', pageTitle: 'Profile' } },
+      ]
+    },
 
-    // --- Worker Routes ---
-    { path: '/worker/dashboard', name: 'WorkerDashboard', component: WorkerDashboard, meta: { title: 'Worker Dashboard | CivicDesk', requiresAuth: true } },
-    { path: '/worker/tasks', name: 'WorkerAssignedTasks', component: WorkerAssignedTasks, meta: { title: 'Assigned Tasks | CivicDesk', requiresAuth: true } },
-    { path: '/worker/task/:id', name: 'WorkerTaskDetails', component: WorkerTaskDetails, meta: { title: 'Task Details | CivicDesk', requiresAuth: true }, props: true },
-    { path: '/worker/update/:id', name: 'WorkerUpdateComplaint', component: WorkerUpdateComplaint, meta: { title: 'Update Complaint | CivicDesk', requiresAuth: true }, props: true },
-    { path: '/worker/completed', name: 'WorkerCompletedTasks', component: WorkerCompletedTasks, meta: { title: 'Completed Tasks | CivicDesk', requiresAuth: true } },
-    { path: '/worker/notifications', name: 'WorkerNotifications', component: WorkerNotifications, meta: { title: 'Notifications | CivicDesk', requiresAuth: true } },
-    { path: '/worker/profile', name: 'WorkerProfile', component: WorkerProfile, meta: { title: 'Profile | CivicDesk', requiresAuth: true } },
-    { path: '/worker/departmentapplications', name: 'DepartmentApplications', component: DepartmentApplications, meta: { title: 'Department Applications | CivicDesk', requiresAuth: true } },
+    // --- Worker section ---
+    {
+      path: '/worker',
+      component: DashboardLayout,
+      meta: { requiresAuth: true },
+      children: [
+        { path: 'dashboard', name: 'WorkerDashboard', component: WorkerDashboard, meta: { title: 'Worker Dashboard | CivicDesk', pageTitle: 'Dashboard' } },
+        { path: 'tasks', name: 'WorkerAssignedTasks', component: WorkerAssignedTasks, meta: { title: 'Assigned Tasks | CivicDesk', pageTitle: 'Assigned Tasks' } },
+        { path: 'task/:id', name: 'WorkerTaskDetails', component: WorkerTaskDetails, meta: { title: 'Task Details | CivicDesk', pageTitle: 'Task Details' }, props: true },
+        { path: 'update/:id', name: 'WorkerUpdateComplaint', component: WorkerUpdateComplaint, meta: { title: 'Update Complaint | CivicDesk', pageTitle: 'Update Complaint' }, props: true },
+        { path: 'completed', name: 'WorkerCompletedTasks', component: WorkerCompletedTasks, meta: { title: 'Completed Tasks | CivicDesk', pageTitle: 'Completed Tasks' } },
+        { path: 'notifications', name: 'WorkerNotifications', component: WorkerNotifications, meta: { title: 'Notifications | CivicDesk', pageTitle: 'Notifications' } },
+        { path: 'profile', name: 'WorkerProfile', component: WorkerProfile, meta: { title: 'Profile | CivicDesk', pageTitle: 'Profile' } },
+        { path: 'departmentapplications', name: 'DepartmentApplications', component: DepartmentApplications, meta: { title: 'Department Applications | CivicDesk', pageTitle: 'Department Applications' } },
+      ]
+    },
 
-    // --- Admin Routes ---
-    { path: '/admin/dashboard', name: 'AdminDashboard', component: AdminDashboard, meta: { title: 'Admin Dashboard | CivicDesk', requiresAuth: true } },
-    { path: '/admin/departmentmanagement', name: 'DepartmentManagement', component: DepartmentManagement, meta: { title: 'Department Management | CivicDesk', requiresAuth: true } },
-    { path: '/admin/officerdetails', name: 'OfficerDetails', component: OfficerDetails, meta: { title: 'Officer Details | CivicDesk', requiresAuth: true } },
-    { path: '/admin/officermanagement', name: 'OfficerManagement', component: OfficerManagement, meta: { title: 'Officer Management | CivicDesk', requiresAuth: true } },
-    { path: '/admin/profile', name: 'OfficersProfile', component: OfficersProfile, meta: { title: 'Profile | CivicDesk', requiresAuth: true } },
-    { path: '/admin/systemanalytics', name: 'SystemAnalytics', component: SystemAnalytics, meta: { title: 'System Analytics | CivicDesk', requiresAuth: true } },
-    { path: '/admin/activitylogs', name: 'ActivityLogs', component: ActivityLogs, meta: { title: 'Activity Logs | CivicDesk', requiresAuth: true } },
-    { path: '/admin/announcements', name: 'Announcements', component: Announcements, meta: { title: 'Announcements | CivicDesk', requiresAuth: true } },
+    // --- Admin section ---
+    {
+      path: '/admin',
+      component: DashboardLayout,
+      meta: { requiresAuth: true },
+      children: [
+        { path: 'dashboard', name: 'AdminDashboard', component: AdminDashboard, meta: { title: 'Admin Dashboard | CivicDesk', pageTitle: 'Dashboard' } },
+        { path: 'departmentmanagement', name: 'DepartmentManagement', component: DepartmentManagement, meta: { title: 'Department Management | CivicDesk', pageTitle: 'Department Management' } },
+        { path: 'officerdetails', name: 'OfficerDetails', component: OfficerDetails, meta: { title: 'Officer Details | CivicDesk', pageTitle: 'Officer Details' } },
+        { path: 'officermanagement', name: 'OfficerManagement', component: OfficerManagement, meta: { title: 'Officer Management | CivicDesk', pageTitle: 'Officer Management' } },
+        { path: 'profile', name: 'OfficersProfile', component: OfficersProfile, meta: { title: 'Profile | CivicDesk', pageTitle: 'Profile' } },
+        { path: 'systemanalytics', name: 'SystemAnalytics', component: SystemAnalytics, meta: { title: 'System Analytics | CivicDesk', pageTitle: 'System Analytics' } },
+        { path: 'activitylogs', name: 'ActivityLogs', component: ActivityLogs, meta: { title: 'Activity Logs | CivicDesk', pageTitle: 'Activity Logs' } },
+        { path: 'announcements', name: 'Announcements', component: Announcements, meta: { title: 'Announcements | CivicDesk', pageTitle: 'Announcements' } },
+      ]
+    },
 
     // --- Fallback ---
     { path: '/:pathMatch(.*)*', redirect: '/' }
@@ -117,9 +148,6 @@ const router = createRouter({
   }
 })
 
-// Maps a backend role string to the URL prefix used across the dashboard
-// routes above. Mirrors the same mapping used in Sidebar.vue / DashboardNavbar.vue
-// — keep these in sync if you ever rename a role or a route prefix.
 function getRolePrefix(role) {
   switch (role) {
     case 'Admin':
@@ -142,28 +170,20 @@ router.beforeEach((to, from, next) => {
     try {
       user = JSON.parse(localStorage.getItem('user'))
     } catch (err) {
-      // Corrupted/stale localStorage — treat as logged out rather than crash.
       user = null
     }
   }
 
   const rolePrefix = user ? getRolePrefix(user.role) : null
 
-  // 1. Guest-only pages (Landing, Login, Register, Forgot Password):
-  //    a logged-in user gets bounced straight to their own dashboard.
   if (to.meta.guestOnly && isLoggedIn && rolePrefix) {
     return next(`/${rolePrefix}/dashboard`)
   }
 
-  // 2. Protected pages: no valid session -> send to Login, remembering
-  //    where they were headed so Login.vue can send them back after auth.
   if (to.meta.requiresAuth && !isLoggedIn) {
     return next({ path: '/login', query: { redirect: to.fullPath } })
   }
 
-  // 3. Protected pages: logged in, but the URL's role section doesn't match
-  //    their actual role (e.g. a Citizen typing /officer/dashboard).
-  //    Bounce them to their own dashboard instead of letting them in.
   if (to.meta.requiresAuth && isLoggedIn) {
     const sectionPrefix = to.path.split('/')[1]
     if (sectionPrefix !== rolePrefix) {

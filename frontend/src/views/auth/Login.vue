@@ -1,6 +1,6 @@
 <template>
   <div class="min-h-screen flex flex-col bg-[#F8FAFC] font-sans text-slate-800 animate-fade-in">
-    
+
     <!-- Reusable Navbar -->
     <Navbar />
 
@@ -17,13 +17,15 @@
               A Civic Complaint Management Platform
             </h2>
             <p class="text-slate-600 leading-relaxed text-lg">
-              Report civic issues, track complaint progress, and stay connected with your local authorities through one secure platform.
+              Report civic issues, track complaint progress, and stay connected with your local authorities through one
+              secure platform.
             </p>
           </div>
 
           <!-- Feature Cards -->
           <div class="space-y-4 mb-10">
-            <div v-for="feature in features" :key="feature" class="flex items-center gap-3 text-slate-700 bg-white px-4 py-3 rounded-xl shadow-sm border border-slate-100">
+            <div v-for="feature in features" :key="feature"
+              class="flex items-center gap-3 text-slate-700 bg-white px-4 py-3 rounded-xl shadow-sm border border-slate-100">
               <div class="bg-[#22C55E]/10 p-1 rounded-full">
                 <Check class="w-4 h-4 text-[#22C55E]" />
               </div>
@@ -35,7 +37,8 @@
 
       <!-- Right Side (Login Form) -->
       <section class="w-full lg:w-1/2 flex items-center justify-center p-6 sm:p-12">
-        <div class="w-full max-w-md bg-white rounded-[16px] shadow-[0_8px_30px_rgb(0,0,0,0.04)] border border-slate-100 p-8 sm:p-10">
+        <div
+          class="w-full max-w-md bg-white rounded-[16px] shadow-[0_8px_30px_rgb(0,0,0,0.04)] border border-slate-100 p-8 sm:p-10">
           <div class="mb-8 text-center lg:text-left">
             <h3 class="text-2xl font-bold text-slate-900 mb-2">Welcome Back</h3>
             <p class="text-slate-500 text-sm">Login to continue using CivicDesk.</p>
@@ -58,17 +61,10 @@
                 <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
                   <Mail class="w-5 h-5 text-slate-400" />
                 </div>
-                <input
-                  id="email"
-                  v-model="form.email"
-                  type="email"
-                  :class="[
-                    'w-full pl-10 pr-4 py-2.5 bg-slate-50 border rounded-lg text-sm focus:outline-none focus:ring-2 transition-all',
-                    errors.email ? 'border-red-500 focus:ring-red-200 bg-red-50/50' : 'border-slate-200 focus:border-[#2563EB] focus:ring-[#2563EB]/20 focus:bg-white'
-                  ]"
-                  placeholder="Enter your email"
-                  aria-label="Email Address"
-                />
+                <input id="email" v-model="form.email" type="email" :class="[
+                  'w-full pl-10 pr-4 py-2.5 bg-slate-50 border rounded-lg text-sm focus:outline-none focus:ring-2 transition-all',
+                  errors.email ? 'border-red-500 focus:ring-red-200 bg-red-50/50' : 'border-slate-200 focus:border-[#2563EB] focus:ring-[#2563EB]/20 focus:bg-white'
+                ]" placeholder="Enter your email" aria-label="Email Address" />
               </div>
               <span v-if="errors.email" class="text-red-500 text-xs mt-1.5 block">{{ errors.email }}</span>
             </div>
@@ -80,23 +76,13 @@
                 <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
                   <Lock class="w-5 h-5 text-slate-400" />
                 </div>
-                <input
-                  id="password"
-                  v-model="form.password"
-                  :type="showPassword ? 'text' : 'password'"
-                  :class="[
-                    'w-full pl-10 pr-10 py-2.5 bg-slate-50 border rounded-lg text-sm focus:outline-none focus:ring-2 transition-all',
-                    errors.password ? 'border-red-500 focus:ring-red-200 bg-red-50/50' : 'border-slate-200 focus:border-[#2563EB] focus:ring-[#2563EB]/20 focus:bg-white'
-                  ]"
-                  placeholder="Enter your password"
-                  aria-label="Password"
-                />
-                <button
-                  type="button"
-                  @click="showPassword = !showPassword"
+                <input id="password" v-model="form.password" :type="showPassword ? 'text' : 'password'" :class="[
+                  'w-full pl-10 pr-10 py-2.5 bg-slate-50 border rounded-lg text-sm focus:outline-none focus:ring-2 transition-all',
+                  errors.password ? 'border-red-500 focus:ring-red-200 bg-red-50/50' : 'border-slate-200 focus:border-[#2563EB] focus:ring-[#2563EB]/20 focus:bg-white'
+                ]" placeholder="Enter your password" aria-label="Password" />
+                <button type="button" @click="showPassword = !showPassword"
                   class="absolute inset-y-0 right-0 pr-3 flex items-center text-slate-400 hover:text-slate-600 transition-colors"
-                  aria-label="Toggle password visibility"
-                >
+                  aria-label="Toggle password visibility">
                   <EyeOff v-if="showPassword" class="w-5 h-5" />
                   <Eye v-else class="w-5 h-5" />
                 </button>
@@ -107,22 +93,17 @@
             <!-- Options Row -->
             <div class="flex items-center justify-between mt-2">
               <label class="flex items-center gap-2 cursor-pointer group">
-                <input
-                  v-model="form.rememberMe"
-                  type="checkbox"
-                  class="w-4 h-4 rounded border-slate-300 text-[#2563EB] focus:ring-[#2563EB] transition-colors"
-                />
+                <input v-model="form.rememberMe" type="checkbox"
+                  class="w-4 h-4 rounded border-slate-300 text-[#2563EB] focus:ring-[#2563EB] transition-colors" />
                 <span class="text-sm text-slate-600 group-hover:text-slate-900 transition-colors">Remember me</span>
               </label>
-              <router-link to="/forgot-password" class="text-sm font-medium text-[#2563EB] hover:underline">Forgot Password?</router-link>
+              <router-link to="/forgot-password" class="text-sm font-medium text-[#2563EB] hover:underline">Forgot
+                Password?</router-link>
             </div>
 
             <!-- Submit Button -->
-            <button
-              type="submit"
-              :disabled="isLoading"
-              class="w-full bg-[#2563EB] hover:bg-blue-700 text-white font-medium py-2.5 rounded-lg transition-all duration-200 flex items-center justify-center gap-2 disabled:opacity-70 disabled:cursor-not-allowed shadow-sm hover:shadow"
-            >
+            <button type="submit" :disabled="isLoading"
+              class="w-full bg-[#2563EB] hover:bg-blue-700 text-white font-medium py-2.5 rounded-lg transition-all duration-200 flex items-center justify-center gap-2 disabled:opacity-70 disabled:cursor-not-allowed shadow-sm hover:shadow">
               <Loader2 v-if="isLoading" class="w-5 h-5 animate-spin" />
               <span>{{ isLoading ? 'Signing in...' : 'Login' }}</span>
             </button>
@@ -138,7 +119,8 @@
           <!-- Register Link -->
           <div class="text-center">
             <p class="text-sm text-slate-600 mb-4">Don't have an account?</p>
-            <router-link to="/register" class="w-full flex justify-center bg-white border border-slate-300 text-slate-700 hover:bg-slate-50 hover:text-slate-900 font-medium py-2.5 rounded-lg transition-all duration-200">
+            <router-link to="/register"
+              class="w-full flex justify-center bg-white border border-slate-300 text-slate-700 hover:bg-slate-50 hover:text-slate-900 font-medium py-2.5 rounded-lg transition-all duration-200">
               Register
             </router-link>
           </div>
@@ -157,7 +139,7 @@ import { useRouter } from 'vue-router'
 import axios from 'axios'
 import Navbar from '../../components/Navbar.vue' // Adjust path based on your folder structure
 import Footer from '../../components/Footer.vue' // Adjust path based on your folder structure
-import { 
+import {
   Mail, Lock, Eye, EyeOff, Loader2, Check
 } from 'lucide-vue-next'
 
@@ -187,7 +169,7 @@ const globalError = ref('')
 
 const validateForm = () => {
   let isValid = true
-  
+
   errors.email = ''
   errors.password = ''
   globalError.value = ''
@@ -213,7 +195,7 @@ const handleLogin = async () => {
 
   isLoading.value = true
   globalError.value = ''
-  
+
   try {
     // Replace the URL with your Flask API's local development URL
     const response = await axios.post('http://127.0.0.1:5000/api/login', {
@@ -261,15 +243,8 @@ const handleLogin = async () => {
 
 <style scoped>
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
-
-.font-sans {
-  font-family: 'Inter', sans-serif;
-}
-
-.animate-fade-in {
-  animation: fadeIn 0.4s ease-out;
-}
-
+.font-sans { font-family: 'Inter', sans-serif; }
+.animate-fade-in { animation: fadeIn 0.4s ease-out; }
 @keyframes fadeIn {
   from { opacity: 0; transform: translateY(10px); }
   to { opacity: 1; transform: translateY(0); }

@@ -1,6 +1,6 @@
 <template>
   <div class="min-h-screen flex flex-col bg-[#F8FAFC] font-sans text-slate-800 animate-fade-in">
-    
+
     <!-- Reusable Navbar -->
     <Navbar />
 
@@ -17,7 +17,8 @@
               Recover Your Account
             </h2>
             <p class="text-slate-600 leading-relaxed text-base">
-              If you've forgotten your password, don't worry. Enter your registered email address and we'll help you reset your password securely.
+              If you've forgotten your password, don't worry. Enter your registered email address and we'll help you
+              reset your password securely.
             </p>
           </div>
 
@@ -50,7 +51,8 @@
           </div>
 
           <!-- Illustration Placeholder -->
-          <div class="w-full h-56 bg-slate-200 rounded-[14px] border-2 border-dashed border-slate-300 flex flex-col items-center justify-center text-slate-500 gap-3">
+          <div
+            class="w-full h-56 bg-slate-200 rounded-[14px] border-2 border-dashed border-slate-300 flex flex-col items-center justify-center text-slate-500 gap-3">
             <LockKeyhole class="w-8 h-8 text-slate-400" />
             <span class="text-sm font-medium">[ Secure Account Recovery Illustration ]</span>
           </div>
@@ -59,8 +61,9 @@
 
       <!-- Right Side (Recovery Form / Success State) -->
       <section class="w-full lg:w-7/12 flex items-center justify-center p-4 sm:p-8">
-        <div class="w-full max-w-md bg-white rounded-[14px] shadow-[0_4px_24px_rgb(0,0,0,0.04)] border border-slate-100 p-8 sm:p-10 transition-shadow duration-300 hover:shadow-[0_8px_30px_rgb(0,0,0,0.06)] relative overflow-hidden">
-          
+        <div
+          class="w-full max-w-md bg-white rounded-[14px] shadow-[0_4px_24px_rgb(0,0,0,0.04)] border border-slate-100 p-8 sm:p-10 transition-shadow duration-300 hover:shadow-[0_8px_30px_rgb(0,0,0,0.06)] relative overflow-hidden">
+
           <!-- Recovery Form -->
           <div v-if="!isSuccess" class="animate-fade-in">
             <div class="mb-8">
@@ -77,41 +80,30 @@
 
             <form @submit.prevent="handleSubmit" novalidate class="space-y-6">
               <div>
-                <label for="email" class="block text-sm font-medium text-slate-700 mb-1.5">Registered Email Address</label>
+                <label for="email" class="block text-sm font-medium text-slate-700 mb-1.5">Registered Email
+                  Address</label>
                 <div class="relative">
                   <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
                     <Mail class="w-5 h-5 text-slate-400" />
                   </div>
-                  <input
-                    id="email"
-                    v-model="email"
-                    type="email"
-                    :disabled="isLoading"
-                    :class="[
-                      'w-full pl-10 pr-4 py-2.5 bg-slate-50 border rounded-lg text-sm focus:outline-none focus:ring-2 transition-all',
-                      emailError ? 'border-red-500 focus:ring-red-200 bg-red-50/50' : 'border-slate-200 focus:border-[#2563EB] focus:ring-[#2563EB]/20 focus:bg-white',
-                      isLoading ? 'opacity-70 cursor-not-allowed' : ''
-                    ]"
-                    placeholder="name@example.com"
-                  />
+                  <input id="email" v-model="email" type="email" :disabled="isLoading" :class="[
+                    'w-full pl-10 pr-4 py-2.5 bg-slate-50 border rounded-lg text-sm focus:outline-none focus:ring-2 transition-all',
+                    emailError ? 'border-red-500 focus:ring-red-200 bg-red-50/50' : 'border-slate-200 focus:border-[#2563EB] focus:ring-[#2563EB]/20 focus:bg-white',
+                    isLoading ? 'opacity-70 cursor-not-allowed' : ''
+                  ]" placeholder="name@example.com" />
                 </div>
                 <span v-if="emailError" class="text-red-500 text-xs mt-1.5 block">{{ emailError }}</span>
               </div>
 
               <div class="space-y-4 pt-2">
-                <button
-                  type="submit"
-                  :disabled="isLoading"
-                  class="w-full bg-[#2563EB] hover:bg-[#1E40AF] text-white font-medium py-2.5 rounded-lg transition-all duration-200 flex items-center justify-center gap-2 disabled:opacity-70 disabled:cursor-not-allowed shadow-sm hover:shadow"
-                >
+                <button type="submit" :disabled="isLoading"
+                  class="w-full bg-[#2563EB] hover:bg-[#1E40AF] text-white font-medium py-2.5 rounded-lg transition-all duration-200 flex items-center justify-center gap-2 disabled:opacity-70 disabled:cursor-not-allowed shadow-sm hover:shadow">
                   <Loader2 v-if="isLoading" class="w-5 h-5 animate-spin" />
                   <span>{{ isLoading ? 'Sending...' : 'Send OTP' }}</span>
                 </button>
-                
-                <a 
-                  href="/login" 
-                  class="w-full flex items-center justify-center gap-2 bg-white border border-slate-300 text-slate-700 hover:bg-slate-50 hover:text-slate-900 font-medium py-2.5 rounded-lg transition-all duration-200"
-                >
+
+                <a href="/login"
+                  class="w-full flex items-center justify-center gap-2 bg-white border border-slate-300 text-slate-700 hover:bg-slate-50 hover:text-slate-900 font-medium py-2.5 rounded-lg transition-all duration-200">
                   <ArrowLeft class="w-4 h-4" />
                   <span>Back to Login</span>
                 </a>
@@ -147,63 +139,41 @@
                 <!-- OTP field -->
                 <div>
                   <label class="block text-sm font-medium text-slate-700 mb-1.5">OTP</label>
-                  <input
-                    v-model="otp"
-                    type="text"
-                    maxlength="6"
-                    placeholder="6-digit OTP"
-                    :class="[
-                      'w-full px-4 py-2.5 bg-slate-50 border rounded-lg text-sm focus:outline-none focus:ring-2 transition-all tracking-widest text-center font-mono',
-                      otpError ? 'border-red-500 focus:ring-red-200 bg-red-50/50' : 'border-slate-200 focus:border-[#2563EB] focus:ring-[#2563EB]/20 focus:bg-white'
-                    ]"
-                  />
+                  <input v-model="otp" type="text" maxlength="6" placeholder="6-digit OTP" :class="[
+                    'w-full px-4 py-2.5 bg-slate-50 border rounded-lg text-sm focus:outline-none focus:ring-2 transition-all tracking-widest text-center font-mono',
+                    otpError ? 'border-red-500 focus:ring-red-200 bg-red-50/50' : 'border-slate-200 focus:border-[#2563EB] focus:ring-[#2563EB]/20 focus:bg-white'
+                  ]" />
                   <span v-if="otpError" class="text-red-500 text-xs mt-1.5 block">{{ otpError }}</span>
                 </div>
 
                 <!-- New password -->
                 <div>
                   <label class="block text-sm font-medium text-slate-700 mb-1.5">New Password</label>
-                  <input
-                    v-model="newPassword"
-                    type="password"
-                    placeholder="Min. 8 characters"
-                    :class="[
-                      'w-full px-4 py-2.5 bg-slate-50 border rounded-lg text-sm focus:outline-none focus:ring-2 transition-all',
-                      passwordError ? 'border-red-500 focus:ring-red-200 bg-red-50/50' : 'border-slate-200 focus:border-[#2563EB] focus:ring-[#2563EB]/20 focus:bg-white'
-                    ]"
-                  />
+                  <input v-model="newPassword" type="password" placeholder="Min. 8 characters" :class="[
+                    'w-full px-4 py-2.5 bg-slate-50 border rounded-lg text-sm focus:outline-none focus:ring-2 transition-all',
+                    passwordError ? 'border-red-500 focus:ring-red-200 bg-red-50/50' : 'border-slate-200 focus:border-[#2563EB] focus:ring-[#2563EB]/20 focus:bg-white'
+                  ]" />
                 </div>
 
                 <!-- Confirm password -->
                 <div>
                   <label class="block text-sm font-medium text-slate-700 mb-1.5">Confirm New Password</label>
-                  <input
-                    v-model="confirmPassword"
-                    type="password"
-                    placeholder="Repeat new password"
-                    :class="[
-                      'w-full px-4 py-2.5 bg-slate-50 border rounded-lg text-sm focus:outline-none focus:ring-2 transition-all',
-                      passwordError ? 'border-red-500 focus:ring-red-200 bg-red-50/50' : 'border-slate-200 focus:border-[#2563EB] focus:ring-[#2563EB]/20 focus:bg-white'
-                    ]"
-                  />
+                  <input v-model="confirmPassword" type="password" placeholder="Repeat new password" :class="[
+                    'w-full px-4 py-2.5 bg-slate-50 border rounded-lg text-sm focus:outline-none focus:ring-2 transition-all',
+                    passwordError ? 'border-red-500 focus:ring-red-200 bg-red-50/50' : 'border-slate-200 focus:border-[#2563EB] focus:ring-[#2563EB]/20 focus:bg-white'
+                  ]" />
                   <span v-if="passwordError" class="text-red-500 text-xs mt-1.5 block">{{ passwordError }}</span>
                 </div>
 
                 <div class="space-y-3 pt-1">
-                  <button
-                    type="submit"
-                    :disabled="isResetting"
-                    class="w-full bg-[#2563EB] hover:bg-[#1E40AF] text-white font-medium py-2.5 rounded-lg transition-all duration-200 flex items-center justify-center gap-2 disabled:opacity-70 disabled:cursor-not-allowed shadow-sm"
-                  >
+                  <button type="submit" :disabled="isResetting"
+                    class="w-full bg-[#2563EB] hover:bg-[#1E40AF] text-white font-medium py-2.5 rounded-lg transition-all duration-200 flex items-center justify-center gap-2 disabled:opacity-70 disabled:cursor-not-allowed shadow-sm">
                     <Loader2 v-if="isResetting" class="w-5 h-5 animate-spin" />
                     <span>{{ isResetting ? 'Resetting...' : 'Reset Password' }}</span>
                   </button>
 
-                  <button
-                    type="button"
-                    @click="isSuccess = false; globalError = ''"
-                    class="w-full flex items-center justify-center gap-2 bg-white border border-slate-300 text-slate-700 hover:bg-slate-50 font-medium py-2.5 rounded-lg transition-all duration-200"
-                  >
+                  <button type="button" @click="isSuccess = false; globalError = ''"
+                    class="w-full flex items-center justify-center gap-2 bg-white border border-slate-300 text-slate-700 hover:bg-slate-50 font-medium py-2.5 rounded-lg transition-all duration-200">
                     <ArrowLeft class="w-4 h-4" />
                     <span>Use different email</span>
                   </button>
@@ -219,7 +189,7 @@
 
     <!-- Reusable Footer -->
     <Footer />
-    
+
   </div>
 </template>
 
@@ -229,29 +199,29 @@ import { useRouter } from 'vue-router'
 import axios from 'axios'
 import Navbar from '../../components/Navbar.vue' // Adjust path based on your folder structure
 import Footer from '../../components/Footer.vue' // Adjust path based on your folder structure
-import { 
-  Check, LockKeyhole, Mail, 
-  ArrowLeft, Loader2, CheckCircle2 
+import {
+  Check, LockKeyhole, Mail,
+  ArrowLeft, Loader2, CheckCircle2
 } from 'lucide-vue-next'
 
 // State
 const router = useRouter()
 
 // ── Step 1: Email ─────────────────────────────────────────────────────────
-const email      = ref('')
+const email = ref('')
 const emailError = ref('')
-const isLoading  = ref(false)
-const isSuccess  = ref(false)   // controls step 1 → step 2 transition
+const isLoading = ref(false)
+const isSuccess = ref(false)   // controls step 1 → step 2 transition
 const globalError = ref('')
 
 // ── Step 2: OTP + new password ────────────────────────────────────────────
-const otp             = ref('')
-const newPassword     = ref('')
+const otp = ref('')
+const newPassword = ref('')
 const confirmPassword = ref('')
-const otpError        = ref('')
-const passwordError   = ref('')
-const isResetting     = ref(false)
-const resetSuccess    = ref(false)
+const otpError = ref('')
+const passwordError = ref('')
+const isResetting = ref(false)
+const resetSuccess = ref(false)
 
 // ── Validation helpers ────────────────────────────────────────────────────
 const validateEmail = () => {
@@ -301,7 +271,7 @@ const handleSubmit = async () => {
 
 // ── Step 2: Verify OTP and reset password ────────────────────────────────
 const handleReset = async () => {
-  otpError.value      = ''
+  otpError.value = ''
   passwordError.value = ''
 
   if (!otp.value.trim()) {
@@ -321,8 +291,8 @@ const handleReset = async () => {
 
   try {
     const response = await axios.post('http://127.0.0.1:5000/api/reset-password', {
-      email:       email.value.trim().toLowerCase(),
-      otp:         otp.value.trim(),
+      email: email.value.trim().toLowerCase(),
+      otp: otp.value.trim(),
       newPassword: newPassword.value
     })
 
@@ -344,15 +314,8 @@ const handleReset = async () => {
 
 <style scoped>
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
-
-.font-sans {
-  font-family: 'Inter', sans-serif;
-}
-
-.animate-fade-in {
-  animation: fadeIn 0.4s ease-out;
-}
-
+.font-sans { font-family: 'Inter', sans-serif; }
+.animate-fade-in { animation: fadeIn 0.4s ease-out; }
 @keyframes fadeIn {
   from { opacity: 0; transform: translateY(8px); }
   to { opacity: 1; transform: translateY(0); }

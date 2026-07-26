@@ -77,12 +77,7 @@ defineProps({
     type: Boolean,
     default: false
   },
-  // Accepted for API parity with DashboardLayout, but intentionally unused:
-  // role is derived from the URL below so the sidebar always matches the
-  // section the user is actually viewing. Note this is *not* a security
-  // boundary — it doesn't stop someone from typing /officer/dashboard into
-  // the address bar. That needs a router navigation guard checking the
-  // stored user's real role, which isn't wired up yet.
+
   userRole: {
     type: String,
     default: ''
@@ -186,18 +181,8 @@ const handleLogout = async () => {
 </script>
 
 <style scoped>
-/* Custom scrollbar styling for the sidebar menu */
-.custom-scrollbar::-webkit-scrollbar {
-  width: 4px;
-}
-.custom-scrollbar::-webkit-scrollbar-track {
-  background: transparent;
-}
-.custom-scrollbar::-webkit-scrollbar-thumb {
-  background: #334155;
-  border-radius: 4px;
-}
-.custom-scrollbar::-webkit-scrollbar-thumb:hover {
-  background: #475569;
-}
+.custom-scrollbar::-webkit-scrollbar { width: 4px; }
+.custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
+.custom-scrollbar::-webkit-scrollbar-thumb {background: #334155; border-radius: 4px; }
+.custom-scrollbar::-webkit-scrollbar-thumb:hover { background: #475569; }
 </style>

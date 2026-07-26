@@ -1,6 +1,6 @@
 <template>
   <div class="min-h-screen flex flex-col bg-[#F8FAFC] font-sans text-slate-800 animate-fade-in">
-    
+
     <!-- Reusable Navbar -->
     <Navbar />
 
@@ -17,7 +17,8 @@
               Create Your Account
             </h2>
             <p class="text-slate-600 leading-relaxed">
-              Join CivicDesk to report civic issues, monitor complaint progress, receive updates, and help improve your community.
+              Join CivicDesk to report civic issues, monitor complaint progress, receive updates, and help improve your
+              community.
             </p>
           </div>
 
@@ -32,7 +33,8 @@
           </div>
 
           <!-- Illustration Placeholder -->
-          <div class="w-full h-56 bg-slate-200 rounded-[14px] border-2 border-dashed border-slate-300 flex items-center justify-center text-slate-500">
+          <div
+            class="w-full h-56 bg-slate-200 rounded-[14px] border-2 border-dashed border-slate-300 flex items-center justify-center text-slate-500">
             [ Smart City / Citizen Illustration ]
           </div>
         </div>
@@ -40,7 +42,8 @@
 
       <!-- Right Side (Registration Form) -->
       <section class="w-full lg:w-7/12 flex items-center justify-center p-4 sm:p-8">
-        <div class="w-full max-w-2xl bg-white rounded-[14px] shadow-[0_4px_24px_rgb(0,0,0,0.04)] border border-slate-100 p-6 sm:p-10 transition-shadow duration-300 hover:shadow-[0_8px_30px_rgb(0,0,0,0.06)]">
+        <div
+          class="w-full max-w-2xl bg-white rounded-[14px] shadow-[0_4px_24px_rgb(0,0,0,0.04)] border border-slate-100 p-6 sm:p-10 transition-shadow duration-300 hover:shadow-[0_8px_30px_rgb(0,0,0,0.06)]">
           <div class="mb-8">
             <h3 class="text-2xl font-bold text-slate-900 mb-1.5">Create Account</h3>
             <p class="text-slate-500 text-sm">Register to access CivicDesk services.</p>
@@ -52,12 +55,13 @@
           </div>
 
           <!-- Global success banner -->
-          <div v-if="globalSuccess" class="mb-4 p-3 bg-green-50 border border-green-200 rounded-lg text-green-700 text-sm">
+          <div v-if="globalSuccess"
+            class="mb-4 p-3 bg-green-50 border border-green-200 rounded-lg text-green-700 text-sm">
             {{ globalSuccess }}
           </div>
 
           <form @submit.prevent="handleRegister" class="grid grid-cols-1 sm:grid-cols-2 gap-x-5 gap-y-5" novalidate>
-            
+
             <!-- Full Name -->
             <div class="sm:col-span-2">
               <label for="fullName" class="block text-sm font-medium text-slate-700 mb-1.5">Full Name</label>
@@ -65,13 +69,8 @@
                 <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
                   <User class="w-5 h-5 text-slate-400" />
                 </div>
-                <input
-                  id="fullName"
-                  v-model="form.fullName"
-                  type="text"
-                  :class="inputClasses(errors.fullName)"
-                  placeholder="John Doe"
-                />
+                <input id="fullName" v-model="form.fullName" type="text" :class="inputClasses(errors.fullName)"
+                  placeholder="John Doe" />
               </div>
               <span v-if="errors.fullName" class="text-red-500 text-xs mt-1.5 block">{{ errors.fullName }}</span>
             </div>
@@ -83,13 +82,8 @@
                 <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
                   <Mail class="w-5 h-5 text-slate-400" />
                 </div>
-                <input
-                  id="email"
-                  v-model="form.email"
-                  type="email"
-                  :class="inputClasses(errors.email)"
-                  placeholder="john@example.com"
-                />
+                <input id="email" v-model="form.email" type="email" :class="inputClasses(errors.email)"
+                  placeholder="john@example.com" />
               </div>
               <span v-if="errors.email" class="text-red-500 text-xs mt-1.5 block">{{ errors.email }}</span>
             </div>
@@ -101,14 +95,8 @@
                 <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
                   <Phone class="w-5 h-5 text-slate-400" />
                 </div>
-                <input
-                  id="mobile"
-                  v-model="form.mobile"
-                  type="tel"
-                  maxlength="10"
-                  :class="inputClasses(errors.mobile)"
-                  placeholder="9876543210"
-                />
+                <input id="mobile" v-model="form.mobile" type="tel" maxlength="10" :class="inputClasses(errors.mobile)"
+                  placeholder="9876543210" />
               </div>
               <span v-if="errors.mobile" class="text-red-500 text-xs mt-1.5 block">{{ errors.mobile }}</span>
             </div>
@@ -120,15 +108,11 @@
                 <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
                   <Shield class="w-5 h-5 text-slate-400" />
                 </div>
-                <select
-                  id="role"
-                  v-model="form.role"
-                  :class="[
-                    'w-full pl-10 pr-10 py-2.5 bg-slate-50 border rounded-lg text-sm appearance-none focus:outline-none focus:ring-2 transition-all cursor-pointer',
-                    errors.role ? 'border-red-500 focus:ring-red-200 bg-red-50/50' : 'border-slate-200 focus:border-[#2563EB] focus:ring-[#2563EB]/20 focus:bg-white',
-                    !form.role ? 'text-slate-400' : 'text-slate-900'
-                  ]"
-                >
+                <select id="role" v-model="form.role" :class="[
+                  'w-full pl-10 pr-10 py-2.5 bg-slate-50 border rounded-lg text-sm appearance-none focus:outline-none focus:ring-2 transition-all cursor-pointer',
+                  errors.role ? 'border-red-500 focus:ring-red-200 bg-red-50/50' : 'border-slate-200 focus:border-[#2563EB] focus:ring-[#2563EB]/20 focus:bg-white',
+                  !form.role ? 'text-slate-400' : 'text-slate-900'
+                ]">
                   <option value="" disabled selected>Select your role</option>
                   <option value="Citizen">Citizen</option>
                   <option value="Officer">Civic Officer</option>
@@ -148,13 +132,9 @@
                 <div class="absolute inset-y-0 left-0 pl-3 pt-3 pointer-events-none">
                   <MapPin class="w-5 h-5 text-slate-400" />
                 </div>
-                <textarea
-                  id="address"
-                  v-model="form.address"
-                  rows="2"
+                <textarea id="address" v-model="form.address" rows="2"
                   :class="[inputClasses(errors.address), 'pt-2.5 resize-none']"
-                  placeholder="Flat/House No., Street Name, Area"
-                ></textarea>
+                  placeholder="Flat/House No., Street Name, Area"></textarea>
               </div>
               <span v-if="errors.address" class="text-red-500 text-xs mt-1.5 block">{{ errors.address }}</span>
             </div>
@@ -166,13 +146,8 @@
                 <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
                   <Building class="w-5 h-5 text-slate-400" />
                 </div>
-                <input
-                  id="city"
-                  v-model="form.city"
-                  type="text"
-                  :class="inputClasses(errors.city)"
-                  placeholder="City Name"
-                />
+                <input id="city" v-model="form.city" type="text" :class="inputClasses(errors.city)"
+                  placeholder="City Name" />
               </div>
               <span v-if="errors.city" class="text-red-500 text-xs mt-1.5 block">{{ errors.city }}</span>
             </div>
@@ -184,14 +159,8 @@
                 <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
                   <Hash class="w-5 h-5 text-slate-400" />
                 </div>
-                <input
-                  id="pincode"
-                  v-model="form.pincode"
-                  type="text"
-                  maxlength="6"
-                  :class="inputClasses(errors.pincode)"
-                  placeholder="123456"
-                />
+                <input id="pincode" v-model="form.pincode" type="text" maxlength="6"
+                  :class="inputClasses(errors.pincode)" placeholder="123456" />
               </div>
               <span v-if="errors.pincode" class="text-red-500 text-xs mt-1.5 block">{{ errors.pincode }}</span>
             </div>
@@ -203,29 +172,24 @@
                 <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
                   <Lock class="w-5 h-5 text-slate-400" />
                 </div>
-                <input
-                  id="password"
-                  v-model="form.password"
-                  :type="showPassword ? 'text' : 'password'"
-                  :class="inputClasses(errors.password)"
-                  placeholder="Create a password"
-                />
-                <button
-                  type="button"
-                  @click="showPassword = !showPassword"
-                  class="absolute inset-y-0 right-0 pr-3 flex items-center text-slate-400 hover:text-slate-600 transition-colors"
-                >
+                <input id="password" v-model="form.password" :type="showPassword ? 'text' : 'password'"
+                  :class="inputClasses(errors.password)" placeholder="Create a password" />
+                <button type="button" @click="showPassword = !showPassword"
+                  class="absolute inset-y-0 right-0 pr-3 flex items-center text-slate-400 hover:text-slate-600 transition-colors">
                   <EyeOff v-if="showPassword" class="w-4 h-4" />
                   <Eye v-else class="w-4 h-4" />
                 </button>
               </div>
-              
+
               <!-- Password Strength Indicator -->
               <div v-if="form.password" class="mt-2 flex items-center gap-2">
                 <div class="flex-1 flex gap-1 h-1">
-                  <div class="flex-1 rounded-full transition-colors duration-300" :class="passwordStrengthScore >= 1 ? strengthColors.bg : 'bg-slate-200'"></div>
-                  <div class="flex-1 rounded-full transition-colors duration-300" :class="passwordStrengthScore >= 2 ? strengthColors.bg : 'bg-slate-200'"></div>
-                  <div class="flex-1 rounded-full transition-colors duration-300" :class="passwordStrengthScore >= 3 ? strengthColors.bg : 'bg-slate-200'"></div>
+                  <div class="flex-1 rounded-full transition-colors duration-300"
+                    :class="passwordStrengthScore >= 1 ? strengthColors.bg : 'bg-slate-200'"></div>
+                  <div class="flex-1 rounded-full transition-colors duration-300"
+                    :class="passwordStrengthScore >= 2 ? strengthColors.bg : 'bg-slate-200'"></div>
+                  <div class="flex-1 rounded-full transition-colors duration-300"
+                    :class="passwordStrengthScore >= 3 ? strengthColors.bg : 'bg-slate-200'"></div>
                 </div>
                 <span class="text-[10px] font-medium uppercase tracking-wider" :class="strengthColors.text">
                   {{ passwordStrengthLabel }}
@@ -236,42 +200,35 @@
 
             <!-- Confirm Password -->
             <div>
-              <label for="confirmPassword" class="block text-sm font-medium text-slate-700 mb-1.5">Confirm Password</label>
+              <label for="confirmPassword" class="block text-sm font-medium text-slate-700 mb-1.5">Confirm
+                Password</label>
               <div class="relative">
                 <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
                   <Lock class="w-5 h-5 text-slate-400" />
                 </div>
-                <input
-                  id="confirmPassword"
-                  v-model="form.confirmPassword"
-                  :type="showConfirmPassword ? 'text' : 'password'"
-                  :class="inputClasses(errors.confirmPassword)"
-                  placeholder="Confirm password"
-                />
-                <button
-                  type="button"
-                  @click="showConfirmPassword = !showConfirmPassword"
-                  class="absolute inset-y-0 right-0 pr-3 flex items-center text-slate-400 hover:text-slate-600 transition-colors"
-                >
+                <input id="confirmPassword" v-model="form.confirmPassword"
+                  :type="showConfirmPassword ? 'text' : 'password'" :class="inputClasses(errors.confirmPassword)"
+                  placeholder="Confirm password" />
+                <button type="button" @click="showConfirmPassword = !showConfirmPassword"
+                  class="absolute inset-y-0 right-0 pr-3 flex items-center text-slate-400 hover:text-slate-600 transition-colors">
                   <EyeOff v-if="showConfirmPassword" class="w-4 h-4" />
                   <Eye v-else class="w-4 h-4" />
                 </button>
               </div>
-              <span v-if="errors.confirmPassword" class="text-red-500 text-xs mt-1.5 block">{{ errors.confirmPassword }}</span>
+              <span v-if="errors.confirmPassword" class="text-red-500 text-xs mt-1.5 block">{{ errors.confirmPassword
+                }}</span>
             </div>
 
             <!-- Terms & Conditions -->
             <div class="sm:col-span-2 mt-2">
               <label class="flex items-start gap-3 cursor-pointer group">
                 <div class="flex items-center h-5">
-                  <input
-                    v-model="form.terms"
-                    type="checkbox"
-                    class="w-4 h-4 rounded border-slate-300 text-[#2563EB] focus:ring-[#2563EB] transition-colors"
-                  />
+                  <input v-model="form.terms" type="checkbox"
+                    class="w-4 h-4 rounded border-slate-300 text-[#2563EB] focus:ring-[#2563EB] transition-colors" />
                 </div>
                 <span class="text-sm text-slate-600 group-hover:text-slate-900 transition-colors">
-                  I agree to the <a href="#" class="text-[#2563EB] hover:underline">Terms of Service</a> and <a href="#" class="text-[#2563EB] hover:underline">Privacy Policy</a>.
+                  I agree to the <a href="#" class="text-[#2563EB] hover:underline">Terms of Service</a> and <a href="#"
+                    class="text-[#2563EB] hover:underline">Privacy Policy</a>.
                 </span>
               </label>
               <span v-if="errors.terms" class="text-red-500 text-xs mt-1.5 block">{{ errors.terms }}</span>
@@ -279,17 +236,15 @@
 
             <!-- Actions -->
             <div class="sm:col-span-2 mt-4 space-y-4">
-              <button
-                type="submit"
-                :disabled="isLoading"
-                class="w-full bg-[#2563EB] hover:bg-blue-700 text-white font-medium py-2.5 rounded-lg transition-all duration-200 flex items-center justify-center gap-2 disabled:opacity-70 disabled:cursor-not-allowed shadow-sm hover:shadow"
-              >
+              <button type="submit" :disabled="isLoading"
+                class="w-full bg-[#2563EB] hover:bg-blue-700 text-white font-medium py-2.5 rounded-lg transition-all duration-200 flex items-center justify-center gap-2 disabled:opacity-70 disabled:cursor-not-allowed shadow-sm hover:shadow">
                 <Loader2 v-if="isLoading" class="w-5 h-5 animate-spin" />
                 <span>{{ isLoading ? 'Creating Account...' : 'Create Account' }}</span>
               </button>
 
               <div class="text-center">
-                <router-link to="/login" class="text-sm font-medium text-slate-600 hover:text-slate-900 transition-colors">
+                <router-link to="/login"
+                  class="text-sm font-medium text-slate-600 hover:text-slate-900 transition-colors">
                   Already have an account? <span class="text-[#2563EB] hover:underline">Login</span>
                 </router-link>
               </div>
@@ -309,9 +264,9 @@ import { ref, reactive, computed } from 'vue'
 import { useRouter } from 'vue-router'
 import Navbar from '../../components/Navbar.vue' // Adjust path based on your folder structure
 import Footer from '../../components/Footer.vue' // Adjust path based on your folder structure
-import { 
-  User, Mail, Phone, MapPin, Building, Hash, Lock, 
-  Eye, EyeOff, Shield, Check, Loader2, ChevronDown 
+import {
+  User, Mail, Phone, MapPin, Building, Hash, Lock,
+  Eye, EyeOff, Shield, Check, Loader2, ChevronDown
 } from 'lucide-vue-next'
 import axios from "axios"
 
@@ -349,8 +304,8 @@ const router = useRouter()
 // Dynamic classes for inputs to handle error state styling
 const inputClasses = (hasError) => [
   'w-full pl-10 pr-4 py-2.5 bg-slate-50 border rounded-lg text-sm focus:outline-none focus:ring-2 transition-all',
-  hasError 
-    ? 'border-red-500 focus:ring-red-200 bg-red-50/50' 
+  hasError
+    ? 'border-red-500 focus:ring-red-200 bg-red-50/50'
     : 'border-slate-200 focus:border-[#2563EB] focus:ring-[#2563EB]/20 focus:bg-white'
 ]
 
@@ -477,14 +432,14 @@ const handleRegister = async () => {
     const response = await axios.post(
       'http://127.0.0.1:5000/api/register',
       {
-        fullName:  form.fullName,
-        email:     form.email,
-        mobile:    form.mobile,
-        address:   form.address,
-        city:      form.city,
-        pincode:   form.pincode,
-        password:  form.password,
-        role:      form.role,
+        fullName: form.fullName,
+        email: form.email,
+        mobile: form.mobile,
+        address: form.address,
+        city: form.city,
+        pincode: form.pincode,
+        password: form.password,
+        role: form.role,
       }
     )
 
@@ -506,29 +461,13 @@ const handleRegister = async () => {
 
 <style scoped>
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
-
-.font-sans {
-  font-family: 'Inter', sans-serif;
-}
-
-.animate-fade-in {
-  animation: fadeIn 0.4s ease-out;
-}
-
+.font-sans { font-family: 'Inter', sans-serif; }
+.animate-fade-in { animation: fadeIn 0.4s ease-out; }
 @keyframes fadeIn {
   from { opacity: 0; transform: translateY(8px); }
   to { opacity: 1; transform: translateY(0); }
 }
-
-/* Custom scrollbar for textarea if needed */
-textarea::-webkit-scrollbar {
-  width: 6px;
-}
-textarea::-webkit-scrollbar-track {
-  background: transparent;
-}
-textarea::-webkit-scrollbar-thumb {
-  background-color: #cbd5e1;
-  border-radius: 20px;
-}
+textarea::-webkit-scrollbar { width: 6px; }
+textarea::-webkit-scrollbar-track { background: transparent; }
+textarea::-webkit-scrollbar-thumb { background-color: #cbd5e1; border-radius: 20px; }
 </style>
