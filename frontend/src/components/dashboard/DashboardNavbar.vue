@@ -31,8 +31,9 @@
 
       <!-- Profile Dropdown -->
       <button @click="router.push(`/${rolePrefix}/profile`)" class="flex items-center gap-3 hover:bg-slate-50 p-1.5 rounded-lg transition-colors text-left">
-        <div class="w-10 h-10 rounded-full bg-slate-100 border border-slate-200 flex items-center justify-center text-slate-500 font-semibold text-sm shrink-0">
-          {{ initials }}
+        <div class="w-10 h-10 rounded-full bg-slate-100 border border-slate-200 flex items-center justify-center text-slate-500 font-semibold text-sm shrink-0 overflow-hidden">
+          <img v-if="user?.profilePhoto" :src="photoUrl" alt="" class="w-full h-full object-cover" />
+          <span v-else>{{ initials }}</span>
         </div>
         <div class="hidden sm:block">
           <p class="text-sm font-bold text-slate-900 leading-none mb-1">{{ user?.name || 'User' }}</p>
@@ -87,4 +88,6 @@ const initials = computed(() => {
   if (!name) return '?'
   return name.trim().split(/\s+/).slice(0, 2).map(n => n[0]?.toUpperCase()).join('')
 })
+
+const photoUrl = computed(() => props.user?.profilePhoto ? `http://127.0.0.1:5000${props.user.profilePhoto}` : '')
 </script>

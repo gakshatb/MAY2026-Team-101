@@ -122,7 +122,8 @@ def login():
             "id":    user.id,
             "name":  user.name,
             "email": user.email,
-            "role":  user.role
+            "role":  user.role,
+            "profilePhoto": user.profile_photo
         }
     ), 200
 
@@ -177,6 +178,7 @@ def me():
             "phone":      user.phone,
             "role":       user.role,
             "status":     user.status,
+            "profilePhoto": user.profile_photo,
             "created_at": user.created_at.isoformat() if user.created_at else None
         }
     ), 200

@@ -85,14 +85,22 @@
               <!-- Profile Card -->
               <div class="bg-white rounded-[14px] shadow-sm border border-slate-100 p-6 flex flex-col items-center text-center">
                 <div class="relative mb-5 group">
-                  <div class="w-32 h-32 rounded-full overflow-hidden border-4 border-white shadow-md bg-slate-100">
-                    <!-- FIXED: Replaced local asset with an external placeholder URL -->
-                    <img src="https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?ixlib=rb-1.2.1&auto=format&fit=facearea&facepad=2&w=256&h=256&q=80" alt="Profile Picture" class="w-full h-full object-cover" />
+                  <div class="w-32 h-32 rounded-full overflow-hidden border-4 border-white shadow-md bg-slate-100 flex items-center justify-center">
+                    <img v-if="photoUrl" :src="photoUrl" alt="Profile Picture" class="w-full h-full object-cover" />
+                    <span v-else class="text-3xl font-bold text-slate-400">{{ initials }}</span>
+                    <div v-if="isUploadingPhoto" class="absolute inset-0 rounded-full bg-white/70 flex items-center justify-center">
+                      <span class="w-6 h-6 border-2 border-slate-300 border-t-[#2563EB] rounded-full animate-spin"></span>
+                    </div>
                   </div>
-                  <button class="absolute bottom-0 right-0 bg-[#2563EB] hover:bg-[#1E40AF] text-white p-2.5 rounded-full shadow-lg transition-colors focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[#2563EB]">
+                  <input ref="photoInput" type="file" accept=".png,.jpg,.jpeg" class="hidden" @change="onPhotoSelected" />
+                  <button @click="photoInput.click()" :disabled="isUploadingPhoto" class="absolute bottom-0 right-0 bg-[#2563EB] hover:bg-[#1E40AF] text-white p-2.5 rounded-full shadow-lg transition-colors focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[#2563EB] disabled:opacity-60">
                     <Camera class="w-5 h-5" />
                   </button>
                 </div>
+                <button v-if="photoUrl" @click="removePhoto" :disabled="isUploadingPhoto" class="text-xs font-medium text-slate-400 hover:text-red-500 transition-colors -mt-3 mb-3">
+                  Remove photo
+                </button>
+                <p v-if="photoError" class="text-xs text-red-500 -mt-2 mb-3">{{ photoError }}</p>
                 <h2 class="text-xl font-bold text-slate-900 mb-1">{{ profileForm.fullName }}</h2>
                 <p class="text-sm font-medium text-[#2563EB] mb-4">{{ userRole }}</p>
                 <div class="flex items-center gap-2 px-3 py-1 bg-[#22C55E]/10 text-[#22C55E] rounded-full text-xs font-semibold tracking-wide uppercase">
@@ -418,7 +426,7 @@
 </template>
 
 <script setup>
-import { ref, reactive, onMounted } from 'vue'
+import { ref, reactive, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import axios from 'axios'
 import DashboardNavbar from '../../components/dashboard/DashboardNavbar.vue'
@@ -488,6 +496,9 @@ const fetchProfile = async () => {
       accountId:   u.accountId   || '',
       memberSince: u.memberSince || '',
     })
+    // Keep the header avatar (which reads from localStorage) in sync too.
+    currentUser.value = { ...currentUser.value, profilePhoto: u.profilePhoto || null }
+    localStorage.setItem('user', JSON.stringify(currentUser.value))
   } catch (err) {
     if (err.response?.status === 401) router.push('/login')
   }
@@ -496,6 +507,70 @@ onMounted(() => {
   fetchProfile()
   if (userRole.value === 'Citizen') fetchComplaintStats()
 })
+
+const photoInput = ref(null)
+const isUploadingPhoto = ref(false)
+const photoError = ref('')
+const photoUrl = computed(() => currentUser.value?.profilePhoto ? `http://127.0.0.1:5000${currentUser.value.profilePhoto}` : '')
+const initials = computed(() => {
+  const name = profileForm.fullName
+  if (!name) return '?'
+  return name.trim().split(/\s+/).slice(0, 2).map(n => n[0]?.toUpperCase()).join('')
+})
+
+const ALLOWED_PHOTO_TYPES = ['image/png', 'image/jpeg']
+const MAX_PHOTO_BYTES = 5 * 1024 * 1024
+
+const onPhotoSelected = async (e) => {
+  const file = e.target.files[0]
+  e.target.value = '' // allow re-selecting the same file later
+  if (!file) return
+
+  photoError.value = ''
+  if (!ALLOWED_PHOTO_TYPES.includes(file.type)) {
+    photoError.value = 'Only PNG and JPEG images are allowed.'
+    return
+  }
+  if (file.size > MAX_PHOTO_BYTES) {
+    photoError.value = 'Image exceeds the 5MB size limit.'
+    return
+  }
+
+  isUploadingPhoto.value = true
+  try {
+    const token = localStorage.getItem('token')
+    const formData = new FormData()
+    formData.append('photo', file)
+    const { data } = await axios.post('http://127.0.0.1:5000/api/citizen/profile/photo', formData, {
+      headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'multipart/form-data' }
+    })
+    currentUser.value = { ...currentUser.value, profilePhoto: data.profilePhoto }
+    localStorage.setItem('user', JSON.stringify(currentUser.value))
+  } catch (err) {
+    if (err.response?.status === 401) router.push('/login')
+    photoError.value = err.response?.data?.message || 'Upload failed. Please try again.'
+  } finally {
+    isUploadingPhoto.value = false
+  }
+}
+
+const removePhoto = async () => {
+  isUploadingPhoto.value = true
+  photoError.value = ''
+  try {
+    const token = localStorage.getItem('token')
+    await axios.delete('http://127.0.0.1:5000/api/citizen/profile/photo', {
+      headers: { Authorization: `Bearer ${token}` }
+    })
+    currentUser.value = { ...currentUser.value, profilePhoto: null }
+    localStorage.setItem('user', JSON.stringify(currentUser.value))
+  } catch (err) {
+    if (err.response?.status === 401) router.push('/login')
+    photoError.value = 'Could not remove photo. Please try again.'
+  } finally {
+    isUploadingPhoto.value = false
+  }
+}
 
 const passwordForm = reactive({
   current: '',

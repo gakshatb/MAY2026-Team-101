@@ -85,7 +85,6 @@ def _serialize_complaint(c, include_full=False):
         "location":   c.location,
         "created_at": c.created_at.isoformat() if c.created_at else None,
         "updated_at": c.updated_at.isoformat() if c.updated_at else None,
-        "has_feedback": c.feedback is not None,
     }
     if include_full:
         data.update({
@@ -100,6 +99,7 @@ def _serialize_complaint(c, include_full=False):
             "urgency_note":  c.urgency_note,
             "is_escalated":  c.is_escalated,
             "images":        [img.image_url for img in c.images],
+            "has_feedback":  c.feedback is not None,
         })
     return data
 
@@ -311,35 +311,6 @@ def track_complaint(complaint_id):
     ), 200
 
 
-@citizen_bp.route('/complaints/<int:complaint_id>/feedback', methods=['GET'])
-@role_required('Citizen')
-def get_feedback_for_complaint(complaint_id):
-    user_id = int(get_jwt_identity())
-    complaint = Complaint.query.get(complaint_id)
-
-    if not complaint:
-        return jsonify(message="Complaint not found."), 404
-    if complaint.created_by != user_id:
-        return jsonify(message="You do not have access to this complaint."), 403
-    if not complaint.feedback:
-        return jsonify(message="No feedback has been submitted for this complaint."), 404
-
-    fb = complaint.feedback
-    return jsonify(
-        success=True,
-        feedback={
-            "rating":          fb.rating,
-            "service_ratings": json.loads(fb.service_ratings) if fb.service_ratings else {},
-            "categories":      json.loads(fb.categories) if fb.categories else [],
-            "comment":         fb.comments,
-            "improvement":     fb.improvement,
-            "would_recommend": fb.would_recommend,
-            "is_anonymous":    fb.is_anonymous,
-            "submitted_at":    fb.submitted_at.isoformat() if fb.submitted_at else None,
-        }
-    ), 200
-
-
 # ─────────────────────────────────────────────────────────────────────────
 # Submit feedback for a resolved complaint. One feedback per complaint
 # ─────────────────────────────────────────────────────────────────────────
@@ -501,6 +472,7 @@ def get_profile():
             "state":      user.state,
             "pincode":    user.pincode,
             "gender":     user.gender,
+            "profilePhoto": user.profile_photo,
             "accountId":  f"CVC-USR-{user.id:04d}",
             "memberSince": user.created_at.strftime('%B %d, %Y') if user.created_at else None
         }
@@ -556,6 +528,45 @@ def update_profile():
     db.session.commit()
 
     return jsonify(success=True, message="Profile updated successfully."), 200
+
+
+# ─────────────────────────────────────────────────────────────────────────
+# Profile photo — upload (replace) or remove the citizen's avatar.
+# Reuses the same _save_uploaded_image() helper as complaint image uploads.
+# ─────────────────────────────────────────────────────────────────────────
+@citizen_bp.route('/profile/photo', methods=['POST'])
+@role_required('Citizen')
+def upload_profile_photo():
+    user_id = int(get_jwt_identity())
+    user = User.query.get(user_id)
+
+    if 'photo' not in request.files:
+        return jsonify(message="No photo file was provided."), 400
+
+    try:
+        photo_url = _save_uploaded_image(request.files['photo'])
+    except ValueError as e:
+        return jsonify(message=str(e)), 400
+
+    if not photo_url:
+        return jsonify(message="No photo file was provided."), 400
+
+    user.profile_photo = photo_url
+    db.session.commit()
+
+    return jsonify(success=True, profilePhoto=photo_url), 200
+
+
+@citizen_bp.route('/profile/photo', methods=['DELETE'])
+@role_required('Citizen')
+def delete_profile_photo():
+    user_id = int(get_jwt_identity())
+    user = User.query.get(user_id)
+
+    user.profile_photo = None
+    db.session.commit()
+
+    return jsonify(success=True), 200
 
 
 # ─────────────────────────────────────────────────────────────────────────

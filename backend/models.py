@@ -17,6 +17,7 @@ class User(db.Model):
     state      = db.Column(db.String(100), nullable=True)
     pincode    = db.Column(db.String(20),  nullable=True)
     gender     = db.Column(db.String(20),  nullable=True)
+    profile_photo = db.Column(db.String(500), nullable=True)
     role       = db.Column(db.String(20),  nullable=False)          # citizen | officer | worker
     status     = db.Column(db.String(20),  nullable=False, default='active')
     created_at = db.Column(db.DateTime,    nullable=False, default=datetime.utcnow)  # FIX: was datetime.now (local time + missing parens)
