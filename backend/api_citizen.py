@@ -75,16 +75,17 @@ def _create_notification(user_id, title, message, complaint_id=None, ntype='info
 
 def _serialize_complaint(c, include_full=False):
     data = {
-        "id":         f"CMP-{c.id:05d}",
-        "raw_id":     c.id,
-        "title":      c.title,
-        "category":   c.category,
-        "priority":   c.priority,
-        "department": c.department,
-        "status":     c.status,
-        "location":   c.location,
-        "created_at": c.created_at.isoformat() if c.created_at else None,
-        "updated_at": c.updated_at.isoformat() if c.updated_at else None,
+        "id":           f"CMP-{c.id:05d}",
+        "raw_id":       c.id,
+        "title":        c.title,
+        "category":     c.category,
+        "priority":     c.priority,
+        "department":   c.department,
+        "status":       c.status,
+        "location":     c.location,
+        "has_feedback": c.feedback is not None,
+        "created_at":   c.created_at.isoformat() if c.created_at else None,
+        "updated_at":   c.updated_at.isoformat() if c.updated_at else None,
     }
     if include_full:
         data.update({
@@ -99,7 +100,6 @@ def _serialize_complaint(c, include_full=False):
             "urgency_note":  c.urgency_note,
             "is_escalated":  c.is_escalated,
             "images":        [img.image_url for img in c.images],
-            "has_feedback":  c.feedback is not None,
         })
     return data
 

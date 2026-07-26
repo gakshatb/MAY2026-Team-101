@@ -155,10 +155,10 @@ const menuItems = computed(() => {
         { name: 'Dashboard', icon: LayoutDashboard, route: '/citizen/dashboard' },
         { name: 'Submit Complaint', icon: PlusCircle, route: '/citizen/submit' },
         { name: 'My Complaints', icon: FolderOpen, route: '/citizen/complaints' },
-        { name: 'Complaint Details', icon: FileText, route: '/citizen/complaintdetails/CMP-000' },
-        { name: 'Complaint Tracking', icon: MapPin, route: '/citizen/track/CMP-000' }, 
+        { name: 'Complaint Details', icon: FileText, route: '/citizen/complaintdetails' },
+        { name: 'Complaint Tracking', icon: MapPin, route: '/citizen/track' }, 
         { name: 'Notifications', icon: Bell, route: '/citizen/notifications' },
-        { name: 'Feedback', icon: MessageSquare, route: '/citizen/feedback/CMP-000' } 
+        { name: 'Feedback', icon: MessageSquare, route: '/citizen/feedback' } 
       ]
   }
 })

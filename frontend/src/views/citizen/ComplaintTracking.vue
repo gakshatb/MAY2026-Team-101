@@ -21,6 +21,17 @@
           Loading tracking details...
         </div>
 
+        <!-- No complaint selected: let the user pick one instead of a dead end -->
+        <div v-else-if="!route.params.id" class="max-w-5xl mx-auto py-6">
+          <ComplaintPicker
+            title="Select a Complaint to Track"
+            subtitle="Choose one of your complaints to see its full tracking timeline."
+            action-label="Track"
+            empty-message="No complaints available to track."
+            @select="(id) => router.push(`/citizen/track/${id}`)"
+          />
+        </div>
+
         <!-- Complaint Not Found State -->
         <div v-else-if="!complaint" class="h-full flex items-center justify-center">
           <div class="text-center">
@@ -159,11 +170,12 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import axios from 'axios'
 import Sidebar from '../../components/dashboard/Sidebar.vue'
 import DashboardNavbar from '../../components/dashboard/DashboardNavbar.vue'
+import ComplaintPicker from '../../components/dashboard/ComplaintPicker.vue'
 import { 
   Download, MapPin, SearchX, Check, 
   Printer 
@@ -190,7 +202,13 @@ const activityLog   = ref([])
 const STAGE_ORDER  = ['Pending', 'In Progress', 'Resolved', 'Closed']
 const STAGE_LABELS = { Pending: 'Submitted', 'In Progress': 'In Progress', Resolved: 'Resolved', Closed: 'Closed' }
 
-onMounted(async () => {
+const fetchTracking = async () => {
+  if (!route.params.id) {
+    complaint.value = null
+    isLoading.value = false
+    return
+  }
+  isLoading.value = true
   try {
     const token = localStorage.getItem('token')
     const id    = route.params.id
@@ -220,12 +238,19 @@ onMounted(async () => {
       remarks: log.remark || '—',
     }))
   } catch (err) {
+    complaint.value = null
     if (err.response?.status === 401) router.push('/login')
     console.error('Tracking fetch error:', err)
   } finally {
     isLoading.value = false
   }
-})
+}
+
+onMounted(fetchTracking)
+// Vue Router reuses this component instance when navigating between
+// /citizen/track and /citizen/track/:id (same route, different param) —
+// onMounted alone won't re-fire, so re-fetch whenever the id changes.
+watch(() => route.params.id, fetchTracking)
 </script>
 
 <style scoped>

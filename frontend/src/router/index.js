@@ -75,9 +75,9 @@ const router = createRouter({
     { path: '/citizen/notifications', name: 'CitizenNotifications', component: Notifications, meta: { title: 'Notifications | CivicDesk', requiresAuth: true } },
     { path: '/citizen/complaints', name: 'MyComplaints', component: MyComplaints, meta: { title: 'My Complaints | CivicDesk', requiresAuth: true } },
     { path: '/citizen/submit', name: 'SubmitComplaint', component: SubmitComplaint, meta: { title: 'Submit Complaint | CivicDesk', requiresAuth: true } },
-    { path: '/citizen/complaintdetails/:id', name: 'ComplaintDetails', component: ComplaintDetails, meta: { title: 'Details | CivicDesk', requiresAuth: true }, props: true },
-    { path: '/citizen/track/:id', name: 'ComplaintTracking', component: ComplaintTracking, meta: { title: 'Track | CivicDesk', requiresAuth: true }, props: true },
-    { path: '/citizen/feedback/:id', name: 'CitizenFeedback', component: Feedback, meta: { title: 'Feedback | CivicDesk', requiresAuth: true }, props: true },
+    { path: '/citizen/complaintdetails/:id?', name: 'ComplaintDetails', component: ComplaintDetails, meta: { title: 'Details | CivicDesk', requiresAuth: true }, props: true },
+    { path: '/citizen/track/:id?', name: 'ComplaintTracking', component: ComplaintTracking, meta: { title: 'Track | CivicDesk', requiresAuth: true }, props: true },
+    { path: '/citizen/feedback/:id?', name: 'CitizenFeedback', component: Feedback, meta: { title: 'Feedback | CivicDesk', requiresAuth: true }, props: true },
 
     // --- Officer Routes ---
     { path: '/officer/dashboard', name: 'OfficerDashboard', component: OfficerDashboard, meta: { title: 'Officer Dashboard | CivicDesk', requiresAuth: true } },

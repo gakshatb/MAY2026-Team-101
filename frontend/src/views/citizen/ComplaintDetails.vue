@@ -21,6 +21,17 @@
           Loading complaint details...
         </div>
 
+        <!-- No complaint selected: let the user pick one instead of a dead end -->
+        <div v-else-if="!route.params.id" class="max-w-5xl mx-auto">
+          <ComplaintPicker
+            title="Select a Complaint"
+            subtitle="Choose one of your complaints to view its full details."
+            action-label="View Details"
+            empty-message="No complaints available to view."
+            @select="(id) => router.push(`/citizen/complaintdetails/${id}`)"
+          />
+        </div>
+
         <!-- Error / not found state -->
         <div v-else-if="!complaint" class="max-w-7xl mx-auto py-24 text-center">
           <p class="text-slate-500 font-medium">We couldn't load this complaint.</p>
@@ -151,11 +162,12 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import axios from 'axios'
 import Sidebar from '@/components/dashboard/Sidebar.vue'
 import DashboardNavbar from '@/components/dashboard/DashboardNavbar.vue'
+import ComplaintPicker from '@/components/dashboard/ComplaintPicker.vue'
 import { 
   Printer, Download, MapPin, Camera, Maximize2, 
   User, HardHat, ShieldCheck 
@@ -179,7 +191,13 @@ const rawId           = ref(null)
 const STAGE_ORDER  = ['Pending', 'In Progress', 'Resolved', 'Closed']
 const STAGE_LABELS = { Pending: 'Submitted', 'In Progress': 'In Progress', Resolved: 'Resolved', Closed: 'Closed' }
 
-onMounted(async () => {
+const fetchComplaintDetails = async () => {
+  if (!route.params.id) {
+    complaint.value = null
+    isLoading.value = false
+    return
+  }
+  isLoading.value = true
   try {
     const token = localStorage.getItem('token')
     const id    = route.params.id
@@ -233,7 +251,13 @@ onMounted(async () => {
   } finally {
     isLoading.value = false
   }
-})
+}
+
+onMounted(fetchComplaintDetails)
+// Vue Router reuses this component instance when navigating between
+// /citizen/complaintdetails and /citizen/complaintdetails/:id (same route,
+// different param) — onMounted alone won't re-fire, so re-fetch on id change.
+watch(() => route.params.id, fetchComplaintDetails)
 </script>
 
 <style scoped>

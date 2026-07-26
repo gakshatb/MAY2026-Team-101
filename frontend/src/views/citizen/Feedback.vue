@@ -28,6 +28,19 @@
             Loading complaint...
           </div>
 
+          <!-- No complaint selected: let the user pick a resolved complaint to review -->
+          <div v-else-if="!route.params.id">
+            <ComplaintPicker
+              title="Select a Complaint to Review"
+              subtitle="Choose a resolved complaint to share feedback on."
+              action-label="Give Feedback"
+              empty-message="No complaints available for feedback."
+              status-filter="Resolved"
+              :exclude-with-feedback="true"
+              @select="(id) => router.push(`/citizen/feedback/${id}`)"
+            />
+          </div>
+
           <!-- Not eligible for feedback -->
           <div v-else-if="!complaint || complaint.status !== 'Resolved' || complaint.has_feedback" class="bg-white rounded-[14px] shadow-sm border border-slate-100 p-10 text-center">
             <p class="text-slate-700 font-bold text-lg mb-2">
@@ -317,11 +330,12 @@
 </template>
 
 <script setup>
-import { ref, reactive, computed, onMounted } from 'vue'
+import { ref, reactive, computed, onMounted, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import axios from 'axios'
 import Sidebar from '@/components/dashboard/Sidebar.vue'
 import DashboardNavbar from '@/components/dashboard/DashboardNavbar.vue'
+import ComplaintPicker from '@/components/dashboard/ComplaintPicker.vue'
 import { 
   Star, CheckCircle, MapPin, Clock, Building, User, 
   Check, Camera, Trash2, Lightbulb, ThumbsUp
@@ -387,6 +401,11 @@ const fetchPastFeedback = async () => {
   }
 }
 const fetchComplaint = async () => {
+  if (!route.params.id) {
+    complaint.value = null
+    isLoadingComplaint.value = false
+    return
+  }
   isLoadingComplaint.value = true
   try {
     const token = localStorage.getItem('token')
@@ -408,6 +427,7 @@ onMounted(() => {
   fetchComplaint()
   fetchPastFeedback()
 })
+watch(() => route.params.id, fetchComplaint)
 
 const ratingText = computed(() => {
   const val = hoverOverall.value || form.overallRating
