@@ -418,7 +418,7 @@
 </template>
 
 <script setup>
-import { ref, reactive, computed, onMounted } from 'vue'
+import { ref, reactive, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import axios from 'axios'
 import DashboardNavbar from '../../components/dashboard/DashboardNavbar.vue'
@@ -439,10 +439,7 @@ const isUpdatingPassword = ref(false)
 const profileSuccess     = ref('')
 const passwordSuccess    = ref('')
 
-const currentUser = computed(() => {
-  const stored = localStorage.getItem('user')
-  return stored ? JSON.parse(stored) : null
-})
+const currentUser = ref(JSON.parse(localStorage.getItem('user') || 'null'))
 
 const complaintStats = reactive({ total: 0, pending: 0, resolved: 0, closed: 0 })
 
@@ -590,6 +587,13 @@ const saveProfile = async () => {
     }, { headers: { Authorization: `Bearer ${token}` } })
     isEditingProfile.value = false
     profileSuccess.value = 'Profile updated successfully.'
+
+    currentUser.value = {
+      ...currentUser.value,
+      name:  profileForm.fullName,
+      email: profileForm.email,
+    }
+    localStorage.setItem('user', JSON.stringify(currentUser.value))
   } catch (err) {
     if (err.response?.status === 401) router.push('/login')
     profileErrors.submit = err.response?.data?.message || 'Update failed.'
