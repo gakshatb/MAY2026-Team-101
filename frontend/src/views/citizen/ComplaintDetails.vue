@@ -50,10 +50,10 @@
               <p class="text-sm text-slate-500 mt-1">{{ complaint.title }}</p>
             </div>
             <div class="flex items-center gap-3">
-              <button class="px-4 py-2 bg-white border border-slate-200 rounded-lg text-sm font-medium text-slate-700 hover:bg-slate-50 transition-colors flex items-center gap-2">
+              <button @click="printPage" class="px-4 py-2 bg-white border border-slate-200 rounded-lg text-sm font-medium text-slate-700 hover:bg-slate-50 transition-colors flex items-center gap-2">
                 <Printer class="w-4 h-4" /> Print
               </button>
-              <button class="px-4 py-2 bg-[#2563EB] text-white rounded-lg text-sm font-medium hover:bg-[#1E40AF] transition-colors flex items-center gap-2">
+              <button @click="downloadPdf" class="px-4 py-2 bg-[#2563EB] text-white rounded-lg text-sm font-medium hover:bg-[#1E40AF] transition-colors flex items-center gap-2">
                 <Download class="w-4 h-4" /> Download PDF
               </button>
             </div>
@@ -165,6 +165,7 @@
 import { ref, computed, onMounted, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import axios from 'axios'
+import jsPDF from 'jspdf'
 import Sidebar from '@/components/dashboard/Sidebar.vue'
 import DashboardNavbar from '@/components/dashboard/DashboardNavbar.vue'
 import ComplaintPicker from '@/components/dashboard/ComplaintPicker.vue'
@@ -258,6 +259,75 @@ onMounted(fetchComplaintDetails)
 // /citizen/complaintdetails and /citizen/complaintdetails/:id (same route,
 // different param) — onMounted alone won't re-fire, so re-fetch on id change.
 watch(() => route.params.id, fetchComplaintDetails)
+
+const printPage = () => window.print()
+
+const downloadPdf = () => {
+  if (!complaint.value) return
+  const doc = new jsPDF()
+  const marginX = 14
+  const pageWidth = doc.internal.pageSize.getWidth()
+  let y = 20
+
+  doc.setFontSize(18)
+  doc.setFont(undefined, 'bold')
+  doc.text('CivicDesk — Complaint Report', marginX, y)
+  y += 12
+
+  doc.setFontSize(11)
+  doc.setFont(undefined, 'normal')
+  const fields = [
+    ['Complaint ID', complaint.value.id],
+    ['Title', complaint.value.title],
+    ['Category', complaint.value.category],
+    ['Status', complaint.value.status],
+    ['Priority', complaint.value.priority],
+    ['Submitted', complaint.value.submittedAt],
+  ]
+  fields.forEach(([label, value]) => {
+    doc.setFont(undefined, 'bold')
+    doc.text(`${label}:`, marginX, y)
+    doc.setFont(undefined, 'normal')
+    doc.text(String(value ?? '—'), marginX + 40, y)
+    y += 8
+  })
+
+  y += 4
+  doc.setFont(undefined, 'bold')
+  doc.text('Description', marginX, y)
+  y += 7
+  doc.setFont(undefined, 'normal')
+  const descLines = doc.splitTextToSize(complaint.value.description || 'No description provided.', pageWidth - marginX * 2)
+  doc.text(descLines, marginX, y)
+  y += descLines.length * 6 + 8
+
+  if (Object.keys(locationDetails.value).length) {
+    doc.setFont(undefined, 'bold')
+    doc.text('Location', marginX, y)
+    y += 7
+    doc.setFont(undefined, 'normal')
+    Object.entries(locationDetails.value).forEach(([label, value]) => {
+      doc.text(`${label}: ${value}`, marginX, y)
+      y += 6
+    })
+    y += 6
+  }
+
+  if (timeline.value.length) {
+    doc.setFont(undefined, 'bold')
+    doc.text('Status Timeline', marginX, y)
+    y += 7
+    doc.setFont(undefined, 'normal')
+    timeline.value.forEach(step => {
+      const status = step.completed ? 'Completed' : 'Pending'
+      doc.text(`${step.title}: ${status}${step.date ? ' (' + step.date + ')' : ''}`, marginX, y)
+      y += 6
+    })
+  }
+
+  doc.save(`${complaint.value.id}-report.pdf`)
+}
+
 </script>
 
 <style scoped>

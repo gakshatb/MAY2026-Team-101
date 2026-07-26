@@ -59,7 +59,7 @@
               </div>
             </div>
             <div class="flex gap-3">
-              <button class="px-4 py-2 border border-slate-200 bg-white rounded-lg text-sm font-medium hover:bg-slate-50 flex items-center gap-2">
+              <button @click="downloadReport" class="px-4 py-2 border border-slate-200 bg-white rounded-lg text-sm font-medium hover:bg-slate-50 flex items-center gap-2">
                 <Download class="w-4 h-4" /> Download Report
               </button>
             </div>
@@ -173,12 +173,12 @@
 import { ref, computed, onMounted, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import axios from 'axios'
+import jsPDF from 'jspdf'
 import Sidebar from '../../components/dashboard/Sidebar.vue'
 import DashboardNavbar from '../../components/dashboard/DashboardNavbar.vue'
 import ComplaintPicker from '../../components/dashboard/ComplaintPicker.vue'
 import { 
-  Download, MapPin, SearchX, Check, 
-  Printer 
+  Download, MapPin, SearchX, Check 
 } from 'lucide-vue-next'
 
 const route    = useRoute()
@@ -251,6 +251,67 @@ onMounted(fetchTracking)
 // /citizen/track and /citizen/track/:id (same route, different param) —
 // onMounted alone won't re-fire, so re-fetch whenever the id changes.
 watch(() => route.params.id, fetchTracking)
+
+const downloadReport = () => {
+  if (!complaint.value) return
+  const doc = new jsPDF()
+  const marginX = 14
+  const pageWidth = doc.internal.pageSize.getWidth()
+  let y = 20
+
+  doc.setFontSize(18)
+  doc.setFont(undefined, 'bold')
+  doc.text('CivicDesk — Complaint Tracking Report', marginX, y)
+  y += 12
+
+  doc.setFontSize(11)
+  doc.setFont(undefined, 'normal')
+  const fields = [
+    ['Complaint ID', complaint.value.id],
+    ['Title', complaint.value.title],
+    ['Category', complaint.value.category],
+    ['Department', complaint.value.department],
+    ['Status', complaint.value.status],
+    ['Priority', complaint.value.priority],
+    ['Location', complaint.value.location],
+  ]
+  fields.forEach(([label, value]) => {
+    doc.setFont(undefined, 'bold')
+    doc.text(`${label}:`, marginX, y)
+    doc.setFont(undefined, 'normal')
+    const lines = doc.splitTextToSize(String(value ?? '—'), pageWidth - marginX * 2 - 40)
+    doc.text(lines, marginX + 40, y)
+    y += 6 * lines.length + 2
+  })
+
+  y += 6
+  doc.setFont(undefined, 'bold')
+  doc.text('Progress Timeline', marginX, y)
+  y += 7
+  doc.setFont(undefined, 'normal')
+  timelineSteps.value.forEach(step => {
+    doc.text(`${step.title}: ${step.status}${step.date ? ' (' + step.date + ')' : ''}`, marginX, y)
+    y += 6
+  })
+
+  y += 6
+  doc.setFont(undefined, 'bold')
+  doc.text('Activity Log', marginX, y)
+  y += 7
+  doc.setFont(undefined, 'normal')
+  if (activityLog.value.length) {
+    activityLog.value.forEach(log => {
+      if (y > 270) { doc.addPage(); y = 20 }
+      doc.text(`${log.date} — ${log.status}: ${log.remarks}`, marginX, y)
+      y += 6
+    })
+  } else {
+    doc.text('No activity recorded yet.', marginX, y)
+  }
+
+  doc.save(`${complaint.value.id}-tracking-report.pdf`)
+}
+
 </script>
 
 <style scoped>
