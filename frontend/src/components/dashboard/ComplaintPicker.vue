@@ -62,7 +62,7 @@
                 <span :class="['px-2.5 py-1 rounded-full text-[10px] font-bold uppercase', statusColors(c.status)]">{{ c.status }}</span>
               </td>
               <td class="px-6 py-4 text-right">
-                <button @click="$emit('select', c.rawId)" class="text-[#2563EB] font-medium hover:underline text-sm">{{ actionLabel }}</button>
+                <button @click="$emit('select', c.rawId)" class="text-[#2563EB] font-medium hover:underline text-sm">{{ rowLabel(c) }}</button>
               </td>
             </tr>
           </tbody>
@@ -77,7 +77,7 @@
             <span :class="['px-2 py-0.5 rounded text-[10px] font-bold', statusColors(c.status)]">{{ c.status }}</span>
           </div>
           <p class="text-xs text-slate-500">ID: {{ c.id }} | {{ c.category }}</p>
-          <button @click="$emit('select', c.rawId)" class="w-full py-2 bg-slate-50 rounded-lg text-sm font-medium text-slate-700">{{ actionLabel }}</button>
+          <button @click="$emit('select', c.rawId)" class="w-full py-2 bg-slate-50 rounded-lg text-sm font-medium text-slate-700">{{ rowLabel(c) }}</button>
         </div>
       </div>
     </template>
@@ -94,6 +94,8 @@ const props = defineProps({
   title:        { type: String, default: 'Select a Complaint' },
   subtitle:     { type: String, default: '' },
   actionLabel:  { type: String, default: 'Select' },
+  // feedback (c.has_feedback). Leave null to keep using actionLabel always.
+  viewedLabel:  { type: String, default: null },
   emptyMessage: { type: String, default: 'No complaints available.' },
   // Only show complaints in this status (e.g. 'Resolved' for the Feedback picker).
   statusFilter: { type: String, default: null },
@@ -136,6 +138,10 @@ const fetchComplaints = async () => {
 }
 
 onMounted(fetchComplaints)
+
+// Per-row action label: use viewedLabel when the complaint already has
+// feedback and a viewedLabel was provided, otherwise fall back to actionLabel.
+const rowLabel = (c) => (c.has_feedback && props.viewedLabel) ? props.viewedLabel : props.actionLabel
 
 const statusColors = (status) => {
   switch (status) {

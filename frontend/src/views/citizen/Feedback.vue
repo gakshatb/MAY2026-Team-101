@@ -34,22 +34,97 @@
               title="Select a Complaint to Review"
               subtitle="Choose a resolved complaint to share feedback on."
               action-label="Give Feedback"
+              viewed-label="View Feedback"
               empty-message="No complaints available for feedback."
               status-filter="Resolved"
-              :exclude-with-feedback="true"
               @select="(id) => router.push(`/citizen/feedback/${id}`)"
             />
           </div>
 
-          <!-- Not eligible for feedback -->
-          <div v-else-if="!complaint || complaint.status !== 'Resolved' || complaint.has_feedback" class="bg-white rounded-[14px] shadow-sm border border-slate-100 p-10 text-center">
+          <!-- Not eligible for feedback (couldn't load, or not resolved yet) -->
+          <div v-else-if="!complaint || complaint.status !== 'Resolved'" class="bg-white rounded-[14px] shadow-sm border border-slate-100 p-10 text-center">
             <p class="text-slate-700 font-bold text-lg mb-2">
-              {{ !complaint ? "We couldn't load this complaint." : complaint.has_feedback ? 'Feedback already submitted.' : 'Feedback isn\'t available yet.' }}
+              {{ !complaint ? "We couldn't load this complaint." : 'Feedback isn\'t available yet.' }}
             </p>
             <p class="text-slate-500 text-sm mb-6">
-              {{ !complaint ? 'It may not exist, or you may not have access to it.' : complaint.has_feedback ? 'You\'ve already reviewed this complaint.' : 'Feedback can only be submitted once a complaint is marked Resolved.' }}
+              {{ !complaint ? 'It may not exist, or you may not have access to it.' : 'Feedback can only be submitted once a complaint is marked Resolved.' }}
             </p>
             <button @click="router.push('/citizen/complaints')" class="px-5 py-2.5 bg-[#2563EB] text-white rounded-lg text-sm font-medium hover:bg-[#1E40AF]">
+              Back to My Complaints
+            </button>
+          </div>
+
+          <!-- Already submitted: show what the citizen wrote instead of just blocking them -->
+          <div v-else-if="complaint.has_feedback" class="max-w-3xl space-y-6">
+            <div class="bg-white rounded-[14px] shadow-sm border border-slate-100 p-6 sm:p-8">
+              <div class="flex items-start justify-between gap-4 mb-6">
+                <div>
+                  <span class="text-xs font-bold text-green-700 bg-green-100 px-2 py-1 rounded uppercase">Feedback Submitted</span>
+                  <h2 class="text-xl font-bold text-slate-900 mt-3">{{ complaint.title }}</h2>
+                  <p class="text-sm text-slate-500 mt-1">{{ complaint.id }} · Submitted {{ submittedFeedback ? new Date(submittedFeedback.submitted_at).toLocaleDateString('en-US', { month: 'short', day: '2-digit', year: 'numeric' }) : '' }}</p>
+                </div>
+                <button @click="router.push(`/citizen/complaintdetails/${complaint.raw_id}`)" class="text-sm font-medium text-[#2563EB] hover:underline whitespace-nowrap">View Details</button>
+              </div>
+
+              <div v-if="isLoadingFeedback" class="py-10 text-center text-slate-400">Loading your feedback...</div>
+
+              <div v-else-if="!submittedFeedback" class="py-10 text-center text-slate-400">
+                Couldn't load your submitted feedback right now.
+              </div>
+
+              <div v-else class="space-y-8">
+                <!-- Overall Rating -->
+                <div>
+                  <p class="text-sm font-medium text-slate-700 mb-2">Overall Rating</p>
+                  <div class="flex items-center gap-3">
+                    <div class="flex gap-1">
+                      <Star v-for="i in 5" :key="i" :class="['w-6 h-6', i <= submittedFeedback.rating ? 'text-amber-400 fill-amber-400' : 'text-slate-200']" />
+                    </div>
+                    <span class="text-sm font-bold text-slate-600">{{ submittedFeedback.rating }}/5</span>
+                  </div>
+                </div>
+
+                <!-- Detailed Service Ratings -->
+                <div v-if="submittedFeedback.service_ratings?.length" class="bg-slate-50 p-6 rounded-xl border border-slate-100 space-y-3">
+                  <div v-for="sr in submittedFeedback.service_ratings" :key="sr.id" class="flex items-center justify-between gap-2">
+                    <span class="text-sm font-medium text-slate-700">{{ serviceRatingLabel(sr.id) }}</span>
+                    <div class="flex gap-1">
+                      <Star v-for="i in 5" :key="i" :class="['w-4 h-4', i <= sr.rating ? 'text-amber-400 fill-amber-400' : 'text-slate-300']" />
+                    </div>
+                  </div>
+                </div>
+
+                <!-- What went well -->
+                <div v-if="submittedFeedback.categories?.length">
+                  <p class="text-sm font-medium text-slate-700 mb-2">What went well</p>
+                  <div class="flex flex-wrap gap-2">
+                    <span v-for="cat in submittedFeedback.categories" :key="cat" class="text-xs font-medium text-[#2563EB] bg-blue-50 px-3 py-1.5 rounded-full">{{ cat }}</span>
+                  </div>
+                </div>
+
+                <!-- Comment -->
+                <div>
+                  <p class="text-sm font-medium text-slate-700 mb-2">Your comment</p>
+                  <p class="text-sm text-slate-600 bg-slate-50 rounded-lg p-4 border border-slate-100 leading-relaxed">{{ submittedFeedback.comment }}</p>
+                </div>
+
+                <!-- Improvement -->
+                <div v-if="submittedFeedback.improvement">
+                  <p class="text-sm font-medium text-slate-700 mb-2">Suggested improvement</p>
+                  <p class="text-sm text-slate-600 bg-slate-50 rounded-lg p-4 border border-slate-100 leading-relaxed">{{ submittedFeedback.improvement }}</p>
+                </div>
+
+                <!-- Recommend -->
+                <div v-if="submittedFeedback.would_recommend" class="flex items-center gap-2">
+                  <span class="text-sm font-medium text-slate-700">Would recommend CivicDesk:</span>
+                  <span class="text-sm font-bold text-slate-900">{{ submittedFeedback.would_recommend }}</span>
+                </div>
+
+                <p v-if="submittedFeedback.is_anonymous" class="text-xs text-slate-400 italic">Submitted anonymously.</p>
+              </div>
+            </div>
+
+            <button @click="router.push('/citizen/complaints')" class="px-5 py-2.5 bg-white border border-slate-200 text-slate-700 rounded-lg text-sm font-medium hover:bg-slate-50">
               Back to My Complaints
             </button>
           </div>
@@ -400,6 +475,27 @@ const fetchPastFeedback = async () => {
     console.error('Past feedback fetch error:', err)
   }
 }
+const submittedFeedback = ref(null)
+const isLoadingFeedback = ref(false)
+
+const fetchSubmittedFeedback = async (id) => {
+  isLoadingFeedback.value = true
+  submittedFeedback.value = null
+  try {
+    const token = localStorage.getItem('token')
+    const { data } = await axios.get(`http://127.0.0.1:5000/api/citizen/complaints/${id}/feedback`, {
+      headers: { Authorization: `Bearer ${token}` }
+    })
+    submittedFeedback.value = data.feedback
+  } catch (err) {
+    console.error('Submitted feedback fetch error:', err)
+  } finally {
+    isLoadingFeedback.value = false
+  }
+}
+
+const serviceRatingLabel = (id) => serviceRatings.find(r => r.id === id)?.label || id
+
 const fetchComplaint = async () => {
   if (!route.params.id) {
     complaint.value = null
@@ -414,6 +510,9 @@ const fetchComplaint = async () => {
       headers: { Authorization: `Bearer ${token}` }
     })
     complaint.value = data.complaint
+    if (complaint.value.has_feedback) {
+      fetchSubmittedFeedback(id)
+    }
   } catch (err) {
     if (err.response?.status === 401) router.push('/login')
     complaint.value = null

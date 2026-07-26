@@ -75,17 +75,17 @@ def _create_notification(user_id, title, message, complaint_id=None, ntype='info
 
 def _serialize_complaint(c, include_full=False):
     data = {
-        "id":           f"CMP-{c.id:05d}",
-        "raw_id":       c.id,
-        "title":        c.title,
-        "category":     c.category,
-        "priority":     c.priority,
-        "department":   c.department,
-        "status":       c.status,
-        "location":     c.location,
+        "id":         f"CMP-{c.id:05d}",
+        "raw_id":     c.id,
+        "title":      c.title,
+        "category":   c.category,
+        "priority":   c.priority,
+        "department": c.department,
+        "status":     c.status,
+        "location":   c.location,
+        "created_at": c.created_at.isoformat() if c.created_at else None,
+        "updated_at": c.updated_at.isoformat() if c.updated_at else None,
         "has_feedback": c.feedback is not None,
-        "created_at":   c.created_at.isoformat() if c.created_at else None,
-        "updated_at":   c.updated_at.isoformat() if c.updated_at else None,
     }
     if include_full:
         data.update({
@@ -308,6 +308,35 @@ def track_complaint(complaint_id):
             }
             for log in logs
         ]
+    ), 200
+
+
+@citizen_bp.route('/complaints/<int:complaint_id>/feedback', methods=['GET'])
+@role_required('Citizen')
+def get_feedback_for_complaint(complaint_id):
+    user_id = int(get_jwt_identity())
+    complaint = Complaint.query.get(complaint_id)
+
+    if not complaint:
+        return jsonify(message="Complaint not found."), 404
+    if complaint.created_by != user_id:
+        return jsonify(message="You do not have access to this complaint."), 403
+    if not complaint.feedback:
+        return jsonify(message="No feedback has been submitted for this complaint."), 404
+
+    fb = complaint.feedback
+    return jsonify(
+        success=True,
+        feedback={
+            "rating":          fb.rating,
+            "service_ratings": json.loads(fb.service_ratings) if fb.service_ratings else {},
+            "categories":      json.loads(fb.categories) if fb.categories else [],
+            "comment":         fb.comments,
+            "improvement":     fb.improvement,
+            "would_recommend": fb.would_recommend,
+            "is_anonymous":    fb.is_anonymous,
+            "submitted_at":    fb.submitted_at.isoformat() if fb.submitted_at else None,
+        }
     ), 200
 
 
