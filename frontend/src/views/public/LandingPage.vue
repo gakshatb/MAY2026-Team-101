@@ -43,13 +43,14 @@
             <div class="absolute inset-0 bg-blue-100/50 rounded-full blur-3xl transform -translate-x-10 translate-y-10">
             </div>
             <!-- Illustration Placeholder -->
+            <!-- Hero Image -->
             <div
               class="relative w-full aspect-square bg-white rounded-3xl border border-slate-100 shadow-xl flex items-center justify-center overflow-hidden">
-              <div class="text-slate-400 text-center p-8">
-                <MonitorSmartphone class="w-16 h-16 mx-auto mb-4 text-[#2563EB]/40" />
-                <p class="font-medium">[ Modern Civic Illustration: Citizen reporting via mobile, city skyline,
-                  maintenance workers ]</p>
-              </div>
+              <img 
+                src="../../assets/home.jpg" 
+                alt="CivicDesk Illustration" 
+                class="w-full h-full object-cover"
+              />
             </div>
           </div>
         </div>
@@ -150,10 +151,11 @@
           <div class="flex-1 w-full">
             <div
               class="w-full aspect-[4/3] bg-white rounded-3xl border border-slate-200 shadow-lg flex items-center justify-center overflow-hidden">
-              <div class="text-slate-400 text-center p-8">
-                <PieChart class="w-16 h-16 mx-auto mb-4 text-[#22C55E]/40" />
-                <p class="font-medium">[ Modern Illustration: Benefits, Charts, Happy Citizens ]</p>
-              </div>
+              <img 
+                src="../../assets/home1.jpg" 
+                alt="CivicDesk Benefits" 
+                class="w-full h-full object-cover"
+              />
             </div>
           </div>
           <div class="flex-1">

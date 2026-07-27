@@ -19,9 +19,12 @@
                 Us</router-link>
             </div>
           </div>
-          <div
-            class="flex-1 w-full h-80 bg-slate-100 rounded-2xl flex items-center justify-center border-2 border-dashed border-slate-300">
-            <span class="text-slate-400 font-medium">[ Hero Illustration: Smart City Maintenance ]</span>
+          <div class="flex-1 w-full h-80 rounded-2xl overflow-hidden shadow-lg border border-slate-100">
+            <img 
+              src="../../assets/services.jpg" 
+              alt="CivicDesk Services" 
+              class="w-full h-full object-cover"
+            />
           </div>
         </div>
       </section>
