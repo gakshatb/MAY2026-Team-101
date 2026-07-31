@@ -1,7 +1,7 @@
 import json
 import os
 import uuid
-from datetime import datetime
+from datetime import datetime, timedelta
 
 from flask import Blueprint, current_app, jsonify, request # type: ignore
 from flask_jwt_extended import get_jwt_identity # type: ignore
@@ -655,6 +655,52 @@ def dashboard():
     else:
         avg_resolution_days = None
 
+    total_count = base.count()
+    resolved_or_closed_count = base.filter(Complaint.status.in_(['Resolved', 'Closed'])).count()
+    resolution_rate = round((resolved_or_closed_count / total_count) * 100, 1) if total_count else 0.0
+
+    # Avg. first response time: how long between submission and the first
+    # status change made *by the department* (i.e. the first StatusLog row
+    # that isn't the initial "submitted" entry). Gives citizens a sense of
+    # how quickly their issue gets picked up, separate from full resolution time.
+    first_response_hours = []
+    for c in base.all():
+        first_action = (
+            StatusLog.query.filter_by(complaint_id=c.id)
+            .filter(StatusLog.old_status.isnot(None))
+            .order_by(StatusLog.changed_at.asc())
+            .first()
+        )
+        if first_action and first_action.changed_at and c.created_at:
+            first_response_hours.append((first_action.changed_at - c.created_at).total_seconds() / 3600)
+    avg_first_response_hours = round(sum(first_response_hours) / len(first_response_hours), 1) if first_response_hours else None
+
+    # Avg. rating the citizen has given across their own feedback submissions.
+    rating_avg = (
+        db.session.query(db.func.avg(Feedback.rating))
+        .join(Complaint, Feedback.complaint_id == Complaint.id)
+        .filter(Complaint.created_by == user_id)
+        .scalar()
+    )
+    avg_rating = round(float(rating_avg), 1) if rating_avg is not None else None
+
+    # Complaints that have sat open (not resolved/closed) for more than 7 days —
+    # surfaced on the dashboard so citizens can spot stalled issues.
+    OPEN_STATUSES = ['Pending', 'Under Review', 'Assigned', 'In Progress']
+    aging_cutoff = datetime.utcnow() - timedelta(days=7)
+    aging_open_count = base.filter(
+        Complaint.status.in_(OPEN_STATUSES),
+        Complaint.created_at < aging_cutoff
+    ).count()
+    oldest_aging_complaint = (
+        base.filter(
+            Complaint.status.in_(OPEN_STATUSES),
+            Complaint.created_at < aging_cutoff
+        )
+        .order_by(Complaint.created_at.asc())
+        .first()
+    )
+
     now = datetime.utcnow()
     month_keys = []
     y, m = now.year, now.month
@@ -692,8 +738,13 @@ def dashboard():
             "escalated":   escalated_count,
             "unread_notifications": Notification.query.filter_by(user_id=user_id, is_read=False).count(),
             "avg_resolution_days": avg_resolution_days,
+            "resolution_rate": resolution_rate,
+            "avg_first_response_hours": avg_first_response_hours,
+            "avg_rating": avg_rating,
+            "aging_open": aging_open_count,
         },
         pending_feedback_complaint_id=(f"CMP-{pending_feedback.id:05d}" if pending_feedback else None),
+        oldest_aging_complaint=(_serialize_complaint(oldest_aging_complaint) if oldest_aging_complaint else None),
         recent_complaints=[_serialize_complaint(c) for c in recent],
         recent_notifications=[
             {

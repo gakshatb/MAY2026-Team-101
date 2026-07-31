@@ -57,6 +57,29 @@
       </router-link>
     </div>
 
+    <!-- Aging / Stalled Complaints Alert -->
+    <div v-if="hasAging"
+      class="bg-gradient-to-r from-orange-50 to-white border border-orange-200 rounded-[14px] p-5 shadow-sm flex flex-col sm:flex-row sm:items-center justify-between gap-4 relative overflow-hidden">
+      <div class="absolute left-0 top-0 bottom-0 w-1.5 bg-orange-500"></div>
+      <div class="flex items-center gap-4">
+        <div class="w-10 h-10 bg-orange-100 text-orange-600 rounded-full flex items-center justify-center shrink-0">
+          <Hourglass class="w-5 h-5" />
+        </div>
+        <div>
+          <h3 class="font-bold text-slate-900">{{ agingCount }} Complaint{{ agingCount > 1 ? 's' : '' }} Awaiting
+            Action for 7+ Days</h3>
+          <p class="text-sm text-slate-600 mt-0.5">
+            <span v-if="oldestAgingComplaint">Oldest: {{ oldestAgingComplaint.title }} ({{ oldestAgingComplaint.id
+              }}). </span>Consider following up if this needs urgent attention.
+          </p>
+        </div>
+      </div>
+      <router-link to="/citizen/complaints"
+        class="px-5 py-2.5 bg-orange-500 hover:bg-orange-600 text-white text-sm font-bold rounded-lg shadow-sm transition-colors whitespace-nowrap text-center">
+        Review Complaints
+      </router-link>
+    </div>
+
     <!-- Statistics Cards -->
     <div class="grid grid-cols-2 md:grid-cols-4 xl:grid-cols-8 gap-4">
       <div v-for="stat in summaryStats" :key="stat.title"
@@ -70,6 +93,7 @@
             :class="`flex items-center gap-1 text-[10px] font-bold px-1.5 py-0.5 rounded-full ${stat.trend === 'up' ? 'bg-green-50 text-green-600' : 'bg-red-50 text-red-600'}`">
             <TrendingUp v-if="stat.trend === 'up'" class="w-3 h-3" />
             <TrendingDown v-else class="w-3 h-3" />
+            <span v-if="stat.trendLabel">{{ stat.trendLabel }}</span>
           </span>
         </div>
         <div>
@@ -96,6 +120,59 @@
           <p class="text-xs text-slate-500 line-clamp-1">{{ action.desc }}</p>
         </div>
       </router-link>
+    </div>
+
+    <!-- Insights Row -->
+    <div class="grid grid-cols-1 sm:grid-cols-3 gap-6">
+
+      <!-- Resolution Rate -->
+      <div class="bg-white p-5 rounded-[14px] shadow-sm border border-slate-100 flex items-center gap-5">
+        <div class="relative w-20 h-20 shrink-0">
+          <svg viewBox="0 0 80 80" class="w-20 h-20 -rotate-90">
+            <circle cx="40" cy="40" r="34" fill="none" stroke="#f1f5f9" stroke-width="8" />
+            <circle cx="40" cy="40" r="34" fill="none" stroke="#22C55E" stroke-width="8" stroke-linecap="round"
+              :stroke-dasharray="`${(resolutionRate / 100) * 213.6} 213.6`" class="transition-all duration-700" />
+          </svg>
+          <div class="absolute inset-0 flex items-center justify-center">
+            <span class="text-lg font-extrabold text-slate-900">{{ resolutionRate }}%</span>
+          </div>
+        </div>
+        <div>
+          <p class="text-xs font-bold text-slate-500 uppercase tracking-wide">Resolution Rate</p>
+          <p class="text-sm text-slate-600 mt-1">Of your complaints have been resolved or closed.</p>
+        </div>
+      </div>
+
+      <!-- Avg First Response -->
+      <div class="bg-white p-5 rounded-[14px] shadow-sm border border-slate-100 flex items-center gap-5">
+        <div class="w-16 h-16 rounded-2xl bg-blue-50 text-[#2563EB] flex items-center justify-center shrink-0">
+          <Zap class="w-7 h-7" />
+        </div>
+        <div>
+          <p class="text-xs font-bold text-slate-500 uppercase tracking-wide">Avg. First Response</p>
+          <p class="text-2xl font-extrabold text-slate-900 mt-0.5">{{ avgFirstResponseLabel }}</p>
+          <p class="text-xs text-slate-500 mt-0.5">Time until the department acts on a new complaint.</p>
+        </div>
+      </div>
+
+      <!-- Satisfaction Rating -->
+      <div class="bg-white p-5 rounded-[14px] shadow-sm border border-slate-100 flex items-center gap-5">
+        <div class="w-16 h-16 rounded-2xl bg-amber-50 text-amber-500 flex items-center justify-center shrink-0">
+          <Star class="w-7 h-7 fill-amber-500" />
+        </div>
+        <div>
+          <p class="text-xs font-bold text-slate-500 uppercase tracking-wide">Your Satisfaction Rating</p>
+          <div v-if="avgRating != null" class="flex items-center gap-1 mt-0.5">
+            <span class="text-2xl font-extrabold text-slate-900">{{ avgRating }}</span>
+            <div class="flex items-center gap-0.5 ml-1">
+              <Star v-for="n in 5" :key="n" class="w-3.5 h-3.5"
+                :class="n <= Math.round(avgRating) ? 'text-amber-500 fill-amber-500' : 'text-slate-200 fill-slate-200'" />
+            </div>
+          </div>
+          <p v-else class="text-sm text-slate-500 mt-1">No feedback given yet.</p>
+        </div>
+      </div>
+
     </div>
 
     <!-- Main Layout Grid -->
@@ -194,13 +271,21 @@
 
         <!-- Categories Summary -->
         <div class="bg-white rounded-[14px] shadow-sm border border-slate-100 p-5">
-          <h3 class="font-bold text-slate-900 flex items-center gap-2 mb-4">
-            <MapPin class="w-5 h-5 text-amber-500" /> Issues by Category
-          </h3>
+          <div class="flex items-center justify-between mb-4">
+            <h3 class="font-bold text-slate-900 flex items-center gap-2">
+              <MapPin class="w-5 h-5 text-amber-500" /> Issues by Category
+            </h3>
+            <span v-if="busiestCategory"
+              class="text-[10px] font-bold uppercase tracking-wide text-amber-700 bg-amber-50 border border-amber-200 px-2 py-1 rounded-full">
+              Most reported: {{ busiestCategory }}
+            </span>
+          </div>
           <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
             <div v-for="cat in categories" :key="cat.name"
-              class="p-3 bg-slate-50 border border-slate-100 rounded-xl text-center hover:border-slate-200 transition-colors">
-              <component :is="cat.icon" class="w-5 h-5 mx-auto mb-2 text-slate-400" />
+              class="p-3 rounded-xl text-center border transition-colors"
+              :class="cat.name === busiestCategory ? 'bg-amber-50 border-amber-200' : 'bg-slate-50 border-slate-100 hover:border-slate-200'">
+              <component :is="cat.icon" class="w-5 h-5 mx-auto mb-2"
+                :class="cat.name === busiestCategory ? 'text-amber-500' : 'text-slate-400'" />
               <p class="text-[10px] font-bold text-slate-500 uppercase tracking-wide truncate mb-1">{{ cat.name }}</p>
               <p class="text-lg font-bold text-slate-900">{{ cat.count }}</p>
             </div>
@@ -331,7 +416,8 @@ import {
   ClipboardList, Bell, CheckCircle, Clock, AlertTriangle, MapPin,
   Activity, TrendingUp, TrendingDown, Star, User, FileText, ShieldCheck,
   Calendar, Trash2, Construction, Droplets, Lightbulb, ChevronRight,
-  PlusCircle, Navigation, LayoutDashboard, Siren, Timer, BarChart3
+  PlusCircle, Navigation, LayoutDashboard, Siren, Timer, BarChart3,
+  Hourglass, Zap
 } from 'lucide-vue-next'
 
 const router = useRouter()
@@ -355,6 +441,23 @@ const hasPendingFeedback = ref(false)
 const pendingFeedbackId = ref(null)
 const hasEscalated = ref(false)
 const escalatedCount = ref(0)
+const hasAging = ref(false)
+const agingCount = ref(0)
+const oldestAgingComplaint = ref(null)
+const resolutionRate = ref(0)
+const avgFirstResponseHours = ref(null)
+const avgRating = ref(null)
+
+const avgFirstResponseLabel = computed(() => {
+  if (avgFirstResponseHours.value == null) return '—'
+  const h = avgFirstResponseHours.value
+  return h < 24 ? `${h}h` : `${(h / 24).toFixed(1)}d`
+})
+
+const busiestCategory = computed(() => {
+  if (!categories.value.length) return null
+  return categories.value.reduce((max, c) => (c.count > max.count ? c : max), categories.value[0]).name
+})
 
 // --- Dummy Data ---
 const summaryStats = ref([
@@ -412,6 +515,35 @@ const fetchDashboard = async () => {
 
     hasEscalated.value = s.escalated > 0
     escalatedCount.value = s.escalated
+
+    resolutionRate.value = s.resolution_rate ?? 0
+    avgFirstResponseHours.value = s.avg_first_response_hours ?? null
+    avgRating.value = s.avg_rating ?? null
+
+    hasAging.value = (s.aging_open || 0) > 0
+    agingCount.value = s.aging_open || 0
+    oldestAgingComplaint.value = data.oldest_aging_complaint
+      ? { title: data.oldest_aging_complaint.title, id: data.oldest_aging_complaint.id }
+      : null
+
+    // Real month-over-month trend for the Total Complaints card, using the
+    // last two points of the monthly trend series (this month vs last month).
+    if (Array.isArray(data.monthly_trend) && data.monthly_trend.length >= 2) {
+      const trend = data.monthly_trend
+      const curr = trend[trend.length - 1].count
+      const prev = trend[trend.length - 2].count
+      if (prev > 0) {
+        const changePct = Math.round(((curr - prev) / prev) * 100)
+        summaryStats.value[0].trend = changePct >= 0 ? 'up' : 'down'
+        summaryStats.value[0].trendLabel = `${changePct >= 0 ? '+' : ''}${changePct}%`
+      } else if (curr > 0) {
+        summaryStats.value[0].trend = 'up'
+        summaryStats.value[0].trendLabel = 'New'
+      }
+    }
+    // Resolved card: reflect whether resolution rate is trending healthy (>=50%) or not.
+    summaryStats.value[3].trend = resolutionRate.value >= 50 ? 'up' : 'down'
+    summaryStats.value[3].trendLabel = `${resolutionRate.value}%`
 
     // Priority breakdown, ordered by urgency, with a % width for the bars
     const prioData = data.priority_breakdown || {}
