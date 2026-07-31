@@ -602,7 +602,7 @@ def delete_profile_photo():
 
 
 # ─────────────────────────────────────────────────────────────────────────
-# Combined dashboard summary: stats + recent complaints + recent
+# Dashboard summary: stats + recent complaints + recent
 # notifications, in one call, matching what Dashboard.vue actually shows.
 # ─────────────────────────────────────────────────────────────────────────
 @citizen_bp.route('/dashboard', methods=['GET'])
@@ -634,16 +634,64 @@ def dashboard():
         .all()
     )
 
+    priority_counts = (
+        db.session.query(Complaint.priority, db.func.count(Complaint.id))
+        .filter(Complaint.created_by == user_id)
+        .group_by(Complaint.priority)
+        .all()
+    )
+
+    escalated_count = base.filter_by(is_escalated=True).count()
+
+    resolved_rows = base.filter(
+        Complaint.status.in_(['Resolved', 'Closed']),
+        Complaint.updated_at.isnot(None)
+    ).all()
+    if resolved_rows:
+        avg_resolution_days = round(
+            sum((c.updated_at - c.created_at).total_seconds() for c in resolved_rows)
+            / len(resolved_rows) / 86400, 1
+        )
+    else:
+        avg_resolution_days = None
+
+    now = datetime.utcnow()
+    month_keys = []
+    y, m = now.year, now.month
+    for _ in range(6):
+        month_keys.append((y, m))
+        m -= 1
+        if m == 0:
+            m = 12
+            y -= 1
+    month_keys.reverse()
+
+    trend_counts = {key: 0 for key in month_keys}
+    for c in base.all():
+        if c.created_at:
+            key = (c.created_at.year, c.created_at.month)
+            if key in trend_counts:
+                trend_counts[key] += 1
+
+    monthly_trend = [
+        {"month": datetime(y, m, 1).strftime('%b'), "count": trend_counts[(y, m)]}
+        for (y, m) in month_keys
+    ]
+
     return jsonify(
         success=True,
         category_breakdown={cat: count for cat, count in category_counts},
+        priority_breakdown={pri: count for pri, count in priority_counts},
+        monthly_trend=monthly_trend,
         summary={
             "total":       base.count(),
             "pending":     base.filter_by(status='Pending').count(),
             "in_progress": base.filter_by(status='In Progress').count(),
             "resolved":    base.filter_by(status='Resolved').count(),
             "closed":      base.filter_by(status='Closed').count(),
+            "escalated":   escalated_count,
             "unread_notifications": Notification.query.filter_by(user_id=user_id, is_read=False).count(),
+            "avg_resolution_days": avg_resolution_days,
         },
         pending_feedback_complaint_id=(f"CMP-{pending_feedback.id:05d}" if pending_feedback else None),
         recent_complaints=[_serialize_complaint(c) for c in recent],

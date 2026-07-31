@@ -36,8 +36,29 @@
       </router-link>
     </div>
 
+    <!-- Escalated Complaints Alert -->
+    <div v-if="hasEscalated"
+      class="bg-gradient-to-r from-red-50 to-white border border-red-200 rounded-[14px] p-5 shadow-sm flex flex-col sm:flex-row sm:items-center justify-between gap-4 relative overflow-hidden">
+      <div class="absolute left-0 top-0 bottom-0 w-1.5 bg-red-500"></div>
+      <div class="flex items-center gap-4">
+        <div class="w-10 h-10 bg-red-100 text-red-600 rounded-full flex items-center justify-center shrink-0">
+          <Siren class="w-5 h-5" />
+        </div>
+        <div>
+          <h3 class="font-bold text-slate-900">{{ escalatedCount }} Complaint{{ escalatedCount > 1 ? 's' : '' }}
+            Escalated</h3>
+          <p class="text-sm text-slate-600 mt-0.5">These have been flagged for priority attention by the department.
+          </p>
+        </div>
+      </div>
+      <router-link to="/citizen/complaints"
+        class="px-5 py-2.5 bg-red-500 hover:bg-red-600 text-white text-sm font-bold rounded-lg shadow-sm transition-colors whitespace-nowrap text-center">
+        View Complaints
+      </router-link>
+    </div>
+
     <!-- Statistics Cards -->
-    <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
+    <div class="grid grid-cols-2 md:grid-cols-4 xl:grid-cols-8 gap-4">
       <div v-for="stat in summaryStats" :key="stat.title"
         class="bg-white p-5 rounded-[14px] shadow-sm border border-slate-100 hover:shadow-md hover:-translate-y-0.5 transition-all duration-300 group">
         <div class="flex justify-between items-start mb-3">
@@ -186,6 +207,25 @@
           </div>
         </div>
 
+        <!-- Priority Breakdown -->
+        <div v-if="priorities.length" class="bg-white rounded-[14px] shadow-sm border border-slate-100 p-5">
+          <h3 class="font-bold text-slate-900 flex items-center gap-2 mb-4">
+            <BarChart3 class="w-5 h-5 text-indigo-500" /> Priority Breakdown
+          </h3>
+          <div class="space-y-3">
+            <div v-for="pri in priorities" :key="pri.name">
+              <div class="flex justify-between text-xs font-semibold text-slate-600 mb-1">
+                <span>{{ pri.name }}</span>
+                <span>{{ pri.count }}</span>
+              </div>
+              <div class="w-full h-2 bg-slate-100 rounded-full overflow-hidden">
+                <div class="h-full rounded-full transition-all duration-500" :class="pri.color"
+                  :style="`width: ${pri.pct}%`"></div>
+              </div>
+            </div>
+          </div>
+        </div>
+
       </div>
 
       <!-- Right Column: Secondary Content (4 cols) -->
@@ -291,7 +331,7 @@ import {
   ClipboardList, Bell, CheckCircle, Clock, AlertTriangle, MapPin,
   Activity, TrendingUp, TrendingDown, Star, User, FileText, ShieldCheck,
   Calendar, Trash2, Construction, Droplets, Lightbulb, ChevronRight,
-  PlusCircle, Navigation, LayoutDashboard
+  PlusCircle, Navigation, LayoutDashboard, Siren, Timer, BarChart3
 } from 'lucide-vue-next'
 
 const router = useRouter()
@@ -313,6 +353,8 @@ const currentDate = new Date().toLocaleDateString('en-US', { weekday: 'long', ye
 // ── reactive data (replaces hardcoded values) ─────────────────────────
 const hasPendingFeedback = ref(false)
 const pendingFeedbackId = ref(null)
+const hasEscalated = ref(false)
+const escalatedCount = ref(0)
 
 // --- Dummy Data ---
 const summaryStats = ref([
@@ -321,7 +363,9 @@ const summaryStats = ref([
   { title: 'In Progress', value: '0', icon: Activity, iconBg: 'bg-purple-50', iconColor: 'text-purple-500' },
   { title: 'Resolved', value: '0', icon: CheckCircle, trend: 'up', iconBg: 'bg-green-50', iconColor: 'text-[#22C55E]' },
   { title: 'Closed', value: '0', icon: FileText, iconBg: 'bg-slate-100', iconColor: 'text-slate-600' },
-  { title: 'Unread Alerts', value: '0', icon: Bell, iconBg: 'bg-red-50', iconColor: 'text-red-500' }
+  { title: 'Unread Alerts', value: '0', icon: Bell, iconBg: 'bg-red-50', iconColor: 'text-red-500' },
+  { title: 'Escalated', value: '0', icon: Siren, iconBg: 'bg-red-50', iconColor: 'text-red-500' },
+  { title: 'Avg. Resolution', value: '—', icon: Timer, iconBg: 'bg-teal-50', iconColor: 'text-teal-600' }
 ])
 
 const quickActions = [
@@ -336,6 +380,15 @@ const recentComplaints = ref([])
 const notifications = ref([])
 const categories = ref([])
 const timeline = ref([])
+const priorities = ref([])
+
+const PRIORITY_ORDER = ['Emergency', 'High', 'Medium', 'Low']
+const PRIORITY_COLOR = {
+  Emergency: 'bg-red-500',
+  High: 'bg-orange-500',
+  Medium: 'bg-amber-400',
+  Low: 'bg-slate-300'
+}
 
 // ── API fetch ─────────────────────────────────────────────────────────
 const fetchDashboard = async () => {
@@ -354,6 +407,23 @@ const fetchDashboard = async () => {
     summaryStats.value[3].value = String(s.resolved)
     summaryStats.value[4].value = String(s.closed)
     summaryStats.value[5].value = String(s.unread_notifications)
+    summaryStats.value[6].value = String(s.escalated)
+    summaryStats.value[7].value = s.avg_resolution_days != null ? `${s.avg_resolution_days}d` : '—'
+
+    hasEscalated.value = s.escalated > 0
+    escalatedCount.value = s.escalated
+
+    // Priority breakdown, ordered by urgency, with a % width for the bars
+    const prioData = data.priority_breakdown || {}
+    const prioMax = Math.max(1, ...Object.values(prioData))
+    priorities.value = PRIORITY_ORDER
+      .filter(name => prioData[name] > 0)
+      .map(name => ({
+        name,
+        count: prioData[name],
+        pct: Math.round((prioData[name] / prioMax) * 100),
+        color: PRIORITY_COLOR[name]
+      }))
 
     recentComplaints.value = data.recent_complaints.map(c => ({
       id: c.id,
@@ -405,6 +475,18 @@ const fetchDashboard = async () => {
       name, count, icon: catIcons[name] || ShieldCheck
     }))
 
+    // Push real data into the charts (created in onMounted, populated here
+    // once the API response is in).
+    if (lineChart && Array.isArray(data.monthly_trend)) {
+      lineChart.data.labels = data.monthly_trend.map(m => m.month)
+      lineChart.data.datasets[0].data = data.monthly_trend.map(m => m.count)
+      lineChart.update()
+    }
+    if (doughnutChart) {
+      doughnutChart.data.datasets[0].data = [s.resolved, s.in_progress, s.pending, s.closed]
+      doughnutChart.update()
+    }
+
   } catch (err) {
     if (err.response?.status === 401) router.push('/login')
     console.error('Dashboard fetch error:', err)
@@ -438,10 +520,10 @@ onMounted(() => {
     lineChart = new Chart(lineChartRef.value, {
       type: 'line',
       data: {
-        labels: ['Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul'],
+        labels: [],
         datasets: [{
           label: 'Complaints',
-          data: [1, 3, 2, 4, 2, 3],
+          data: [],
           borderColor: '#2563EB',
           backgroundColor: 'rgba(37,99,235,0.1)',
           fill: true,
@@ -466,9 +548,9 @@ onMounted(() => {
     doughnutChart = new Chart(doughnutChartRef.value, {
       type: 'doughnut',
       data: {
-        labels: ['Resolved', 'In Progress', 'Assigned', 'Pending'],
+        labels: ['Resolved', 'In Progress', 'Pending', 'Closed'],
         datasets: [{
-          data: [8, 1, 1, 2],
+          data: [0, 0, 0, 0],
           backgroundColor: ['#22C55E', '#F59E0B', '#2563EB', '#94A3B8'],
           borderWidth: 0,
           hoverOffset: 4
