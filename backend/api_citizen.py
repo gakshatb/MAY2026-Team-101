@@ -541,7 +541,15 @@ def list_activity():
 def get_profile():
     user_id = int(get_jwt_identity())
     user = User.query.get(user_id)
-
+    last_login = (
+        ActivityLog.query
+        .filter(
+            ActivityLog.user_id == user.id,
+            ActivityLog.activity_type == "login"
+        )
+        .order_by(ActivityLog.created_at.desc())
+        .first()
+    )
     return jsonify(
         success=True,
         profile={
@@ -556,7 +564,8 @@ def get_profile():
             "gender":     user.gender,
             "profilePhoto": user.profile_photo,
             "accountId":  f"CVC-USR-{user.id:04d}",
-            "memberSince": user.created_at.strftime('%B %d, %Y') if user.created_at else None
+            "memberSince": user.created_at.strftime('%B %d, %Y') if user.created_at else None,
+            "lastLogin": last_login.created_at.strftime('%b %d, %Y %I:%M %p') if last_login else None
         }
     ), 200
 

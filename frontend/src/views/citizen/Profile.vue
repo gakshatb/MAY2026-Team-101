@@ -125,7 +125,7 @@
             </div>
             <div class="flex justify-between items-center py-2 border-b border-slate-50 last:border-0">
               <span class="text-sm text-slate-500">Last Login</span>
-              <span class="text-sm font-medium text-slate-900">Today, 10:42 AM</span>
+              <span class="text-sm font-medium text-slate-900">{{ profileForm.lastLogin || 'N/A' }}</span>
             </div>
           </div>
         </div>
@@ -225,11 +225,12 @@
             <div>
               <label class="block text-sm font-medium text-slate-700 mb-1.5">Gender</label>
               <select v-model="profileForm.gender" :disabled="!isEditingProfile"
-                :class="[inputClasses(false, !isEditingProfile), 'appearance-none']">
+                :class="[inputClasses(profileErrors.gender, !isEditingProfile), 'appearance-none']">
                 <option value="Male">Male</option>
                 <option value="Female">Female</option>
                 <option value="Other">Other</option>
               </select>
+              <span v-if="profileErrors.gender" class="text-red-500 text-xs mt-1 block">{{ profileErrors.gender }}</span>
             </div>
 
             <!-- Action Buttons -->
@@ -377,7 +378,7 @@ let originalProfileData = {}
 const profileForm = reactive({
   fullName: '', email: '', mobile: '',
   address: '', city: '', state: '', pincode: '', gender: '',
-  accountId: '', memberSince: ''
+  accountId: '', memberSince: '', lastLogin: ''
 })
 
 const fetchProfile = async () => {
@@ -398,6 +399,7 @@ const fetchProfile = async () => {
       gender: u.gender || '',
       accountId: u.accountId || '',
       memberSince: u.memberSince || '',
+      lastLogin: u.lastLogin || ''
     })
     // Keep the header avatar (which reads from localStorage) in sync too.
     currentUser.value = { ...currentUser.value, profilePhoto: u.profilePhoto || null }
@@ -541,6 +543,7 @@ const validateProfile = () => {
   if (!profileForm.address.trim()) profileErrors.address = 'Address is required', isValid = false
   if (!profileForm.city.trim()) profileErrors.city = 'City is required', isValid = false
   if (!profileForm.state.trim()) profileErrors.state = 'State is required', isValid = false
+  if (!profileForm.gender.trim()) profileErrors.gender = 'Gender is required', isValid = false
 
   if (!/^\d{6}$/.test(profileForm.pincode)) {
     profileErrors.pincode = 'Enter a valid 6-digit pincode'
