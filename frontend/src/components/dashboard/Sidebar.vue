@@ -154,7 +154,7 @@ const menuItems = computed(() => {
         { name: 'Complaint Tracking', icon: MapPin, route: '/citizen/track' }, 
         { name: 'Notifications', icon: Bell, route: '/citizen/notifications' },
         { name: 'Feedback', icon: MessageSquare, route: '/citizen/feedback' },
-        { name: 'Recent Activity', icon: Activity, route: '/citizen/activity' }
+        { name: 'Activity', icon: Activity, route: '/citizen/activity' }
       ]
   }
 })

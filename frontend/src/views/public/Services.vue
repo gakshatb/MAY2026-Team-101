@@ -179,7 +179,10 @@ const animateStats = () => {
 
 onMounted(() => {
   const observer = new IntersectionObserver((entries) => {
-    if (entries[0].isIntersecting) animateStats()
+    if (entries[0].isIntersecting) {
+      animateStats()
+      observer.disconnect()
+    }
   }, { threshold: 0.5 })
   if (statsSection.value) observer.observe(statsSection.value)
 })

@@ -1,33 +1,6 @@
 <template>
-  <div class="flex h-screen overflow-hidden bg-[#F8FAFC]">
-    
-    <!-- Mobile Sidebar Backdrop -->
-    <div 
-      v-if="sidebarOpen" 
-      class="fixed inset-0 bg-slate-900/50 z-40 lg:hidden transition-opacity" 
-      @click="sidebarOpen = false"
-      aria-hidden="true"
-    ></div>
-
-    <!-- Sidebar Wrapper -->
-    <div 
-      :class="[
-        'fixed inset-y-0 left-0 z-50 transform transition-transform duration-300 lg:relative lg:translate-x-0',
-        sidebarOpen ? 'translate-x-0' : '-translate-x-full'
-      ]"
-    >
-      <Sidebar userRole="Administrator" />
-    </div>
-
     <!-- Main Content Area -->
     <div class="flex-1 flex flex-col relative overflow-hidden w-full">
-      
-      <!-- Top Navbar -->
-      <DashboardNavbar 
-        userRole="System Administrator" 
-        pageTitle="Admin Dashboard" 
-        @toggle-sidebar="sidebarOpen = !sidebarOpen" 
-      />
       
       <!-- Scrollable Dashboard Content -->
       <main class="flex-1 overflow-y-auto p-4 md:p-6 lg:p-8 font-sans animate-fade-in custom-scrollbar">
@@ -241,16 +214,11 @@
 
       </main>
     </div>
-  </div>
 </template>
 
 <script setup>
 import { ref, onMounted, onUnmounted } from 'vue';
 import Chart from 'chart.js/auto';
-
-// Import Your Existing Layout Components (Adjust paths if necessary)
-import DashboardNavbar from '@/components/dashboard/DashboardNavbar.vue';
-import Sidebar from '@/components/dashboard/Sidebar.vue';
 
 // Icons
 import { 
