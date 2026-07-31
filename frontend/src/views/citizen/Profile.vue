@@ -321,45 +321,6 @@
           </form>
         </div>
 
-        <!-- Recent Activity Timeline -->
-        <div class="bg-white rounded-[14px] shadow-sm border border-slate-100 p-6 sm:p-8">
-          <h3 class="text-xl font-bold text-slate-900 mb-6 flex items-center gap-2">
-            <Calendar class="w-5 h-5 text-slate-400" />
-            Recent Activity
-          </h3>
-          <div class="pl-4 border-l-2 border-slate-100 space-y-6">
-
-            <div class="relative">
-              <div class="absolute -left-[21px] bg-white p-1 rounded-full">
-                <div class="w-2.5 h-2.5 bg-[#2563EB] rounded-full"></div>
-              </div>
-              <p class="text-sm font-bold text-slate-900">Updated Profile</p>
-              <p class="text-xs text-slate-500 mt-1">Today, 11:30 AM</p>
-              <p class="text-sm text-slate-600 mt-2">You successfully updated your residential address.</p>
-            </div>
-
-            <div class="relative">
-              <div class="absolute -left-[21px] bg-white p-1 rounded-full">
-                <div class="w-2.5 h-2.5 bg-[#22C55E] rounded-full"></div>
-              </div>
-              <p class="text-sm font-bold text-slate-900">Complaint Resolved</p>
-              <p class="text-xs text-slate-500 mt-1">Yesterday, 04:15 PM</p>
-              <p class="text-sm text-slate-600 mt-2">Complaint #CVC-9021 (Streetlight Failure) was marked as resolved.
-              </p>
-            </div>
-
-            <div class="relative">
-              <div class="absolute -left-[21px] bg-white p-1 rounded-full">
-                <div class="w-2.5 h-2.5 bg-amber-500 rounded-full"></div>
-              </div>
-              <p class="text-sm font-bold text-slate-900">Complaint Submitted</p>
-              <p class="text-xs text-slate-500 mt-1">July 07, 2026, 09:10 AM</p>
-              <p class="text-sm text-slate-600 mt-2">You submitted a new complaint regarding Garbage Accumulation.</p>
-            </div>
-
-          </div>
-        </div>
-
       </div>
     </div>
 
@@ -377,7 +338,7 @@ import axios from 'axios'
 import {
   User, Mail, Phone, MapPin, Building,
   Lock, Eye, EyeOff, Shield, Check,
-  Camera, Calendar
+  Camera
 } from 'lucide-vue-next'
 
 // --- State ---

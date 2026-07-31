@@ -180,6 +180,27 @@ class Assignment(db.Model):
 
 
 # ─────────────────────────────────────────────────────────────────────────────
+# ActivityLog
+# ─────────────────────────────────────────────────────────────────────────────
+class ActivityLog(db.Model):
+    __tablename__ = 'activity_logs'
+
+    id            = db.Column(db.Integer,     primary_key=True, autoincrement=True)
+    user_id       = db.Column(db.Integer,     db.ForeignKey('users.id'), nullable=False)
+    complaint_id  = db.Column(db.Integer,     db.ForeignKey('complaints.id'), nullable=True)
+    activity_type = db.Column(db.String(50),  nullable=False)   # see ACTIVITY_TYPES in api_auth_utils.py
+    description   = db.Column(db.String(255), nullable=False)   # human-readable, ready to show in UI
+    ip_address    = db.Column(db.String(45),  nullable=True)    # supports IPv6
+    created_at    = db.Column(db.DateTime,    nullable=False, default=datetime.utcnow)
+
+    user      = db.relationship('User', backref=db.backref('activity_logs', lazy=True, cascade='all, delete-orphan'))
+    complaint = db.relationship('Complaint', backref=db.backref('activity_logs', lazy=True))
+
+    def __repr__(self):
+        return f'<ActivityLog id={self.id} user_id={self.user_id} type={self.activity_type}>'
+
+
+# ─────────────────────────────────────────────────────────────────────────────
 # ContactMessage
 # Stores messages submitted via the public Contact Us form.
 # No authentication required — anyone can submit.

@@ -11,7 +11,7 @@ from flask_jwt_extended import ( # type: ignore
 from models import db, User
 
 from api_auth_utils import (
-    VALID_ROLES, blocklist, is_valid_email, is_valid_phone, token_not_revoked
+    VALID_ROLES, blocklist, is_valid_email, is_valid_phone, log_activity, token_not_revoked
 )
 
 auth_bp = Blueprint('auth', __name__, url_prefix='/api')
@@ -80,6 +80,9 @@ def register():
         status='active'
     )
     db.session.add(new_user)
+    db.session.flush()   # get new_user.id before we log against it
+
+    log_activity(new_user.id, 'register', f'Account created as {role}.')
     db.session.commit()
 
     return jsonify(
@@ -114,6 +117,9 @@ def login():
     access_token  = create_access_token(identity=str(user.id))
     refresh_token = create_refresh_token(identity=str(user.id))
 
+    log_activity(user.id, 'login', 'Logged in.')
+    db.session.commit()
+
     return jsonify(
         success=True,
         access_token=access_token,
@@ -136,6 +142,10 @@ def login():
 def logout():
     jti = get_jwt()["jti"]
     blocklist.add(jti)
+
+    log_activity(int(get_jwt_identity()), 'logout', 'Logged out.')
+    db.session.commit()
+
     return jsonify(success=True, message="Logged out successfully."), 200
 
 
@@ -212,6 +222,9 @@ def forgot_password():
         "expires_at": datetime.utcnow() + timedelta(minutes=10)
     }
 
+    log_activity(user.id, 'password_reset_requested', 'Requested a password reset OTP.')
+    db.session.commit()
+
     response_data = dict(success=True, message="OTP sent successfully.")
     if current_app.debug:
         response_data["dev_otp"] = otp
@@ -257,6 +270,7 @@ def reset_password():
         return jsonify(message="User not found."), 404
 
     user.password = generate_password_hash(new_password)
+    log_activity(user.id, 'password_reset_completed', 'Password reset via OTP.')
     db.session.commit()
 
     # OTP is single-use — remove after successful reset
@@ -300,6 +314,7 @@ def change_password():
         return jsonify(message="New password must be different from current password."), 400
 
     user.password = generate_password_hash(new_password)
+    log_activity(user.id, 'password_changed', 'Password changed.')
     db.session.commit()
 
     return jsonify(

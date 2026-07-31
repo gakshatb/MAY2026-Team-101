@@ -7,8 +7,8 @@ from flask import Blueprint, current_app, jsonify, request # type: ignore
 from flask_jwt_extended import get_jwt_identity # type: ignore
 from werkzeug.utils import secure_filename # type: ignore
 
-from models import db, User, Complaint, StatusLog, ComplaintImages, Feedback, Notification
-from api_auth_utils import role_required
+from models import db, User, Complaint, StatusLog, ComplaintImages, Feedback, Notification, ActivityLog
+from api_auth_utils import log_activity, role_required
 
 citizen_bp = Blueprint('citizen', __name__, url_prefix='/api/citizen')
 
@@ -202,6 +202,12 @@ def submit_complaint():
         ntype='submitted'
     )
 
+    log_activity(
+        user_id, 'complaint_submitted',
+        f'Submitted complaint "{title}".',
+        complaint_id=complaint.id
+    )
+
     db.session.commit()
 
     return jsonify(
@@ -361,6 +367,13 @@ def submit_feedback(complaint_id):
         is_anonymous=anonymous
     )
     db.session.add(feedback)
+
+    log_activity(
+        user_id, 'feedback_submitted',
+        f'Submitted feedback for complaint CMP-{complaint_id:05d}.',
+        complaint_id=complaint_id
+    )
+
     db.session.commit()
 
     return jsonify(success=True, message="Thank you! Your feedback has been submitted."), 201
@@ -483,6 +496,43 @@ def mark_all_notifications_read():
 
 
 # ─────────────────────────────────────────────────────────────────────────
+# Recent Activity feed
+# ─────────────────────────────────────────────────────────────────────────
+@citizen_bp.route('/activity', methods=['GET'])
+@role_required('Citizen')
+def list_activity():
+    user_id = int(get_jwt_identity())
+
+    try:
+        limit = int(request.args.get('limit', 20))
+    except ValueError:
+        limit = 20
+    limit = max(1, min(limit, 100))
+
+    query = ActivityLog.query.filter_by(user_id=user_id)
+
+    activity_type = request.args.get('type', '').strip()
+    if activity_type:
+        query = query.filter_by(activity_type=activity_type)
+
+    rows = query.order_by(ActivityLog.created_at.desc()).limit(limit).all()
+
+    return jsonify(
+        success=True,
+        activity=[
+            {
+                "id":            a.id,
+                "type":          a.activity_type,
+                "description":   a.description,
+                "complaint_id":  f"CMP-{a.complaint_id:05d}" if a.complaint_id else None,
+                "created_at":    a.created_at.isoformat() if a.created_at else None
+            }
+            for a in rows
+        ]
+    ), 200
+
+
+# ─────────────────────────────────────────────────────────────────────────
 # Profile — extends /api/me with the address/city/state/pincode/gender
 # fields Profile.vue needs that the general auth endpoint doesn't return.
 # ─────────────────────────────────────────────────────────────────────────
@@ -557,6 +607,7 @@ def update_profile():
     if gender:
         user.gender = gender
 
+    log_activity(user_id, 'profile_updated', 'Updated profile details.')
     db.session.commit()
 
     return jsonify(success=True, message="Profile updated successfully."), 200
@@ -584,6 +635,7 @@ def upload_profile_photo():
         return jsonify(message="No photo file was provided."), 400
 
     user.profile_photo = photo_url
+    log_activity(user_id, 'profile_photo_updated', 'Updated profile photo.')
     db.session.commit()
 
     return jsonify(success=True, profilePhoto=photo_url), 200
@@ -596,6 +648,7 @@ def delete_profile_photo():
     user = User.query.get(user_id)
 
     user.profile_photo = None
+    log_activity(user_id, 'profile_photo_removed', 'Removed profile photo.')
     db.session.commit()
 
     return jsonify(success=True), 200
@@ -615,6 +668,12 @@ def dashboard():
     recent_notes = (
         Notification.query.filter_by(user_id=user_id)
         .order_by(Notification.created_at.desc())
+        .limit(5)
+        .all()
+    )
+    recent_activity = (
+        ActivityLog.query.filter_by(user_id=user_id)
+        .order_by(ActivityLog.created_at.desc())
         .limit(5)
         .all()
     )
@@ -752,5 +811,15 @@ def dashboard():
                 "is_read": n.is_read, "created_at": n.created_at.isoformat() if n.created_at else None
             }
             for n in recent_notes
+        ],
+        recent_activity=[
+            {
+                "id":           a.id,
+                "type":         a.activity_type,
+                "description":  a.description,
+                "complaint_id": f"CMP-{a.complaint_id:05d}" if a.complaint_id else None,
+                "created_at":   a.created_at.isoformat() if a.created_at else None
+            }
+            for a in recent_activity
         ]
     ), 200

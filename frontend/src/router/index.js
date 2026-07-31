@@ -25,6 +25,7 @@ import SubmitComplaint from '../views/citizen/SubmitComplaint.vue'
 import ComplaintDetails from '../views/citizen/ComplaintDetails.vue'
 import ComplaintTracking from '../views/citizen/ComplaintTracking.vue'
 import Feedback from '../views/citizen/Feedback.vue'
+import CitizenActivity from '../views/citizen/Activity.vue'
 
 // --- Officer Imports ---
 import OfficerDashboard from '../views/officer/Dashboard.vue'
@@ -86,6 +87,7 @@ const router = createRouter({
         { path: 'complaintdetails/:id?', name: 'ComplaintDetails', component: ComplaintDetails, meta: { title: 'Details | CivicDesk', pageTitle: 'Complaint Details' }, props: true },
         { path: 'track/:id?', name: 'ComplaintTracking', component: ComplaintTracking, meta: { title: 'Track | CivicDesk', pageTitle: 'Complaint Tracking' }, props: true },
         { path: 'feedback/:id?', name: 'CitizenFeedback', component: Feedback, meta: { title: 'Feedback | CivicDesk', pageTitle: 'Complaint Feedback' }, props: true },
+        { path: 'activity', name: 'CitizenActivity', component: CitizenActivity, meta: { title: 'Recent Activity | CivicDesk', pageTitle: 'Recent Activity' } },
       ]
     },
 

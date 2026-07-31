@@ -1,16 +1,49 @@
 from functools import wraps
 import re
 
-from flask import jsonify # type: ignore
+from flask import jsonify, request # type: ignore
 from flask_jwt_extended import ( # type: ignore
     get_jwt, get_jwt_identity, jwt_required, verify_jwt_in_request
 )
 
-from models import User
+from models import db, User, ActivityLog
 
 blocklist = set()
 
 VALID_ROLES = {'Admin', 'Citizen', 'Officer', 'Worker'}
+
+# ─────────────────────────────────────────────────────────────────────────
+# Recognised activity_type values for ActivityLog rows.
+# ─────────────────────────────────────────────────────────────────────────
+ACTIVITY_TYPES = {
+    'register',
+    'login',
+    'logout',
+    'password_changed',
+    'password_reset_requested',
+    'password_reset_completed',
+    'profile_updated',
+    'profile_photo_updated',
+    'profile_photo_removed',
+    'complaint_submitted',
+    'feedback_submitted',
+}
+
+
+def log_activity(user_id, activity_type, description, complaint_id=None):
+    """Adds an ActivityLog row to the session."""
+    if activity_type not in ACTIVITY_TYPES:
+        raise ValueError(f"Unknown activity_type: {activity_type!r}")
+
+    entry = ActivityLog(
+        user_id=user_id,
+        complaint_id=complaint_id,
+        activity_type=activity_type,
+        description=description,
+        ip_address=request.remote_addr if request else None
+    )
+    db.session.add(entry)
+    return entry
 
 
 def is_valid_email(email):

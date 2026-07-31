@@ -344,17 +344,26 @@
 
         <!-- Activity Timeline -->
         <div class="bg-white rounded-[14px] shadow-sm border border-slate-100 p-5">
-          <h3 class="font-bold text-slate-900 flex items-center gap-2 mb-5">
-            <Clock class="w-5 h-5 text-purple-500" /> Recent Activity
-          </h3>
-          <div v-if="timeline.length" class="relative pl-4 border-l-2 border-slate-100 space-y-6">
-            <div v-for="(event, idx) in timeline" :key="idx" class="relative">
-              <div class="absolute -left-[21px] w-2.5 h-2.5 rounded-full ring-4 ring-white border-2"
-                :class="idx === 0 ? 'bg-[#2563EB] border-[#2563EB]' : 'bg-slate-300 border-slate-300'"></div>
-              <p class="text-sm font-bold text-slate-900">{{ event.action }}</p>
-              <p class="text-[10px] font-medium text-slate-500 mt-0.5">{{ event.date }}<span v-if="event.time"> • {{
-                  event.time }}</span></p>
-              <p class="text-xs text-slate-600 font-mono mt-1">{{ event.id }}</p>
+          <div class="flex items-center justify-between mb-5">
+            <h3 class="font-bold text-slate-900 flex items-center gap-2">
+              <Clock class="w-5 h-5 text-purple-500" /> Recent Activity
+            </h3>
+            <router-link to="/citizen/activity" class="text-xs font-bold text-[#2563EB] hover:underline">
+              View All
+            </router-link>
+          </div>
+          <div v-if="timeline.length" class="space-y-4">
+            <div v-for="(event, idx) in timeline" :key="idx" class="flex gap-3">
+              <div
+                :class="`w-8 h-8 rounded-full flex items-center justify-center shrink-0 mt-0.5 ${event.iconBg} ${event.iconColor}`">
+                <component :is="event.icon" class="w-4 h-4" />
+              </div>
+              <div class="flex-1 min-w-0">
+                <p class="text-sm font-semibold text-slate-800 leading-snug">{{ event.action }}</p>
+                <p class="text-[10px] font-bold text-slate-400 uppercase tracking-wide mt-1">
+                  {{ event.date }}<span v-if="event.time"> • {{ event.time }}</span>
+                </p>
+              </div>
             </div>
           </div>
           <p v-else class="text-sm text-slate-400">No recent activity yet.</p>
@@ -417,7 +426,7 @@ import {
   Activity, TrendingUp, TrendingDown, Star, User, FileText, ShieldCheck,
   Calendar, Trash2, Construction, Droplets, Lightbulb, ChevronRight,
   PlusCircle, Navigation, LayoutDashboard, Siren, Timer, BarChart3,
-  Hourglass, Zap
+  Hourglass, Zap, LogIn, LogOut, KeyRound, UserPlus, Camera, Mail, UserCog
 } from 'lucide-vue-next'
 
 const router = useRouter()
@@ -484,6 +493,21 @@ const notifications = ref([])
 const categories = ref([])
 const timeline = ref([])
 const priorities = ref([])
+
+const ACTIVITY_META = {
+  register:                 { icon: UserPlus,       bg: 'bg-blue-100',   color: 'text-blue-600' },
+  login:                    { icon: LogIn,           bg: 'bg-green-100',  color: 'text-green-600' },
+  logout:                   { icon: LogOut,          bg: 'bg-slate-100',  color: 'text-slate-500' },
+  password_changed:         { icon: KeyRound,        bg: 'bg-amber-100',  color: 'text-amber-600' },
+  password_reset_requested: { icon: Mail,            bg: 'bg-amber-100',  color: 'text-amber-600' },
+  password_reset_completed: { icon: KeyRound,        bg: 'bg-green-100',  color: 'text-green-600' },
+  profile_updated:          { icon: UserCog,         bg: 'bg-purple-100', color: 'text-purple-600' },
+  profile_photo_updated:    { icon: Camera,          bg: 'bg-purple-100', color: 'text-purple-600' },
+  profile_photo_removed:    { icon: Camera,          bg: 'bg-slate-100',  color: 'text-slate-500' },
+  complaint_submitted:      { icon: ClipboardList,   bg: 'bg-blue-100',   color: 'text-blue-600' },
+  feedback_submitted:       { icon: Star,            bg: 'bg-amber-100',  color: 'text-amber-600' },
+  default:                  { icon: Clock,           bg: 'bg-slate-100',  color: 'text-slate-500' },
+}
 
 const PRIORITY_ORDER = ['Emergency', 'High', 'Medium', 'Low']
 const PRIORITY_COLOR = {
@@ -577,14 +601,22 @@ const fetchDashboard = async () => {
       color: 'text-blue-600',
     }))
 
-    // No separate activity-log endpoint for the dashboard, so build the
-    // "Recent Activity" timeline from the same recent-complaints data.
-    timeline.value = recentComplaints.value.slice(0, 5).map(c => ({
-      action: `${c.status}: ${c.title}`,
-      date: c.submittedDate,
-      time: '',
-      id: c.id,
-    }))
+    // Recent Activity — backed by ActivityLog via the dashboard's
+    // recent_activity field. Falls back to an empty list on older backends
+    // that don't send it yet, so this never throws.
+    timeline.value = (data.recent_activity || []).map(a => {
+      const meta = ACTIVITY_META[a.type] || ACTIVITY_META.default
+      const dt = a.created_at ? new Date(a.created_at) : null
+      return {
+        action: a.description,
+        date: dt ? dt.toLocaleDateString('en-US', { month: 'short', day: '2-digit', year: 'numeric' }) : '',
+        time: dt ? dt.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }) : '',
+        complaintId: a.complaint_id || '',
+        icon: meta.icon,
+        iconBg: meta.bg,
+        iconColor: meta.color,
+      }
+    })
 
     if (data.pending_feedback_complaint_id) {
       hasPendingFeedback.value = true
