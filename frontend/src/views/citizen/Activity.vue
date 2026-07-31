@@ -25,21 +25,23 @@
 
     <!-- Activity List -->
     <div v-if="filteredActivity.length > 0" class="bg-white rounded-[14px] shadow-sm border border-slate-100 overflow-hidden">
-      <div class="relative pl-10 py-6 pr-5">
-        <div class="absolute left-[35px] top-6 bottom-6 w-px bg-slate-100"></div>
-        <div v-for="(event, idx) in filteredActivity" :key="event.id" class="relative pb-7 last:pb-0">
+      <div class="relative py-6 px-6">
+        <div class="absolute left-[43px] top-8 bottom-8 w-px bg-slate-200"></div>
+        <div v-for="(event, idx) in filteredActivity" :key="event.id" class="relative flex items-start gap-4 pb-8 last:pb-0">
           <div
-            :class="`absolute -left-10 top-0 w-8 h-8 rounded-full flex items-center justify-center ring-4 ring-white ${event.iconBg} ${event.iconColor}`">
-            <component :is="event.icon" class="w-4 h-4" />
+            :class="`relative z-10 flex h-10 w-10 shrink-0 items-center justify-center rounded-full ring-4 ring-white shadow-sm ${event.iconBg} ${event.iconColor}`">
+            <component :is="event.icon" class="w-5 h-5" />
           </div>
-          <p class="text-sm font-bold text-slate-900">{{ event.description }}</p>
-          <p class="text-xs text-slate-500 font-medium mt-1">
-            {{ event.date }}<span v-if="event.time"> • {{ event.time }}</span>
-          </p>
-          <button v-if="event.complaintId" @click="goToComplaint(event.complaintId)"
+          <div class="flex-1 min-w-0">
+            <p class="text-sm font-bold text-slate-900">{{ event.description }}</p>
+            <p class="text-xs text-slate-500 font-medium mt-1">
+              {{ event.date }}<span v-if="event.time"> • {{ event.time }}</span>
+            </p>
+            <button v-if="event.complaintId" @click="goToComplaint(event.complaintId)"
             class="text-xs font-bold text-[#2563EB] hover:underline mt-1.5 inline-flex items-center gap-1">
             {{ event.complaintId }} <ChevronRight class="w-3 h-3" />
-          </button>
+            </button>
+          </div>
         </div>
       </div>
     </div>
