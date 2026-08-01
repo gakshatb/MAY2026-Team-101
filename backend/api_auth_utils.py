@@ -5,12 +5,31 @@ from flask import jsonify, request # type: ignore
 from flask_jwt_extended import ( # type: ignore
     get_jwt, get_jwt_identity, jwt_required, verify_jwt_in_request
 )
+from flask_limiter import Limiter # type: ignore
+from flask_limiter.util import get_remote_address # type: ignore
 
-from models import db, User, ActivityLog
-
-blocklist = set()
+from models import db, User, ActivityLog, TokenBlocklist, now_ist
 
 VALID_ROLES = {'Admin', 'Citizen', 'Officer', 'Worker'}
+
+limiter = Limiter(key_func=get_remote_address)
+
+def is_token_revoked(jti):
+    """DB-backed replacement for the old `jti in blocklist` check."""
+    return TokenBlocklist.query.filter_by(jti=jti).first() is not None
+
+
+def revoke_token(jti, expires_at, user_id=None):
+    """Adds a jti to the blocklist. Caller is responsible for committing."""
+    if is_token_revoked(jti):
+        return
+    db.session.add(TokenBlocklist(jti=jti, user_id=user_id, expires_at=expires_at))
+
+
+def purge_expired_blocklist_entries():
+    """Optional housekeeping — call periodically."""
+    TokenBlocklist.query.filter(TokenBlocklist.expires_at < now_ist()).delete()
+    db.session.commit()
 
 # ─────────────────────────────────────────────────────────────────────────
 # Recognised activity_type values for ActivityLog rows.
@@ -68,7 +87,7 @@ def token_not_revoked(fn):
     def wrapper(*args, **kwargs):
         verify_jwt_in_request()
         jti = get_jwt()["jti"]
-        if jti in blocklist:
+        if is_token_revoked(jti):
             return jsonify(message="Token has been revoked. Please log in again."), 401
         return fn(*args, **kwargs)
     return wrapper
@@ -84,7 +103,7 @@ def role_required(*roles):
         @jwt_required()
         def wrapper(*args, **kwargs):
             jti = get_jwt()["jti"]
-            if jti in blocklist:
+            if is_token_revoked(jti):
                 return jsonify(message="Token has been revoked. Please log in again."), 401
             user_id = get_jwt_identity()
             user = User.query.get(int(user_id))

@@ -1,4 +1,4 @@
-from datetime import timedelta
+from datetime import datetime, timedelta
 import secrets
 
 from flask import Blueprint, current_app, jsonify, request # type: ignore
@@ -8,21 +8,21 @@ from flask_jwt_extended import ( # type: ignore
     get_jwt, get_jwt_identity, jwt_required
 )
 
-from models import db, User, now_ist
+from models import db, User, PasswordResetOTP, now_ist
 
 from api_auth_utils import (
-    VALID_ROLES, blocklist, is_valid_email, is_valid_phone, log_activity, token_not_revoked
+    VALID_ROLES, is_token_revoked, is_valid_email, is_valid_phone, limiter,
+    log_activity, revoke_token, token_not_revoked
 )
 
 auth_bp = Blueprint('auth', __name__, url_prefix='/api')
-
-otp_store = {}
 
 
 # ─────────────────────────────────────────────────────────────────────────
 # Register a new user (citizen, officer, worker).
 # ─────────────────────────────────────────────────────────────────────────
 @auth_bp.route('/register', methods=['POST'])
+@limiter.limit("5 per hour")
 def register():
     data = request.get_json()
     if not data:
@@ -101,6 +101,7 @@ def register():
 # Authenticate user, return JWT access token + basic user info.
 # ─────────────────────────────────────────────────────────────────────────
 @auth_bp.route('/login', methods=['POST'])
+@limiter.limit("5 per minute")
 def login():
     data = request.get_json()
     if not data:
@@ -148,19 +149,24 @@ def login():
 @auth_bp.route('/logout', methods=['POST'])
 @jwt_required()
 def logout():
-    jti = get_jwt()["jti"]
-    blocklist.add(jti)
+    user_id = int(get_jwt_identity())
+    claims = get_jwt()
+    revoke_token(claims["jti"], datetime.fromtimestamp(claims["exp"]), user_id=user_id)
 
     data = request.get_json(silent=True) or {}
     refresh_token = data.get("refresh_token")
     if refresh_token:
         try:
-            refresh_jti = decode_token(refresh_token)["jti"]
-            blocklist.add(refresh_jti)
+            refresh_claims = decode_token(refresh_token)
+            revoke_token(
+                refresh_claims["jti"],
+                datetime.fromtimestamp(refresh_claims["exp"]),
+                user_id=user_id
+            )
         except Exception:
             pass
 
-    log_activity(int(get_jwt_identity()), 'logout', 'Logged out.')
+    log_activity(user_id, 'logout', 'Logged out.')
     db.session.commit()
 
     return jsonify(success=True, message="Logged out successfully."), 200
@@ -173,7 +179,7 @@ def logout():
 @jwt_required(refresh=True)
 def refresh():
     jti = get_jwt()["jti"]
-    if jti in blocklist:
+    if is_token_revoked(jti):
         return jsonify(message="Token has been revoked. Please log in again."), 401
 
     user_id = get_jwt_identity()
@@ -219,6 +225,7 @@ def me():
 # Step 1 of password reset — generate a 6-digit OTP and "send" it.
 # ─────────────────────────────────────────────────────────────────────────
 @auth_bp.route('/forgot-password', methods=['POST'])
+@limiter.limit("5 per hour")
 def forgot_password():
     data = request.get_json()
     if not data:
@@ -236,12 +243,16 @@ def forgot_password():
             message="If this email is registered, an OTP has been sent."
         ), 200
 
-    # Generate 6-digit OTP, valid for 10 minutes
+    # Generate 6-digit OTP, valid for 10 minutes.
     otp = str(secrets.randbelow(900000) + 100000)   # 100000–999999
-    otp_store[email] = {
-        "otp":        otp,
-        "expires_at": now_ist() + timedelta(minutes=10)
-    }
+
+    PasswordResetOTP.query.filter_by(email=email).delete()
+    db.session.add(PasswordResetOTP(
+        email=email,
+        otp_hash=generate_password_hash(otp),
+        attempts=0,
+        expires_at=now_ist() + timedelta(minutes=10)
+    ))
 
     log_activity(user.id, 'password_reset_requested', 'Requested a password reset OTP.')
     db.session.commit()
@@ -257,6 +268,7 @@ def forgot_password():
 # Step 2 of password reset — verify OTP and set new password.
 # ─────────────────────────────────────────────────────────────────────────
 @auth_bp.route('/reset-password', methods=['POST'])
+@limiter.limit("5 per minute")
 def reset_password():
     data = request.get_json()
     if not data:
@@ -273,16 +285,24 @@ def reset_password():
         return jsonify(message="Password must be at least 8 characters."), 400
 
     # ── OTP validation ───────────────────────────────────────────────
-    record = otp_store.get(email)
+    record = PasswordResetOTP.query.filter_by(email=email).first()
 
     if not record:
         return jsonify(message="No OTP request found for this email."), 400
 
-    if now_ist() > record["expires_at"]:
-        otp_store.pop(email, None)
+    if now_ist() > record.expires_at:
+        db.session.delete(record)
+        db.session.commit()
         return jsonify(message="OTP has expired. Please request a new one."), 400
 
-    if record["otp"] != otp:
+    if record.attempts >= PasswordResetOTP.MAX_ATTEMPTS:
+        db.session.delete(record)
+        db.session.commit()
+        return jsonify(message="Too many incorrect attempts. Please request a new OTP."), 429
+
+    if not check_password_hash(record.otp_hash, otp):
+        record.attempts += 1
+        db.session.commit()
         return jsonify(message="Invalid OTP."), 400
 
     # ── update password ──────────────────────────────────────────────
@@ -292,10 +312,10 @@ def reset_password():
 
     user.password = generate_password_hash(new_password)
     log_activity(user.id, 'password_reset_completed', 'Password reset via OTP.')
-    db.session.commit()
 
     # OTP is single-use — remove after successful reset
-    otp_store.pop(email, None)
+    db.session.delete(record)
+    db.session.commit()
 
     return jsonify(
         success=True,
@@ -309,6 +329,7 @@ def reset_password():
 @auth_bp.route('/change-password', methods=['POST'])
 @jwt_required()
 @token_not_revoked
+@limiter.limit("10 per hour")
 def change_password():
     user_id = get_jwt_identity()
     user = User.query.get(int(user_id))

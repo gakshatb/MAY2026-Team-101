@@ -218,6 +218,41 @@ class ActivityLog(db.Model):
 
 
 # ─────────────────────────────────────────────────────────────────────────────
+# TokenBlocklist
+# ─────────────────────────────────────────────────────────────────────────────
+class TokenBlocklist(db.Model):
+    __tablename__ = 'token_blocklist'
+
+    id         = db.Column(db.Integer,     primary_key=True, autoincrement=True)
+    jti        = db.Column(db.String(36),  nullable=False, unique=True, index=True)
+    user_id    = db.Column(db.Integer,     db.ForeignKey('users.id'), nullable=True)
+    expires_at = db.Column(db.DateTime,    nullable=False)   # token's own exp, for cleanup
+    created_at = db.Column(db.DateTime,    nullable=False, default=now_ist)
+
+    def __repr__(self):
+        return f'<TokenBlocklist jti={self.jti}>'
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# PasswordResetOTP
+# ─────────────────────────────────────────────────────────────────────────────
+class PasswordResetOTP(db.Model):
+    __tablename__ = 'password_reset_otps'
+
+    id         = db.Column(db.Integer,     primary_key=True, autoincrement=True)
+    email      = db.Column(db.String(255), nullable=False, unique=True, index=True)
+    otp_hash   = db.Column(db.String(255), nullable=False)   # hashed, never store the raw OTP
+    attempts   = db.Column(db.Integer,     nullable=False, default=0)
+    expires_at = db.Column(db.DateTime,    nullable=False)
+    created_at = db.Column(db.DateTime,    nullable=False, default=now_ist)
+
+    MAX_ATTEMPTS = 5
+
+    def __repr__(self):
+        return f'<PasswordResetOTP email={self.email}>'
+
+
+# ─────────────────────────────────────────────────────────────────────────────
 # ContactMessage
 # Stores messages submitted via the public Contact Us form.
 # No authentication required — anyone can submit.
@@ -237,17 +272,26 @@ class ContactMessage(db.Model):
         return f'<ContactMessage id={self.name} email={self.email} subject={self.subject!r} message={self.message!r}>'
 
 
-def init_db(app):
+def init_db(app, admin_config):
     db.init_app(app)
     with app.app_context():
         db.create_all()
-        if not User.query.filter_by(role='Admin').first():
+        if not User.query.filter_by(role="Admin").first():
             admin = User(
-                name="Administrator",
-                email="admin@gmail.com",
-                phone="9999999999",
+                name=admin_config.get("name") or "Administrator",
+                email=admin_config.get("email") or "admin@gmail.com",
+                phone=admin_config.get("phone") or "9999999999",
                 role="Admin",
-                password=generate_password_hash("Admin@123")
+                password=generate_password_hash(admin_config.get("password") or "Admin@123"),
             )
             db.session.add(admin)
+            db.session.commit()
+
+        if not Department.query.first():
+            for name in [
+                'Sanitation Department', 'Roads & Infrastructure',
+                'Electrical Department', 'Water & Drainage Department',
+                'General Administration'
+            ]:
+                db.session.add(Department(department_name=name, status='Active'))
             db.session.commit()
