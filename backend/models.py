@@ -26,6 +26,7 @@ class User(db.Model):
     profile_photo = db.Column(db.String(500), nullable=True)
     role       = db.Column(db.String(20),  nullable=False)          # citizen | officer | worker
     status     = db.Column(db.String(20),  nullable=False, default='active')  # active | pending | suspended
+    designation = db.Column(db.String(100), nullable=True)
     department_id = db.Column(db.Integer,  db.ForeignKey('departments.id'), nullable=True)  # Officer/Worker's assigned department
     created_at = db.Column(db.DateTime,    nullable=False, default=now_ist)
 

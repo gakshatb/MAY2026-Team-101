@@ -51,6 +51,7 @@ ACTIVITY_TYPES = {
     'officer_suspended',
     'officer_reactivated',
     'officer_updated',
+    'officer_transferred',
     'department_created',
     'department_updated',
     'department_deleted',

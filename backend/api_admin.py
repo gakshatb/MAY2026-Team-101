@@ -578,3 +578,289 @@ def eligible_department_heads():
             for o in officers
         ]
     ), 200
+
+
+# ─────────────────────────────────────────────────────────────────────────
+# Officer Management
+# ─────────────────────────────────────────────────────────────────────────
+def _experience_label(created_at):
+    """Tenure since account creation — there's no separate 'years of prior
+    experience' field, so this reflects time on this platform, not career
+    history."""
+    if not created_at:
+        return "N/A"
+    days = (now_ist() - created_at).days
+    years, remainder_days = divmod(days, 365)
+    months = remainder_days // 30
+    if years and months:
+        return f"{years} Yr {months} Mo"
+    if years:
+        return f"{years} Yr{'s' if years != 1 else ''}"
+    if months:
+        return f"{months} Mo{'s' if months != 1 else ''}"
+    return f"{days} Day{'s' if days != 1 else ''}"
+
+
+def _officer_complaint_stats(officer_id):
+    """Returns (resolved_count, pending_count, avg_time_label, citizen_rating)
+    for complaints assigned to one officer."""
+    assigned = Complaint.query.filter_by(assigned_officer=officer_id).all()
+    resolved_rows = [c for c in assigned if c.status in ('Resolved', 'Closed')]
+    pending_count = sum(1 for c in assigned if c.status not in ('Resolved', 'Closed'))
+    avg_time_label, _ = _avg_time_label(resolved_rows)
+
+    rating_avg = (
+        db.session.query(db.func.avg(Feedback.rating))
+        .join(Complaint, Feedback.complaint_id == Complaint.id)
+        .filter(Complaint.assigned_officer == officer_id)
+        .scalar()
+    )
+    citizen_rating = round(float(rating_avg), 1) if rating_avg is not None else None
+
+    return len(resolved_rows), pending_count, avg_time_label, citizen_rating
+
+
+def _serialize_officer(u):
+    resolved, pending, avg_time_label, citizen_rating = _officer_complaint_stats(u.id)
+    total = resolved + pending
+    score = round((resolved / total) * 100) if total else 0
+
+    return {
+        "id":           u.id,
+        "empId":        f"OFC-{u.id:04d}",
+        "name":         u.name,
+        "designation":  u.designation,
+        "department":   u.member_department.department_name if u.member_department else None,
+        "departmentId": u.department_id,
+        "email":        u.email,
+        "phone":        u.phone,
+        "joined":       u.created_at.strftime('%b %Y') if u.created_at else None,
+        "experience":   _experience_label(u.created_at),
+        "resolved":     resolved,
+        "pending":      pending,
+        "avgTime":      avg_time_label,
+        "score":        score,
+        "citizenRating": citizen_rating,
+        "status":       u.status.capitalize(),   # Active | Suspended | Pending
+        "avatar":       _avatar_url(u),
+    }
+
+
+@admin_bp.route('/officers', methods=['GET'])
+@role_required('Admin')
+def list_officers():
+    """Matches OfficerManagement.vue: top stats, quick insights, the
+    filterable officer table, pending registrations, and recent
+    officer-related activity, all in one call."""
+    all_officers = User.query.filter_by(role='Officer').filter(User.status != 'rejected').all()
+    full = [_serialize_officer(u) for u in all_officers]   # unfiltered, used for stats/insights
+
+    # ── apply filters/search/sort for the table itself ─────────────────
+    result = full
+
+    search = request.args.get('search', '').strip().lower()
+    if search:
+        result = [
+            o for o in result
+            if search in o['name'].lower() or search in o['empId'].lower() or search in o['email'].lower()
+        ]
+
+    status = request.args.get('status', 'All')
+    if status != 'All':
+        result = [o for o in result if o['status'] == status]
+
+    department = request.args.get('department', 'All')
+    if department != 'All':
+        result = [o for o in result if o['department'] == department]
+
+    performance = request.args.get('performance', 'All')
+    if performance != 'All':
+        def in_bucket(score):
+            if performance == 'Excellent': return score >= 90
+            if performance == 'Good': return 80 <= score < 90
+            if performance == 'Average': return 60 <= score < 80
+            return score < 60
+        result = [o for o in result if in_bucket(o['score'])]
+
+    sort = request.args.get('sort', 'Name')
+    if sort == 'Complaints':
+        result = sorted(result, key=lambda o: o['resolved'] + o['pending'], reverse=True)
+    elif sort == 'Score':
+        result = sorted(result, key=lambda o: o['score'], reverse=True)
+    else:
+        result = sorted(result, key=lambda o: o['name'].lower())
+
+    # ── top stats (platform-wide, ignores the filters above) ───────────
+    ratings = [o['citizenRating'] for o in full if o['citizenRating'] is not None]
+    top_stats = {
+        "total_officers":    len(full),
+        "active_officers":   sum(1 for o in full if o['status'] == 'Active'),
+        "pending_approvals": sum(1 for o in full if o['status'] == 'Pending'),
+        "suspended":         sum(1 for o in full if o['status'] == 'Suspended'),
+        "departments":       Department.query.count(),
+        "avg_rating":        round(sum(ratings) / len(ratings), 1) if ratings else None,
+    }
+
+    # ── quick insights ──────────────────────────────────────────────────
+    quick_insights = []
+    scored = [o for o in full if (o['resolved'] + o['pending']) > 0]
+    if scored:
+        top_performer = max(scored, key=lambda o: o['score'])
+        quick_insights.append({
+            "label": "Top Performer",
+            "value": f"{top_performer['name']} ({top_performer['department'] or 'Unassigned'})"
+        })
+
+    dept_activity = (
+        db.session.query(Complaint.department, db.func.count(Complaint.id))
+        .group_by(Complaint.department)
+        .all()
+    )
+    if dept_activity:
+        most_active = max(dept_activity, key=lambda d: d[1])
+        quick_insights.append({"label": "Most Active Dept", "value": most_active[0]})
+
+    if scored:
+        highest_workload = max(scored, key=lambda o: o['pending'])
+        if highest_workload['pending'] > 0:
+            quick_insights.append({
+                "label": "Highest Workload",
+                "value": f"{highest_workload['name']} ({highest_workload['pending']} Cmp)"
+            })
+
+    # ── pending Officer registrations ───────────────────────────────────
+    pending_users = (
+        User.query.filter_by(role='Officer', status='pending')
+        .order_by(User.created_at.asc())
+        .all()
+    )
+    pending_registrations = [
+        {
+            "id":            u.id,
+            "name":          u.name,
+            "requestedDept": u.member_department.department_name if u.member_department else None,
+            "date":          u.created_at.strftime('%b %d, %Y') if u.created_at else None,
+        }
+        for u in pending_users
+    ]
+
+    # ── recent officer-related admin activity ───────────────────────────
+    officer_activity_types = [
+        'officer_approved', 'officer_rejected', 'officer_suspended',
+        'officer_reactivated', 'officer_updated', 'officer_transferred'
+    ]
+    recent_logs = (
+        db.session.query(ActivityLog, User)
+        .join(User, ActivityLog.user_id == User.id)
+        .filter(ActivityLog.activity_type.in_(officer_activity_types))
+        .order_by(ActivityLog.created_at.desc())
+        .limit(10)
+        .all()
+    )
+    recent_activities = [
+        {
+            "id":          log.id,
+            "action":      log.activity_type.replace('_', ' ').title(),
+            "description": log.description,
+            "created_at":  log.created_at.isoformat() if log.created_at else None,
+            "admin":       actor.name,
+        }
+        for log, actor in recent_logs
+    ]
+
+    return jsonify(
+        success=True,
+        top_stats=top_stats,
+        quick_insights=quick_insights,
+        officers=result,
+        pending_registrations=pending_registrations,
+        recent_activities=recent_activities,
+        departments=[
+            d.department_name for d in Department.query.order_by(Department.department_name.asc()).all()
+        ],
+    ), 200
+
+
+@admin_bp.route('/officers/<int:officer_id>/suspend', methods=['PATCH'])
+@role_required('Admin')
+def suspend_officer(officer_id):
+    officer = User.query.get(officer_id)
+    if not officer or officer.role != 'Officer':
+        return jsonify(message="Officer not found."), 404
+    if officer.status != 'active':
+        return jsonify(message="Only active officers can be suspended."), 400
+
+    data = request.get_json(silent=True) or {}
+    reason = data.get('reason', '').strip()
+
+    officer.status = 'suspended'
+    log_activity(
+        int(get_jwt_identity()), 'officer_suspended',
+        f'Suspended officer {officer.name}.' + (f' Reason: {reason}' if reason else '')
+    )
+    db.session.commit()
+
+    return jsonify(success=True, message=f'{officer.name} suspended.', officer=_serialize_officer(officer)), 200
+
+
+@admin_bp.route('/officers/<int:officer_id>/reactivate', methods=['PATCH'])
+@role_required('Admin')
+def reactivate_officer(officer_id):
+    officer = User.query.get(officer_id)
+    if not officer or officer.role != 'Officer':
+        return jsonify(message="Officer not found."), 404
+    if officer.status != 'suspended':
+        return jsonify(message="Only suspended officers can be reactivated."), 400
+
+    officer.status = 'active'
+    log_activity(
+        int(get_jwt_identity()), 'officer_reactivated',
+        f'Reactivated officer {officer.name}.'
+    )
+    db.session.commit()
+
+    return jsonify(success=True, message=f'{officer.name} reactivated.', officer=_serialize_officer(officer)), 200
+
+
+@admin_bp.route('/officers/<int:officer_id>/transfer', methods=['PATCH'])
+@role_required('Admin')
+def transfer_officer(officer_id):
+    officer = User.query.get(officer_id)
+    if not officer or officer.role != 'Officer':
+        return jsonify(message="Officer not found."), 404
+    if officer.status not in ('active', 'suspended'):
+        return jsonify(message="Only active or suspended officers can be transferred."), 400
+
+    data = request.get_json()
+    if not data:
+        return jsonify(message="Request body must be JSON."), 400
+
+    new_dept_id = data.get('departmentId')
+    if not new_dept_id:
+        return jsonify(message="departmentId is required."), 400
+
+    new_dept = Department.query.get(int(new_dept_id))
+    if not new_dept:
+        return jsonify(message="Department not found."), 404
+    if new_dept.id == officer.department_id:
+        return jsonify(message="Officer is already assigned to this department."), 400
+
+    old_dept = officer.member_department
+    old_name = old_dept.department_name if old_dept else 'Unassigned'
+
+    if old_dept and old_dept.user_id == officer.id:
+        old_dept.user_id = None
+
+    officer.department_id = new_dept.id
+
+    log_activity(
+        int(get_jwt_identity()), 'officer_transferred',
+        f'Transferred {officer.name} from {old_name} to {new_dept.department_name}.'
+    )
+    db.session.commit()
+
+    return jsonify(
+        success=True,
+        message=f'{officer.name} transferred to {new_dept.department_name}.',
+        officer=_serialize_officer(officer)
+    ), 200
