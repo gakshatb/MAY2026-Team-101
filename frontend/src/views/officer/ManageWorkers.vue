@@ -1,14 +1,4 @@
 <template>
-  <div class="flex h-screen bg-[#F8FAFC] font-sans text-slate-800 overflow-hidden">
-    
-    <!-- Sidebar -->
-    <Sidebar userRole="Civic Officer" :isOpen="isSidebarOpen" @close-sidebar="isSidebarOpen = false" />
-
-    <div class="flex-1 flex flex-col h-screen overflow-hidden">
-      
-      <!-- Navbar -->
-      <DashboardNavbar userRole="Civic Officer" pageTitle="Manage Workers" @toggle-sidebar="isSidebarOpen = !isSidebarOpen" />
-
       <main class="flex-1 overflow-x-hidden overflow-y-auto p-4 sm:p-6 lg:p-8">
         <div class="max-w-[1600px] mx-auto space-y-6">
           
@@ -245,7 +235,6 @@
 
         </div>
       </main>
-    </div>
 
     <!-- Worker Profile Drawer -->
     <Teleport to="body">
@@ -475,7 +464,6 @@
       </div>
 
     </Teleport>
-  </div>
 </template>
 
 <script setup>

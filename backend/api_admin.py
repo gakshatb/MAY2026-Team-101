@@ -1,12 +1,16 @@
 from datetime import datetime, timedelta
+from urllib.parse import quote
 
-from flask import Blueprint, jsonify # type: ignore
+from flask import Blueprint, jsonify, request # type: ignore
 from flask_jwt_extended import get_jwt_identity # type: ignore
 
-from models import db, User, Complaint, Department, ActivityLog, now_ist
+from models import db, User, Complaint, Department, ActivityLog, Feedback, now_ist
 from api_auth_utils import log_activity, role_required
 
 admin_bp = Blueprint('admin', __name__, url_prefix='/api/admin')
+
+HIGH_WORKLOAD_THRESHOLD = 50
+VALID_DEPT_STATUSES = {'Active', 'Inactive', 'Under Maintenance'}
 
 
 def _pct_change(curr, prev):
@@ -262,3 +266,315 @@ def reject_user(user_id):
     )
     db.session.commit()
     return jsonify(success=True, message=f'{user.name} rejected.'), 200
+
+
+# ─────────────────────────────────────────────────────────────────────────
+# Department Management
+# ─────────────────────────────────────────────────────────────────────────
+def _avg_time_label(rows):
+    """rows: Complaint objects with both created_at and updated_at set.
+    Returns (label, numeric_hours_or_None)."""
+    timed = [c for c in rows if c.updated_at]
+    if not timed:
+        return "N/A", None
+    avg_hours = sum((c.updated_at - c.created_at).total_seconds() for c in timed) / len(timed) / 3600
+    label = f"{int(avg_hours // 24)}d {int(avg_hours % 24)}h" if avg_hours >= 24 else f"{round(avg_hours, 1)}h"
+    return label, avg_hours
+
+
+def _avatar_url(user):
+    if not user:
+        return "https://ui-avatars.com/api/?name=NA&background=random"
+    return user.profile_photo or f"https://ui-avatars.com/api/?name={quote(user.name)}&background=random"
+
+
+def _serialize_department(dept):
+    head = dept.head_officer
+    officers_count = sum(1 for u in dept.members if u.role == 'Officer' and u.status == 'active')
+    workers_count  = sum(1 for u in dept.members if u.role == 'Worker' and u.status == 'active')
+
+    pending = Complaint.query.filter_by(department=dept.department_name, status='Pending').count()
+    total   = Complaint.query.filter_by(department=dept.department_name).count()
+    resolved_or_closed = Complaint.query.filter(
+        Complaint.department == dept.department_name,
+        Complaint.status.in_(['Resolved', 'Closed'])
+    ).all()
+    resolved_count = len(resolved_or_closed)
+    avg_time_label, _ = _avg_time_label(resolved_or_closed)
+    score = round((resolved_count / total) * 100) if total else 0
+
+    display_status = dept.status
+    if dept.status == 'Active' and pending >= HIGH_WORKLOAD_THRESHOLD:
+        display_status = 'High Workload'
+
+    return {
+        "id":          dept.id,
+        "code":        dept.code,
+        "name":        dept.department_name,
+        "description": dept.description,
+        "head":        head.name if head else "Unassigned",
+        "headEmail":   head.email if head else "N/A",
+        "headPhone":   head.phone if head else "N/A",
+        "headAvatar":  _avatar_url(head),
+        "officers":    officers_count,
+        "workers":     workers_count,
+        "pending":     pending,
+        "resolved":    resolved_count,
+        "avgTime":     avg_time_label,
+        "score":       score,
+        "status":      display_status,     # display-only, may read "High Workload"
+        "rawStatus":   dept.status,         # actual stored value: Active | Inactive | Under Maintenance
+        "created":     dept.created_at.strftime('%b %d, %Y') if dept.created_at else None
+    }
+
+
+@admin_bp.route('/departments', methods=['GET'])
+@role_required('Admin')
+def list_departments():
+    departments = Department.query.order_by(Department.department_name.asc()).all()
+    serialized = [_serialize_department(d) for d in departments]
+
+    total_departments = len(serialized)
+    active_departments = sum(1 for d in serialized if d['rawStatus'] == 'Active')
+    depts_without_officers = sum(1 for d in serialized if d['officers'] == 0)
+    active_complaints = sum(d['pending'] for d in serialized)
+    total_officers = User.query.filter_by(role='Officer', status='active').count()
+
+    platform_resolved = Complaint.query.filter(
+        Complaint.status.in_(['Resolved', 'Closed']),
+        Complaint.updated_at.isnot(None)
+    ).all()
+    avg_resolution_label, _ = _avg_time_label(platform_resolved)
+
+    top_stats = {
+        "total_departments":           total_departments,
+        "active_departments":          active_departments,
+        "departments_without_officers": depts_without_officers,
+        "active_complaints":           active_complaints,
+        "total_officers":              total_officers,
+        "avg_resolution":              avg_resolution_label,
+    }
+
+    # ── Quick insights ────────────────────────────────────────────────
+    quick_insights = []
+    with_volume = [d for d in serialized if (d['pending'] + d['resolved']) > 0]
+    if with_volume:
+        most_active = max(with_volume, key=lambda d: d['pending'] + d['resolved'])
+        quick_insights.append({
+            "label": "Most Active", "department": most_active['name'],
+            "value": f"{most_active['pending'] + most_active['resolved']} Cmp"
+        })
+
+    # Fastest resolution — recompute numeric hours per department with data
+    fastest = None
+    for dept in departments:
+        rows = Complaint.query.filter(
+            Complaint.department == dept.department_name,
+            Complaint.status.in_(['Resolved', 'Closed']),
+            Complaint.updated_at.isnot(None)
+        ).all()
+        _, hours = _avg_time_label(rows)
+        if hours is not None and (fastest is None or hours < fastest[1]):
+            fastest = (dept.department_name, hours)
+    if fastest:
+        h = fastest[1]
+        label = f"{int(h // 24)}d {int(h % 24)}h" if h >= 24 else f"{round(h, 1)}h"
+        quick_insights.append({"label": "Fastest Resolution", "department": fastest[0], "value": label})
+
+    # Highest average feedback rating, by department
+    rating_rows = (
+        db.session.query(Complaint.department, db.func.avg(Feedback.rating))
+        .join(Feedback, Feedback.complaint_id == Complaint.id)
+        .group_by(Complaint.department)
+        .all()
+    )
+    rated = [(name, float(avg)) for name, avg in rating_rows if avg is not None]
+    if rated:
+        best = max(rated, key=lambda r: r[1])
+        quick_insights.append({"label": "Highest Rating", "department": best[0], "value": f"{round(best[1], 1)}/5"})
+
+    if with_volume:
+        busiest = max(with_volume, key=lambda d: d['pending'])
+        if busiest['pending'] > 0:
+            quick_insights.append({
+                "label": "High Workload Alert", "department": busiest['name'],
+                "value": f"{busiest['pending']} Pnd"
+            })
+
+    # ── Recent department-related activity ──────────────────────────
+    recent_logs = (
+        db.session.query(ActivityLog, User)
+        .join(User, ActivityLog.user_id == User.id)
+        .filter(ActivityLog.activity_type.in_(['department_created', 'department_updated', 'department_deleted']))
+        .order_by(ActivityLog.created_at.desc())
+        .limit(10)
+        .all()
+    )
+    recent_activities = [
+        {
+            "id": log.id,
+            "action": log.activity_type.replace('_', ' ').title(),
+            "description": log.description,
+            "date": log.created_at.strftime('%b %d, %Y %I:%M %p') if log.created_at else None,
+            "admin": user.name
+        }
+        for log, user in recent_logs
+    ]
+
+    return jsonify(
+        success=True,
+        departments=serialized,
+        top_stats=top_stats,
+        quick_insights=quick_insights,
+        recent_activities=recent_activities
+    ), 200
+
+
+@admin_bp.route('/departments', methods=['POST'])
+@role_required('Admin')
+def create_department():
+    data = request.get_json()
+    if not data:
+        return jsonify(message="Request body must be JSON."), 400
+
+    name        = data.get('name', '').strip()
+    code        = data.get('code', '').strip().upper()
+    description = data.get('description', '').strip()
+    status      = data.get('status', 'Active').strip()
+
+    if not name:
+        return jsonify(message="Department name is required."), 400
+    if not code:
+        return jsonify(message="Department code is required."), 400
+    if status not in VALID_DEPT_STATUSES:
+        return jsonify(message=f"Invalid status. Choose from: {', '.join(VALID_DEPT_STATUSES)}."), 400
+    if Department.query.filter_by(department_name=name).first():
+        return jsonify(message="A department with this name already exists."), 409
+    if Department.query.filter_by(code=code).first():
+        return jsonify(message="A department with this code already exists."), 409
+
+    dept = Department(
+        department_name=name, code=code,
+        description=description or None, status=status
+    )
+    db.session.add(dept)
+    db.session.flush()
+
+    log_activity(int(get_jwt_identity()), 'department_created', f'Created department "{name}" ({code}).')
+    db.session.commit()
+
+    return jsonify(success=True, message="Department created.", department=_serialize_department(dept)), 201
+
+
+@admin_bp.route('/departments/<int:dept_id>', methods=['PUT'])
+@role_required('Admin')
+def update_department(dept_id):
+    dept = Department.query.get(dept_id)
+    if not dept:
+        return jsonify(message="Department not found."), 404
+
+    data = request.get_json()
+    if not data:
+        return jsonify(message="Request body must be JSON."), 400
+
+    name        = data.get('name', dept.department_name).strip()
+    code        = data.get('code', dept.code or '').strip().upper()
+    description = data.get('description', dept.description or '').strip()
+    status      = data.get('status', dept.status).strip()
+
+    if not name:
+        return jsonify(message="Department name is required."), 400
+    if status not in VALID_DEPT_STATUSES:
+        return jsonify(message=f"Invalid status. Choose from: {', '.join(VALID_DEPT_STATUSES)}."), 400
+    if name != dept.department_name and Department.query.filter_by(department_name=name).first():
+        return jsonify(message="A department with this name already exists."), 409
+    if code and code != dept.code and Department.query.filter_by(code=code).first():
+        return jsonify(message="A department with this code already exists."), 409
+
+    dept.department_name = name
+    dept.code = code or None
+    dept.description = description or None
+    dept.status = status
+
+    log_activity(int(get_jwt_identity()), 'department_updated', f'Updated department "{name}".')
+    db.session.commit()
+
+    return jsonify(success=True, message="Department updated.", department=_serialize_department(dept)), 200
+
+
+@admin_bp.route('/departments/<int:dept_id>', methods=['DELETE'])
+@role_required('Admin')
+def delete_department(dept_id):
+    dept = Department.query.get(dept_id)
+    if not dept:
+        return jsonify(message="Department not found."), 404
+
+    has_members = len(dept.members) > 0
+    has_active_complaints = Complaint.query.filter(
+        Complaint.department == dept.department_name,
+        ~Complaint.status.in_(['Resolved', 'Closed'])
+    ).first() is not None
+
+    if has_members or has_active_complaints:
+        return jsonify(
+            message="Departments with active complaints or assigned officers cannot be deleted."
+        ), 400
+
+    name = dept.department_name
+    db.session.delete(dept)
+    log_activity(int(get_jwt_identity()), 'department_deleted', f'Deleted department "{name}".')
+    db.session.commit()
+
+    return jsonify(success=True, message="Department deleted."), 200
+
+
+@admin_bp.route('/departments/<int:dept_id>/assign-head', methods=['PATCH'])
+@role_required('Admin')
+def assign_department_head(dept_id):
+    dept = Department.query.get(dept_id)
+    if not dept:
+        return jsonify(message="Department not found."), 404
+
+    data = request.get_json()
+    if not data:
+        return jsonify(message="Request body must be JSON."), 400
+
+    officer_id = data.get('officerId')
+    if not officer_id:
+        return jsonify(message="officerId is required."), 400
+
+    officer = User.query.get(int(officer_id))
+    if not officer or officer.role != 'Officer':
+        return jsonify(message="Officer not found."), 404
+    if officer.status != 'active':
+        return jsonify(message="Only active officers can be assigned as department head."), 400
+
+    dept.user_id = officer.id
+    if officer.department_id != dept.id:
+        officer.department_id = dept.id
+
+    log_activity(
+        int(get_jwt_identity()), 'department_updated',
+        f'Assigned {officer.name} as head of "{dept.department_name}".'
+    )
+    db.session.commit()
+
+    return jsonify(success=True, message="Department head assigned.", department=_serialize_department(dept)), 200
+
+
+@admin_bp.route('/departments/eligible-heads', methods=['GET'])
+@role_required('Admin')
+def eligible_department_heads():
+    """Active officers, for the 'Assign Head' dropdown."""
+    officers = User.query.filter_by(role='Officer', status='active').order_by(User.name.asc()).all()
+    return jsonify(
+        success=True,
+        officers=[
+            {
+                "id": o.id,
+                "name": o.name,
+                "currentDepartment": o.member_department.department_name if o.member_department else None
+            }
+            for o in officers
+        ]
+    ), 200

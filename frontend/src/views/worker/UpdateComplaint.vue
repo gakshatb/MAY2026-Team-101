@@ -1,12 +1,4 @@
 <template>
-  <div class="flex h-screen bg-[#F8FAFC] font-sans text-slate-800 overflow-hidden">
-    
-    <Sidebar userRole="Field Worker" :isOpen="isSidebarOpen" @close-sidebar="isSidebarOpen = false" />
-
-    <div class="flex-1 flex flex-col h-screen overflow-hidden">
-      
-      <DashboardNavbar userRole="Field Worker" pageTitle="Update Complaint" @toggle-sidebar="isSidebarOpen = !isSidebarOpen" />
-
       <main class="flex-1 overflow-x-hidden overflow-y-auto p-4 sm:p-6 lg:p-8 custom-scrollbar">
         <div class="max-w-[1400px] mx-auto space-y-6 animate-fade-in">
           
@@ -327,8 +319,6 @@
           </div>
         </div>
       </main>
-    </div>
-
     <!-- Confirmation Modal -->
     <Teleport to="body">
       <div v-if="showConfirmModal" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-fade-in">
@@ -362,8 +352,6 @@
         </div>
       </div>
     </Teleport>
-
-  </div>
 </template>
 
 <script setup>

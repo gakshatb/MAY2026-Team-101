@@ -1,12 +1,4 @@
 <template>
-  <div class="flex h-screen bg-[#F8FAFC] font-sans text-slate-800 overflow-hidden">
-    
-    <Sidebar userRole="Civic Officer" :isOpen="isSidebarOpen" @close-sidebar="isSidebarOpen = false" />
-
-    <div class="flex-1 flex flex-col h-screen overflow-hidden">
-      
-      <DashboardNavbar userRole="Civic Officer" pageTitle="Analytics & Reports" @toggle-sidebar="isSidebarOpen = !isSidebarOpen" />
-
       <main class="flex-1 overflow-x-hidden overflow-y-auto p-4 sm:p-6 lg:p-8">
         <div class="max-w-[1600px] mx-auto space-y-6">
           
@@ -354,11 +346,8 @@
               </div>
             </div>
           </div>
-
         </div>
       </main>
-    </div>
-  </div>
 </template>
 
 <script setup>

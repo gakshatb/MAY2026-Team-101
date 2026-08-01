@@ -1,14 +1,4 @@
 <template>
-  <div class="flex h-screen bg-[#F8FAFC] font-sans text-slate-800 overflow-hidden">
-    
-    <!-- Sidebar Placeholder: Assumes your standard Sidebar component -->
-    <Sidebar userRole="Civic Officer" :isOpen="isSidebarOpen" @close-sidebar="isSidebarOpen = false" />
-
-    <div class="flex-1 flex flex-col h-screen overflow-hidden">
-      
-      <!-- Navbar Placeholder: Assumes your standard Navbar component -->
-      <DashboardNavbar userRole="Civic Officer" pageTitle="Complaint Management" @toggle-sidebar="isSidebarOpen = !isSidebarOpen" />
-
       <main class="flex-1 overflow-x-hidden overflow-y-auto p-4 sm:p-6 lg:p-8">
         <div class="max-w-[1400px] mx-auto space-y-6">
           
@@ -205,7 +195,6 @@
 
         </div>
       </main>
-    </div>
 
     <!-- Side Drawer: Complaint Details -->
     <div v-if="activeDrawer" class="fixed inset-0 z-40 bg-slate-900/20 backdrop-blur-sm flex justify-end" @click="activeDrawer = false">
@@ -339,7 +328,6 @@
       </div>
     </Teleport>
 
-  </div>
 </template>
 
 <script setup>

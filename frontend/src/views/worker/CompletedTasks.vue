@@ -1,12 +1,4 @@
 <template>
-  <div class="flex h-screen bg-[#F8FAFC] font-sans text-slate-800 overflow-hidden">
-    
-    <Sidebar userRole="Field Worker" :isOpen="isSidebarOpen" @close-sidebar="isSidebarOpen = false" />
-
-    <div class="flex-1 flex flex-col h-screen overflow-hidden">
-      
-      <DashboardNavbar userRole="Field Worker" pageTitle="Completed Tasks" @toggle-sidebar="isSidebarOpen = !isSidebarOpen" />
-
       <main class="flex-1 overflow-x-hidden overflow-y-auto p-4 sm:p-6 lg:p-8 custom-scrollbar">
         <div class="max-w-[1600px] mx-auto space-y-6 animate-fade-in">
           
@@ -239,8 +231,6 @@
           </div>
         </div>
       </main>
-    </div>
-
     <!-- Task Details Drawer -->
     <Teleport to="body">
       <div v-if="drawerOpen && activeTask" class="fixed inset-0 z-50 bg-slate-900/40 backdrop-blur-sm flex justify-end animate-fade-in" @click="closeDrawer">
@@ -374,8 +364,6 @@
         <img :src="previewImage" class="max-w-full max-h-[90vh] object-contain rounded-lg shadow-2xl" @click.stop />
       </div>
     </Teleport>
-
-  </div>
 </template>
 
 <script setup>
