@@ -7,7 +7,7 @@ from flask import Blueprint, current_app, jsonify, request # type: ignore
 from flask_jwt_extended import get_jwt_identity # type: ignore
 from werkzeug.utils import secure_filename # type: ignore
 
-from models import db, User, Complaint, StatusLog, ComplaintImages, Feedback, Notification, ActivityLog
+from models import db, User, Complaint, StatusLog, ComplaintImages, Feedback, Notification, ActivityLog, now_ist
 from api_auth_utils import log_activity, role_required
 
 citizen_bp = Blueprint('citizen', __name__, url_prefix='/api/citizen')
@@ -400,7 +400,7 @@ def get_feedback(complaint_id):
         success=True,
         feedback={
             "rating":          fb.rating,
-            "service_ratings": json.loads(fb.service_ratings) if fb.service_ratings else [],
+            "service_ratings": json.loads(fb.service_ratings) if fb.service_ratings else {},
             "categories":      json.loads(fb.categories) if fb.categories else [],
             "comment":         fb.comments,
             "improvement":     fb.improvement,
@@ -755,7 +755,7 @@ def dashboard():
     # Complaints that have sat open (not resolved/closed) for more than 7 days —
     # surfaced on the dashboard so citizens can spot stalled issues.
     OPEN_STATUSES = ['Pending', 'Under Review', 'Assigned', 'In Progress']
-    aging_cutoff = datetime.utcnow() - timedelta(days=7)
+    aging_cutoff = now_ist() - timedelta(days=7)
     aging_open_count = base.filter(
         Complaint.status.in_(OPEN_STATUSES),
         Complaint.created_at < aging_cutoff
@@ -769,7 +769,7 @@ def dashboard():
         .first()
     )
 
-    now = datetime.utcnow()
+    now = now_ist()
     month_keys = []
     y, m = now.year, now.month
     for _ in range(6):

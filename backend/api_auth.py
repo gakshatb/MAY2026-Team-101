@@ -1,14 +1,14 @@
-from datetime import datetime, timedelta
+from datetime import timedelta
 import secrets
 
 from flask import Blueprint, current_app, jsonify, request # type: ignore
 from werkzeug.security import check_password_hash, generate_password_hash # type: ignore
 from flask_jwt_extended import ( # type: ignore
-    create_access_token, create_refresh_token,
+    create_access_token, create_refresh_token, decode_token,
     get_jwt, get_jwt_identity, jwt_required
 )
 
-from models import db, User
+from models import db, User, now_ist
 
 from api_auth_utils import (
     VALID_ROLES, blocklist, is_valid_email, is_valid_phone, log_activity, token_not_revoked
@@ -66,6 +66,10 @@ def register():
         return jsonify(message="This email is already registered."), 409
 
     # ── create user ──────────────────────────────────────────────────
+    # Citizens are usable immediately. Officer/Worker accounts need an
+    # admin to approve them (see api_admin.py) before they can log in.
+    initial_status = 'active' if role == 'Citizen' else 'pending'
+
     new_user = User(
         name=name,
         email=email,
@@ -77,7 +81,7 @@ def register():
         pincode=pincode,
         gender=data.get("gender", "").strip() or None,
         role=role,
-        status='active'
+        status=initial_status
     )
     db.session.add(new_user)
     db.session.flush()   # get new_user.id before we log against it
@@ -85,10 +89,12 @@ def register():
     log_activity(new_user.id, 'register', f'Account created as {role}.')
     db.session.commit()
 
-    return jsonify(
-        success=True,
-        message="Registration successful. You can now log in."
-    ), 201
+    message = (
+        "Registration successful. You can now log in."
+        if initial_status == 'active'
+        else "Registration successful. Your account is pending admin approval before you can log in."
+    )
+    return jsonify(success=True, message=message), 201
 
 
 # ─────────────────────────────────────────────────────────────────────────
@@ -111,6 +117,8 @@ def login():
     if not user or not check_password_hash(user.password, password):
         return jsonify(message="Invalid email or password."), 401
 
+    if user.status == 'pending':
+        return jsonify(message="Your account is pending admin approval."), 403
     if user.status != 'active':
         return jsonify(message="Your account has been disabled. Contact support."), 403
 
@@ -143,6 +151,15 @@ def logout():
     jti = get_jwt()["jti"]
     blocklist.add(jti)
 
+    data = request.get_json(silent=True) or {}
+    refresh_token = data.get("refresh_token")
+    if refresh_token:
+        try:
+            refresh_jti = decode_token(refresh_token)["jti"]
+            blocklist.add(refresh_jti)
+        except Exception:
+            pass
+
     log_activity(int(get_jwt_identity()), 'logout', 'Logged out.')
     db.session.commit()
 
@@ -155,6 +172,10 @@ def logout():
 @auth_bp.route('/refresh', methods=['POST'])
 @jwt_required(refresh=True)
 def refresh():
+    jti = get_jwt()["jti"]
+    if jti in blocklist:
+        return jsonify(message="Token has been revoked. Please log in again."), 401
+
     user_id = get_jwt_identity()
     user = User.query.get(int(user_id))
     if not user or user.status != 'active':
@@ -219,7 +240,7 @@ def forgot_password():
     otp = str(secrets.randbelow(900000) + 100000)   # 100000–999999
     otp_store[email] = {
         "otp":        otp,
-        "expires_at": datetime.utcnow() + timedelta(minutes=10)
+        "expires_at": now_ist() + timedelta(minutes=10)
     }
 
     log_activity(user.id, 'password_reset_requested', 'Requested a password reset OTP.')
@@ -257,7 +278,7 @@ def reset_password():
     if not record:
         return jsonify(message="No OTP request found for this email."), 400
 
-    if datetime.utcnow() > record["expires_at"]:
+    if now_ist() > record["expires_at"]:
         otp_store.pop(email, None)
         return jsonify(message="OTP has expired. Please request a new one."), 400
 

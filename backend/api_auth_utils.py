@@ -27,6 +27,14 @@ ACTIVITY_TYPES = {
     'profile_photo_removed',
     'complaint_submitted',
     'feedback_submitted',
+    'officer_approved',
+    'officer_rejected',
+    'officer_suspended',
+    'officer_reactivated',
+    'officer_updated',
+    'department_created',
+    'department_updated',
+    'department_deleted',
 }
 
 

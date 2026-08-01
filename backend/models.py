@@ -1,8 +1,14 @@
-from datetime import datetime
+from datetime import datetime, timezone, timedelta
 from flask_sqlalchemy import SQLAlchemy # type: ignore
 from werkzeug.security import generate_password_hash # type: ignore
 
 db = SQLAlchemy()
+
+IST = timezone(timedelta(hours=5, minutes=30))
+
+def now_ist():
+    """Current time in IST, returned as a naive datetime."""
+    return datetime.now(IST).replace(tzinfo=None)
 
 class User(db.Model):
     __tablename__ = 'users'
@@ -19,11 +25,19 @@ class User(db.Model):
     gender     = db.Column(db.String(20),  nullable=True)
     profile_photo = db.Column(db.String(500), nullable=True)
     role       = db.Column(db.String(20),  nullable=False)          # citizen | officer | worker
-    status     = db.Column(db.String(20),  nullable=False, default='active')
-    created_at = db.Column(db.DateTime,    nullable=False, default=datetime.utcnow)  # FIX: was datetime.now (local time + missing parens)
+    status     = db.Column(db.String(20),  nullable=False, default='active')  # active | pending | suspended
+    department_id = db.Column(db.Integer,  db.ForeignKey('departments.id'), nullable=True)  # Officer/Worker's assigned department
+    created_at = db.Column(db.DateTime,    nullable=False, default=now_ist)
 
+    member_department = db.relationship(
+        'Department',
+        foreign_keys=[department_id],
+        backref='members',
+        lazy=True
+    )
     department = db.relationship(
         'Department',
+        foreign_keys='Department.user_id',
         backref='head_officer',
         uselist=False,
         lazy=True
@@ -61,9 +75,11 @@ class Department(db.Model):
     __tablename__ = 'departments'
 
     id              = db.Column(db.Integer, primary_key=True, autoincrement=True)
-    user_id         = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=True)
-    department_name = db.Column(db.String(100), nullable=False)
-    created_at      = db.Column(db.DateTime,    nullable=False, default=datetime.utcnow)
+    user_id         = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=True)   # head officer
+    department_name = db.Column(db.String(100), nullable=False, unique=True)
+    description     = db.Column(db.String(500), nullable=True)
+    status          = db.Column(db.String(20),  nullable=False, default='Active')   # Active | Inactive
+    created_at      = db.Column(db.DateTime,    nullable=False, default=now_ist)
 
     def __repr__(self):
         return f'<Department id={self.id} name={self.department_name}>'
@@ -91,8 +107,8 @@ class Complaint(db.Model):
     assigned_officer = db.Column(db.Integer,     db.ForeignKey('users.id'), nullable=True)
     status           = db.Column(db.String(50),  nullable=False, default='Pending')
     is_escalated     = db.Column(db.Boolean,     nullable=False, default=False)
-    updated_at       = db.Column(db.DateTime,    nullable=True,  onupdate=datetime.utcnow)
-    created_at       = db.Column(db.DateTime,    nullable=False, default=datetime.utcnow)
+    updated_at       = db.Column(db.DateTime,    nullable=True,  onupdate=now_ist)
+    created_at       = db.Column(db.DateTime,    nullable=False, default=now_ist)
 
     status_logs   = db.relationship('StatusLog',      backref='complaint', lazy=True, cascade='all, delete-orphan')
     images        = db.relationship('ComplaintImages', backref='complaint', lazy=True, cascade='all, delete-orphan')
@@ -112,7 +128,7 @@ class StatusLog(db.Model):
     old_status   = db.Column(db.String(50),  nullable=True)
     new_status   = db.Column(db.String(50),  nullable=False)
     remark       = db.Column(db.String(500), nullable=True)
-    changed_at   = db.Column(db.DateTime,    nullable=False, default=datetime.utcnow)
+    changed_at   = db.Column(db.DateTime,    nullable=False, default=now_ist)
 
     def __repr__(self):
         return f'<StatusLog id={self.id} {self.old_status}→{self.new_status}>'
@@ -124,7 +140,7 @@ class ComplaintImages(db.Model):
     id           = db.Column(db.Integer,     primary_key=True, autoincrement=True)
     complaint_id = db.Column(db.Integer,     db.ForeignKey('complaints.id'), nullable=False)
     image_url    = db.Column(db.String(500), nullable=False)
-    uploaded_at  = db.Column(db.DateTime,    nullable=False, default=datetime.utcnow)
+    uploaded_at  = db.Column(db.DateTime,    nullable=False, default=now_ist)
 
     def __repr__(self):
         return f'<ComplaintImages id={self.id} complaint_id={self.complaint_id}>'
@@ -142,7 +158,7 @@ class Feedback(db.Model):
     improvement      = db.Column(db.Text,          nullable=True)
     would_recommend  = db.Column(db.String(10),    nullable=True)               # 'Yes' | 'No' | 'Maybe'
     is_anonymous     = db.Column(db.Boolean,       nullable=False, default=False)
-    submitted_at     = db.Column(db.DateTime,      nullable=False, default=datetime.utcnow)
+    submitted_at     = db.Column(db.DateTime,      nullable=False, default=now_ist)
 
     def __repr__(self):
         return f'<Feedback id={self.id} complaint_id={self.complaint_id} rating={self.rating}>'
@@ -158,7 +174,7 @@ class Notification(db.Model):
     message      = db.Column(db.String(500), nullable=False)
     type         = db.Column(db.String(30),  nullable=False, default='info')  # submitted|verified|assigned|resolved|system
     is_read      = db.Column(db.Boolean,     nullable=False, default=False)
-    created_at   = db.Column(db.DateTime,    nullable=False, default=datetime.utcnow)
+    created_at   = db.Column(db.DateTime,    nullable=False, default=now_ist)
 
     user = db.relationship('User', backref='notifications', lazy=True)
 
@@ -173,7 +189,7 @@ class Assignment(db.Model):
     complaint_id = db.Column(db.Integer,  db.ForeignKey('complaints.id'), nullable=False)
     worker_id    = db.Column(db.Integer,  db.ForeignKey('users.id'),      nullable=False)
     assigned_by  = db.Column(db.Integer,  db.ForeignKey('users.id'),      nullable=False)
-    assigned_at  = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
+    assigned_at  = db.Column(db.DateTime, nullable=False, default=now_ist)
 
     def __repr__(self):
         return f'<Assignment id={self.id} complaint_id={self.complaint_id} worker_id={self.worker_id}>'
@@ -191,7 +207,7 @@ class ActivityLog(db.Model):
     activity_type = db.Column(db.String(50),  nullable=False)   # see ACTIVITY_TYPES in api_auth_utils.py
     description   = db.Column(db.String(255), nullable=False)   # human-readable, ready to show in UI
     ip_address    = db.Column(db.String(45),  nullable=True)    # supports IPv6
-    created_at    = db.Column(db.DateTime,    nullable=False, default=datetime.utcnow)
+    created_at    = db.Column(db.DateTime,    nullable=False, default=now_ist)
 
     user      = db.relationship('User', backref=db.backref('activity_logs', lazy=True, cascade='all, delete-orphan'))
     complaint = db.relationship('Complaint', backref=db.backref('activity_logs', lazy=True))
@@ -214,7 +230,7 @@ class ContactMessage(db.Model):
     subject    = db.Column(db.String(255), nullable=False, default='General Inquiry')
     message    = db.Column(db.Text,        nullable=False)
     is_read    = db.Column(db.Boolean,     nullable=False, default=False)
-    created_at = db.Column(db.DateTime,    nullable=False, default=datetime.utcnow)
+    created_at = db.Column(db.DateTime,    nullable=False, default=now_ist)
 
     def __repr__(self):
         return f'<ContactMessage id={self.name} email={self.email} subject={self.subject!r} message={self.message!r}>'
