@@ -47,7 +47,12 @@ const currentUser = ref(readUser())
 
 function readUser() {
   const stored = localStorage.getItem('user')
-  return stored ? JSON.parse(stored) : null
+  if (!stored) return null
+  try {
+    return JSON.parse(stored)
+  } catch (err) {
+    return null
+  }
 }
 
 function syncUser() {

@@ -4,7 +4,7 @@ from urllib.parse import quote
 from flask import Blueprint, jsonify, request # type: ignore
 from flask_jwt_extended import get_jwt_identity # type: ignore
 
-from models import db, User, Complaint, Department, ActivityLog, Feedback, now_ist
+from models import db, User, Complaint, Department, ActivityLog, Feedback, Assignment, now_ist
 from api_auth_utils import log_activity, role_required
 
 admin_bp = Blueprint('admin', __name__, url_prefix='/api/admin')
@@ -864,3 +864,292 @@ def transfer_officer(officer_id):
         message=f'{officer.name} transferred to {new_dept.department_name}.',
         officer=_serialize_officer(officer)
     ), 200
+
+
+# ─────────────────────────────────────────────────────────────────────────
+# Single-officer detail — powers OfficerDetails.vue
+# ─────────────────────────────────────────────────────────────────────────
+@admin_bp.route('/officers/<int:officer_id>', methods=['GET'])
+@role_required('Admin')
+def officer_details(officer_id):
+    officer = User.query.get(officer_id)
+    if not officer or officer.role != 'Officer':
+        return jsonify(message="Officer not found."), 404
+
+    resolved, pending, avg_time_label, citizen_rating = _officer_complaint_stats(officer.id)
+    total = resolved + pending
+    score = round((resolved / total) * 100) if total else 0
+
+    assigned_complaints = Complaint.query.filter_by(assigned_officer=officer.id).all()
+
+    dept_rank = None
+    if officer.department_id:
+        dept_officers = User.query.filter_by(role='Officer', department_id=officer.department_id).all()
+        scored = []
+        for o in dept_officers:
+            r, p, _, _ = _officer_complaint_stats(o.id)
+            t = r + p
+            scored.append((o.id, round((r / t) * 100) if t else 0))
+        scored.sort(key=lambda x: x[1], reverse=True)
+        for i, (oid, _) in enumerate(scored, start=1):
+            if oid == officer.id:
+                dept_rank = i
+                break
+
+    status_breakdown = {}
+    for c in assigned_complaints:
+        status_breakdown[c.status] = status_breakdown.get(c.status, 0) + 1
+
+    monthly_trend = []
+    today = now_ist().date()
+    for i in range(5, -1, -1):
+        y, m = today.year, today.month
+        m -= i
+        while m <= 0:
+            m += 12
+            y -= 1
+        month_start_d = datetime(y, m, 1)
+        next_m, next_y = (m + 1, y) if m < 12 else (1, y + 1)
+        month_end_d = datetime(next_y, next_m, 1)
+
+        month_complaints = [c for c in assigned_complaints
+                             if c.created_at and month_start_d <= c.created_at < month_end_d]
+        month_resolved = [c for c in month_complaints if c.status in ('Resolved', 'Closed')]
+        rate = round((len(month_resolved) / len(month_complaints)) * 100) if month_complaints else 0
+        monthly_trend.append({
+            "month": month_start_d.strftime('%b'),
+            "managed": len(month_complaints),
+            "resolution_rate": rate,
+        })
+
+    worker_summary = {"total": 0, "active": 0, "pending": 0, "completed": 0}
+    if officer.department_id:
+        dept_workers = User.query.filter_by(role='Worker', department_id=officer.department_id).all()
+        worker_summary["total"] = len(dept_workers)
+        worker_summary["active"] = sum(1 for w in dept_workers if w.status == 'active')
+        worker_summary["pending"] = sum(1 for w in dept_workers if w.status == 'pending')
+        worker_summary["completed"] = (
+            db.session.query(Assignment)
+            .join(Complaint, Assignment.complaint_id == Complaint.id)
+            .filter(Assignment.assigned_by == officer.id, Complaint.status.in_(['Resolved', 'Closed']))
+            .count()
+        )
+
+    quick_insights = {"best_month": None, "fastest_resolution": None}
+    if monthly_trend:
+        best = max(monthly_trend, key=lambda m: m["managed"])
+        if best["managed"] > 0:
+            quick_insights["best_month"] = best["month"]
+    resolved_rows = [c for c in assigned_complaints if c.status in ('Resolved', 'Closed') and c.updated_at]
+    if resolved_rows:
+        fastest = min(resolved_rows, key=lambda c: c.updated_at - c.created_at)
+        delta = fastest.updated_at - fastest.created_at
+        hours = delta.total_seconds() / 3600
+        if hours < 24:
+            quick_insights["fastest_resolution"] = f"{int(hours)}h {int((hours % 1) * 60)}m ({fastest.category})"
+        else:
+            quick_insights["fastest_resolution"] = f"{int(hours // 24)}d {int(hours % 24)}h ({fastest.category})"
+
+    recent = sorted(assigned_complaints, key=lambda c: c.created_at, reverse=True)[:6]
+    recent_complaints = []
+    for c in recent:
+        assignment = Assignment.query.filter_by(complaint_id=c.id).order_by(Assignment.assigned_at.desc()).first()
+        worker = User.query.get(assignment.worker_id) if assignment else None
+        recent_complaints.append({
+            "id": f"CMP-{c.id:05d}",
+            "category": c.category,
+            "priority": c.priority,
+            "status": c.status,
+            "worker": worker.name if worker else None,
+        })
+
+    fb_rows = (
+        Feedback.query.join(Complaint, Feedback.complaint_id == Complaint.id)
+        .filter(Complaint.assigned_officer == officer.id)
+        .order_by(Feedback.submitted_at.desc())
+        .all()
+    )
+    avg_rating = round(sum(f.rating for f in fb_rows) / len(fb_rows), 1) if fb_rows else None
+    recent_feedback = []
+    for f in fb_rows[:4]:
+        complaint = Complaint.query.get(f.complaint_id)
+        citizen = User.query.get(complaint.created_by) if complaint else None
+        recent_feedback.append({
+            "name": "Anonymous" if f.is_anonymous else (citizen.name if citizen else "Citizen"),
+            "date": f.submitted_at.strftime('%b %d, %Y') if f.submitted_at else None,
+            "comment": f.comments,
+        })
+
+    last_login_row = (
+        ActivityLog.query.filter_by(user_id=officer.id, activity_type='login')
+        .order_by(ActivityLog.created_at.desc())
+        .first()
+    )
+    last_login = None
+    if last_login_row:
+        last_login = {
+            "at": last_login_row.created_at.strftime('%b %d, %Y - %I:%M %p'),
+            "ip": last_login_row.ip_address,
+        }
+
+    admin_rows = (
+        ActivityLog.query.filter(
+            ActivityLog.activity_type.in_([
+                'officer_approved', 'officer_rejected', 'officer_suspended',
+                'officer_reactivated', 'officer_updated', 'officer_transferred',
+            ]),
+            ActivityLog.description.contains(officer.name),
+        )
+        .order_by(ActivityLog.created_at.desc())
+        .limit(10)
+        .all()
+    )
+    admin_activities = []
+    for a in admin_rows:
+        admin_user = User.query.get(a.user_id)
+        admin_activities.append({
+            "id": a.id,
+            "action": a.activity_type.replace('_', ' ').title(),
+            "description": a.description,
+            "date": a.created_at.strftime('%b %d, %Y - %I:%M %p'),
+            "admin": admin_user.name if admin_user else 'System',
+        })
+
+    dept = officer.member_department
+    dept_head = None
+    if dept and dept.user_id:
+        head_user = User.query.get(dept.user_id)
+        dept_head = head_user.name if head_user else None
+
+    return jsonify(
+        officer={
+            "id":           officer.id,
+            "empId":        f"OFC-{officer.id:04d}",
+            "name":         officer.name,
+            "designation":  officer.designation,
+            "department":   dept.department_name if dept else None,
+            "departmentId": officer.department_id,
+            "email":        officer.email,
+            "phone":        officer.phone,
+            "gender":       officer.gender,
+            "address":      officer.address,
+            "city":         officer.city,
+            "state":        officer.state,
+            "pincode":      officer.pincode,
+            "joined":       officer.created_at.strftime('%b %d, %Y') if officer.created_at else None,
+            "experience":   _experience_label(officer.created_at),
+            "status":       officer.status.capitalize(),
+            "avatar":       _avatar_url(officer),
+        },
+        top_stats={
+            "total_managed": total,
+            "resolved":      resolved,
+            "pending":       pending,
+            "avg_time":      avg_time_label,
+            "satisfaction":  citizen_rating,
+            "dept_rank":     dept_rank,
+        },
+        department={
+            "name":   dept.department_name if dept else None,
+            "code":   dept.code if dept else None,
+            "status": dept.status if dept else None,
+            "head":   dept_head,
+            "since":  dept.created_at.strftime('%b %Y') if dept and dept.created_at else None,
+        },
+        complaint_status_breakdown=status_breakdown,
+        monthly_trend=monthly_trend,
+        performance={
+            "resolution_rate": score,
+            "citizen_satisfaction_pct": round(citizen_rating * 20) if citizen_rating is not None else None,
+        },
+        worker_summary=worker_summary,
+        quick_insights=quick_insights,
+        recent_complaints=recent_complaints,
+        feedback={
+            "avg_rating": avg_rating,
+            "total_reviews": len(fb_rows),
+            "recent": recent_feedback,
+        },
+        last_login=last_login,
+        admin_activities=admin_activities,
+    ), 200
+
+
+# ─────────────────────────────────────────────────────────────────────────
+# System-wide notification feed — powers admin Notifications.vue
+# ─────────────────────────────────────────────────────────────────────────
+_NOTIFICATION_CATEGORY_MAP = {
+    'officer_approved':    'approvals',
+    'officer_rejected':    'suspensions',
+    'officer_suspended':   'suspensions',
+    'officer_reactivated': 'suspensions',
+    'department_created':  'departments',
+    'department_updated':  'departments',
+    'department_deleted':  'departments',
+}
+
+_NOTIFICATION_TITLES = {
+    'officer_approved':    'Officer Approved',
+    'officer_rejected':    'Officer Rejected',
+    'officer_suspended':   'Officer Suspended',
+    'officer_reactivated': 'Officer Reactivated',
+    'department_created':  'Department Created',
+    'department_updated':  'Department Updated',
+    'department_deleted':  'Department Deleted',
+}
+
+
+@admin_bp.route('/notifications', methods=['GET'])
+@role_required('Admin')
+def admin_notifications():
+    """.... Returns a list of recent notifications for the admin dashboard, including
+    officer approvals, suspensions, department changes, and escalated complaints."""
+    log_rows = (
+        db.session.query(ActivityLog, User)
+        .join(User, ActivityLog.user_id == User.id)
+        .filter(ActivityLog.activity_type.in_(_NOTIFICATION_CATEGORY_MAP.keys()))
+        .order_by(ActivityLog.created_at.desc())
+        .limit(100)
+        .all()
+    )
+
+    items = []
+    for log, actor in log_rows:
+        items.append({
+            "id":           f"log-{log.id}",
+            "category":     _NOTIFICATION_CATEGORY_MAP[log.activity_type],
+            "title":        _NOTIFICATION_TITLES[log.activity_type],
+            "message":      log.description,
+            "admin":        actor.name,
+            "complaint_id": None,
+            "created_at":   log.created_at.isoformat() if log.created_at else None,
+        })
+
+    escalated = (
+        Complaint.query.filter_by(is_escalated=True).all()
+    )
+    escalated.sort(key=lambda c: c.updated_at or c.created_at, reverse=True)
+    escalated = escalated[:50]
+    for c in escalated:
+        when = c.updated_at or c.created_at
+        items.append({
+            "id":           f"esc-{c.id}",
+            "category":     "escalations",
+            "title":        "Complaint Escalated",
+            "message":      f"{c.category} complaint escalated in {c.location}.",
+            "admin":        None,
+            "complaint_id": f"CMP-{c.id:05d}",
+            "created_at":   when.isoformat() if when else None,
+        })
+
+    items.sort(key=lambda n: n["created_at"] or "", reverse=True)
+
+    summary = {
+        "total":       len(items),
+        "approvals":   sum(1 for n in items if n["category"] == "approvals"),
+        "suspensions": sum(1 for n in items if n["category"] == "suspensions"),
+        "departments": sum(1 for n in items if n["category"] == "departments"),
+        "escalations": sum(1 for n in items if n["category"] == "escalations"),
+    }
+
+    return jsonify(success=True, notifications=items, summary=summary), 200

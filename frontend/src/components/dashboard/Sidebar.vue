@@ -120,6 +120,7 @@ const menuItems = computed(() => {
         { name: 'System Analytics', icon: BarChart3, route: '/admin/systemanalytics' },
         { name: 'Announcements', icon: Megaphone, route: '/admin/announcements' },
         { name: 'Activity Logs', icon: Activity, route: '/admin/activitylogs' },
+        { name: 'Notifications', icon: Bell, route: '/admin/notifications' }
       ]
       
     case 'Officer':

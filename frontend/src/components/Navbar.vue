@@ -63,7 +63,7 @@
           <div class="relative">
             <button @click="toggleProfileDropdown"
               class="flex items-center justify-center w-10 h-10 rounded-full bg-slate-100 border border-slate-200 hover:border-[#2563EB] transition-colors focus:outline-none focus:ring-2 focus:ring-[#2563EB]"
-              aria-label="User Menu" aria-expanded="isProfileDropdownOpen">
+              aria-label="User Menu" :aria-expanded="isProfileDropdownOpen">
               <User class="w-5 h-5 text-slate-600" />
             </button>
 
@@ -178,7 +178,11 @@ const checkAuthState = () => {
   const token = localStorage.getItem('token')
   const storedUser = localStorage.getItem('user')
   isLoggedIn.value = !!token
-  currentUser.value = storedUser ? JSON.parse(storedUser) : null
+  try {
+    currentUser.value = storedUser ? JSON.parse(storedUser) : null
+  } catch (err) {
+    currentUser.value = null
+  }
 }
 
 const rolePrefix = computed(() => {

@@ -43,8 +43,8 @@
           <ul class="space-y-4 text-sm">
             <li><router-link to="/login" class="hover:text-[#2563EB] transition-colors relative group">Login<span class="absolute -bottom-1 left-0 w-0 h-[1px] bg-[#2563EB] transition-all group-hover:w-full"></span></router-link></li>
             <li><router-link to="/register" class="hover:text-[#2563EB] transition-colors relative group">Register<span class="absolute -bottom-1 left-0 w-0 h-[1px] bg-[#2563EB] transition-all group-hover:w-full"></span></router-link></li>
-            <li><router-link to="/report" class="hover:text-[#2563EB] transition-colors relative group">Report Complaint<span class="absolute -bottom-1 left-0 w-0 h-[1px] bg-[#2563EB] transition-all group-hover:w-full"></span></router-link></li>
-            <li><router-link to="/track" class="hover:text-[#2563EB] transition-colors relative group">Track Complaint<span class="absolute -bottom-1 left-0 w-0 h-[1px] bg-[#2563EB] transition-all group-hover:w-full"></span></router-link></li>
+            <li><router-link to="/citizen/submit" class="hover:text-[#2563EB] transition-colors relative group">Report Complaint<span class="absolute -bottom-1 left-0 w-0 h-[1px] bg-[#2563EB] transition-all group-hover:w-full"></span></router-link></li>
+            <li><router-link to="/citizen/track" class="hover:text-[#2563EB] transition-colors relative group">Track Complaint<span class="absolute -bottom-1 left-0 w-0 h-[1px] bg-[#2563EB] transition-all group-hover:w-full"></span></router-link></li>
           </ul>
         </div>
 

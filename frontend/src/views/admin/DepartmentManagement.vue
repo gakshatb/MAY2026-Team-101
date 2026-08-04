@@ -25,6 +25,9 @@
           </div>
         </header>
 
+        <p v-if="isLoading" class="mb-4 text-sm text-gray-500">Loading departments...</p>
+        <p v-else-if="errorMessage && !activeModal" class="mb-4 text-sm text-red-600 bg-red-50 border border-red-100 rounded-lg px-4 py-2">{{ errorMessage }}</p>
+
         <!-- Top Statistics Grid -->
         <section class="mb-8 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4">
           <div v-for="(stat, index) in topStats" :key="index" class="bg-white p-5 rounded-[14px] shadow-sm hover:shadow-md transition-shadow border border-gray-50 flex flex-col group">
@@ -378,19 +381,20 @@
       <!-- 1. Add/Edit Department Modal -->
       <div v-if="activeModal === 'add' || activeModal === 'edit'" class="relative bg-white rounded-2xl shadow-xl w-full max-w-lg p-6 transform transition-all">
         <h2 class="text-xl font-bold text-gray-900 mb-4">{{ activeModal === 'add' ? 'Create New Department' : 'Edit Department' }}</h2>
-        <form @submit.prevent="closeModal" class="space-y-4">
+        <p v-if="errorMessage" class="mb-3 text-sm text-red-600 bg-red-50 border border-red-100 rounded-lg px-3 py-2">{{ errorMessage }}</p>
+        <form @submit.prevent="saveDepartment" class="space-y-4">
           <div>
             <label class="block text-sm font-medium text-gray-700 mb-1">Department Name</label>
-            <input type="text" class="w-full px-4 py-2 border border-gray-200 rounded-xl focus:ring-2 focus:ring-[#2563EB]/20 focus:border-[#2563EB] outline-none" placeholder="e.g. Garbage Management" />
+            <input v-model="deptForm.name" type="text" required class="w-full px-4 py-2 border border-gray-200 rounded-xl focus:ring-2 focus:ring-[#2563EB]/20 focus:border-[#2563EB] outline-none" placeholder="e.g. Garbage Management" />
           </div>
           <div class="grid grid-cols-2 gap-4">
             <div>
               <label class="block text-sm font-medium text-gray-700 mb-1">Department Code</label>
-              <input type="text" class="w-full px-4 py-2 border border-gray-200 rounded-xl focus:ring-2 focus:ring-[#2563EB]/20 focus:border-[#2563EB] outline-none" placeholder="e.g. DEPT-GM" />
+              <input v-model="deptForm.code" type="text" required class="w-full px-4 py-2 border border-gray-200 rounded-xl focus:ring-2 focus:ring-[#2563EB]/20 focus:border-[#2563EB] outline-none" placeholder="e.g. DEPT-GM" />
             </div>
             <div>
               <label class="block text-sm font-medium text-gray-700 mb-1">Status</label>
-              <select class="w-full px-4 py-2 border border-gray-200 rounded-xl focus:ring-2 focus:ring-[#2563EB]/20 outline-none">
+              <select v-model="deptForm.status" class="w-full px-4 py-2 border border-gray-200 rounded-xl focus:ring-2 focus:ring-[#2563EB]/20 outline-none">
                 <option>Active</option>
                 <option>Inactive</option>
                 <option>Under Maintenance</option>
@@ -399,12 +403,12 @@
           </div>
           <div>
             <label class="block text-sm font-medium text-gray-700 mb-1">Description</label>
-            <textarea rows="3" class="w-full px-4 py-2 border border-gray-200 rounded-xl focus:ring-2 focus:ring-[#2563EB]/20 focus:border-[#2563EB] outline-none custom-scrollbar" placeholder="Brief description of responsibilities..."></textarea>
+            <textarea v-model="deptForm.description" rows="3" class="w-full px-4 py-2 border border-gray-200 rounded-xl focus:ring-2 focus:ring-[#2563EB]/20 focus:border-[#2563EB] outline-none custom-scrollbar" placeholder="Brief description of responsibilities..."></textarea>
           </div>
           <div class="pt-4 flex justify-end gap-3 border-t border-gray-100">
             <button type="button" @click="closeModal" class="px-5 py-2 text-sm font-medium text-gray-600 hover:bg-gray-100 rounded-xl transition-colors">Cancel</button>
-            <button type="submit" class="px-5 py-2 text-sm font-medium text-white bg-[#2563EB] hover:bg-[#1E40AF] rounded-xl transition-colors shadow-sm">
-              {{ activeModal === 'add' ? 'Create Department' : 'Save Changes' }}
+            <button type="submit" :disabled="isSubmitting" class="px-5 py-2 text-sm font-medium text-white bg-[#2563EB] hover:bg-[#1E40AF] rounded-xl transition-colors shadow-sm disabled:opacity-50">
+              {{ isSubmitting ? 'Saving...' : (activeModal === 'add' ? 'Create Department' : 'Save Changes') }}
             </button>
           </div>
         </form>
@@ -413,28 +417,30 @@
       <!-- 2. Assign Head Modal -->
       <div v-if="activeModal === 'assign'" class="relative bg-white rounded-2xl shadow-xl w-full max-w-md p-6 transform transition-all">
         <h2 class="text-xl font-bold text-gray-900 mb-4">Assign Department Head</h2>
-        <form @submit.prevent="closeModal" class="space-y-4">
+        <p v-if="errorMessage" class="mb-3 text-sm text-red-600 bg-red-50 border border-red-100 rounded-lg px-3 py-2">{{ errorMessage }}</p>
+        <form @submit.prevent="assignHead" class="space-y-4">
           <div>
             <label class="block text-sm font-medium text-gray-700 mb-1">Select Department</label>
-            <select class="w-full px-4 py-2 border border-gray-200 rounded-xl focus:ring-2 focus:ring-[#2563EB]/20 outline-none">
-              <option v-for="dept in departments" :key="dept.id">{{ dept.name }}</option>
+            <select v-model="assignForm.departmentId" required class="w-full px-4 py-2 border border-gray-200 rounded-xl focus:ring-2 focus:ring-[#2563EB]/20 outline-none">
+              <option value="" disabled>Choose a department</option>
+              <option v-for="dept in departments" :key="dept.id" :value="dept.id">{{ dept.name }}</option>
             </select>
           </div>
           <div>
             <label class="block text-sm font-medium text-gray-700 mb-1">Select Officer</label>
-            <select class="w-full px-4 py-2 border border-gray-200 rounded-xl focus:ring-2 focus:ring-[#2563EB]/20 outline-none">
-              <option>Anil Sharma (Current Head: Public Health)</option>
-              <option>Priya Desai (Senior Officer)</option>
-              <option>Rahul Verma (Officer)</option>
+            <select v-model="assignForm.officerId" required class="w-full px-4 py-2 border border-gray-200 rounded-xl focus:ring-2 focus:ring-[#2563EB]/20 outline-none">
+              <option value="" disabled>Choose an officer</option>
+              <option v-for="officer in eligibleHeads" :key="officer.id" :value="officer.id">
+                {{ officer.name }}{{ officer.currentDepartment ? ` (Current: ${officer.currentDepartment})` : '' }}
+              </option>
             </select>
-          </div>
-          <div>
-            <label class="block text-sm font-medium text-gray-700 mb-1">Effective Date</label>
-            <input type="date" class="w-full px-4 py-2 border border-gray-200 rounded-xl focus:ring-2 focus:ring-[#2563EB]/20 outline-none" />
+            <p v-if="eligibleHeads.length === 0" class="text-xs text-gray-400 mt-1">No active officers available to assign.</p>
           </div>
           <div class="pt-4 flex justify-end gap-3 border-t border-gray-100">
             <button type="button" @click="closeModal" class="px-5 py-2 text-sm font-medium text-gray-600 hover:bg-gray-100 rounded-xl transition-colors">Cancel</button>
-            <button type="submit" class="px-5 py-2 text-sm font-medium text-white bg-[#2563EB] hover:bg-[#1E40AF] rounded-xl transition-colors shadow-sm">Assign Head</button>
+            <button type="submit" :disabled="isSubmitting" class="px-5 py-2 text-sm font-medium text-white bg-[#2563EB] hover:bg-[#1E40AF] rounded-xl transition-colors shadow-sm disabled:opacity-50">
+              {{ isSubmitting ? 'Assigning...' : 'Assign Head' }}
+            </button>
           </div>
         </form>
       </div>
@@ -450,9 +456,12 @@
           <br/><br/>
           <span class="text-red-500 font-medium bg-red-50 p-2 rounded block text-xs">Warning: Departments with active complaints or assigned officers cannot be deleted.</span>
         </p>
+        <p v-if="errorMessage" class="mb-4 text-sm text-red-600 bg-red-50 border border-red-100 rounded-lg px-3 py-2">{{ errorMessage }}</p>
         <div class="flex justify-center gap-3">
           <button @click="closeModal" class="px-5 py-2 text-sm font-medium text-gray-600 hover:bg-gray-100 rounded-xl transition-colors">Cancel</button>
-          <button @click="closeModal" class="px-5 py-2 text-sm font-medium text-white bg-[#EF4444] hover:bg-red-700 rounded-xl transition-colors shadow-sm">Delete</button>
+          <button @click="confirmDeleteDepartment" :disabled="isSubmitting" class="px-5 py-2 text-sm font-medium text-white bg-[#EF4444] hover:bg-red-700 rounded-xl transition-colors shadow-sm disabled:opacity-50">
+            {{ isSubmitting ? 'Deleting...' : 'Delete' }}
+          </button>
         </div>
       </div>
     </div>
@@ -460,6 +469,7 @@
 
 <script setup>
 import { ref, computed, onMounted } from 'vue';
+import axios from 'axios';
 import Chart from 'chart.js/auto';
 
 // Icons
@@ -469,48 +479,65 @@ import {
   X, Mail, Phone, AlertTriangle, Lightbulb, Activity, CheckCircle
 } from 'lucide-vue-next';
 
+const API_BASE = 'http://127.0.0.1:5000/api/admin';
+const authHeaders = () => ({ headers: { Authorization: `Bearer ${localStorage.getItem('token')}` } });
+
+// Presentation lookup — backend sends {key: value}, we attach icon/color here.
+const STAT_META = {
+  total_departments:            { label: 'Total Departments',   icon: Building2,     colorClass: 'text-[#2563EB] bg-blue-100',    textClass: 'text-[#2563EB]' },
+  active_departments:           { label: 'Active Depts',        icon: CheckCircle,   colorClass: 'text-[#22C55E] bg-green-100',   textClass: 'text-[#22C55E]' },
+  departments_without_officers: { label: 'Depts w/o Officers',  icon: AlertTriangle, colorClass: 'text-[#F59E0B] bg-yellow-100',  textClass: 'text-[#F59E0B]' },
+  active_complaints:            { label: 'Active Complaints',   icon: ClipboardList, colorClass: 'text-[#EF4444] bg-red-100',     textClass: 'text-[#EF4444]' },
+  total_officers:               { label: 'Total Officers',      icon: Users,         colorClass: 'text-[#1E40AF] bg-indigo-100',  textClass: 'text-[#1E40AF]' },
+  avg_resolution:                { label: 'Avg Resolution',      icon: Activity,      colorClass: 'text-purple-600 bg-purple-100', textClass: 'text-purple-600' },
+};
+const STAT_ORDER = ['total_departments', 'active_departments', 'departments_without_officers', 'active_complaints', 'total_officers', 'avg_resolution'];
+
 // Layout State
 const sidebarOpen = ref(false);
 const isDrawerOpen = ref(false);
 const selectedDept = ref(null);
 const activeModal = ref(null);
 const targetDept = ref(null);
+const isLoading = ref(false);
+const isSubmitting = ref(false);
+const errorMessage = ref('');
 
 const currentDate = new Date().toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
 
-// Dummy Data
-const topStats = ref([
-  { label: 'Total Departments', value: '12', icon: Building2, colorClass: 'text-[#2563EB] bg-blue-100', textClass: 'text-[#2563EB]' },
-  { label: 'Active Depts', value: '11', icon: CheckCircle, colorClass: 'text-[#22C55E] bg-green-100', textClass: 'text-[#22C55E]' },
-  { label: 'Depts w/o Officers', value: '0', icon: AlertTriangle, colorClass: 'text-[#F59E0B] bg-yellow-100', textClass: 'text-[#F59E0B]' },
-  { label: 'Active Complaints', value: '2,405', icon: ClipboardList, colorClass: 'text-[#EF4444] bg-red-100', textClass: 'text-[#EF4444]' },
-  { label: 'Total Officers', value: '128', icon: Users, colorClass: 'text-[#1E40AF] bg-indigo-100', textClass: 'text-[#1E40AF]' },
-  { label: 'Avg Resolution', value: '36h', icon: Activity, colorClass: 'text-purple-600 bg-purple-100', textClass: 'text-purple-600' }
-]);
+// Live data — populated from the backend
+const topStats = ref([]);
+const quickInsights = ref([]);
+const departments = ref([]);
+const recentActivities = ref([]);
+const eligibleHeads = ref([]);
 
-const quickInsights = ref([
-  { label: 'Most Active', department: 'Garbage Management', value: '942 Cmp' },
-  { label: 'Fastest Resolution', department: 'Street Lighting', value: '12h' },
-  { label: 'Highest Rating', department: 'Parks & Gardens', value: '4.8/5' },
-  { label: 'High Workload Alert', department: 'Drainage & Sewer', value: '312 Pnd' }
-]);
+const fetchDepartments = async () => {
+  isLoading.value = true;
+  errorMessage.value = '';
+  try {
+    const { data } = await axios.get(`${API_BASE}/departments`, authHeaders());
+    departments.value = data.departments;
+    topStats.value = STAT_ORDER
+      .filter(key => key in data.top_stats)
+      .map(key => ({ ...STAT_META[key], value: data.top_stats[key] }));
+    quickInsights.value = data.quick_insights;
+    recentActivities.value = data.recent_activities;
+  } catch (err) {
+    errorMessage.value = err.response?.data?.message || 'Failed to load departments.';
+  } finally {
+    isLoading.value = false;
+  }
+};
 
-const departments = ref([
-  { id: 1, code: 'DEPT-GM', name: 'Garbage Management', head: 'Ramesh Singh', headEmail: 'ramesh.s@civicdesk.gov', headPhone: '+91 98765 43210', headAvatar: 'https://i.pravatar.cc/150?img=11', officers: 24, workers: 145, pending: 142, resolved: 3260, avgTime: '24h 15m', score: 92, status: 'Active', created: 'Jan 12, 2024' },
-  { id: 2, code: 'DEPT-RM', name: 'Road Maintenance', head: 'Anita Patel', headEmail: 'anita.p@civicdesk.gov', headPhone: '+91 98765 43211', headAvatar: 'https://i.pravatar.cc/150?img=5', officers: 18, workers: 90, pending: 305, resolved: 1800, avgTime: '72h 40m', score: 78, status: 'High Workload', created: 'Feb 05, 2024' },
-  { id: 3, code: 'DEPT-SL', name: 'Street Lighting', head: 'Vikram Joshi', headEmail: 'vikram.j@civicdesk.gov', headPhone: '+91 98765 43212', headAvatar: 'https://i.pravatar.cc/150?img=8', officers: 12, workers: 45, pending: 45, resolved: 1159, avgTime: '12h 10m', score: 98, status: 'Active', created: 'Mar 22, 2024' },
-  { id: 4, code: 'DEPT-WS', name: 'Water Supply', head: 'Priya Desai', headEmail: 'priya.d@civicdesk.gov', headPhone: '+91 98765 43213', headAvatar: 'https://i.pravatar.cc/150?img=9', officers: 20, workers: 85, pending: 85, resolved: 1755, avgTime: '18h 20m', score: 95, status: 'Active', created: 'Apr 10, 2024' },
-  { id: 5, code: 'DEPT-DS', name: 'Drainage & Sewer', head: 'Sanjay Kumar', headEmail: 'sanjay.k@civicdesk.gov', headPhone: '+91 98765 43214', headAvatar: 'https://i.pravatar.cc/150?img=12', officers: 15, workers: 110, pending: 210, resolved: 980, avgTime: '48h 00m', score: 82, status: 'High Workload', created: 'May 01, 2024' },
-  { id: 6, code: 'DEPT-PG', name: 'Parks & Gardens', head: 'Meera Reddy', headEmail: 'meera.r@civicdesk.gov', headPhone: '+91 98765 43215', headAvatar: 'https://i.pravatar.cc/150?img=20', officers: 8, workers: 30, pending: 12, resolved: 420, avgTime: '20h 30m', score: 96, status: 'Active', created: 'Jun 15, 2024' },
-  { id: 7, code: 'DEPT-BM', name: 'Building Maintenance', head: 'Unassigned', headEmail: 'N/A', headPhone: 'N/A', headAvatar: 'https://ui-avatars.com/api/?name=BM&background=random', officers: 0, workers: 0, pending: 0, resolved: 0, avgTime: 'N/A', score: 0, status: 'Inactive', created: 'Jul 09, 2026' }
-]);
-
-const recentActivities = ref([
-  { id: 1, action: 'Department Head Assigned', description: 'Meera Reddy assigned to Parks & Gardens.', date: 'Today, 10:30 AM', admin: 'System Admin' },
-  { id: 2, action: 'Department Created', description: 'Building Maintenance department was added to the system.', date: 'Yesterday, 04:15 PM', admin: 'System Admin' },
-  { id: 3, action: 'Officer Transferred', description: '2 Officers transferred from Roads to Drainage.', date: 'Jul 08, 2026', admin: 'System Admin' },
-  { id: 4, action: 'Status Updated', description: 'Road Maintenance changed to High Workload.', date: 'Jul 05, 2026', admin: 'System Auto' }
-]);
+const fetchEligibleHeads = async () => {
+  try {
+    const { data } = await axios.get(`${API_BASE}/departments/eligible-heads`, authHeaders());
+    eligibleHeads.value = data.officers;
+  } catch (err) {
+    errorMessage.value = err.response?.data?.message || 'Failed to load eligible officers.';
+  }
+};
 
 // Search & Filter State
 const searchQuery = ref('');
@@ -589,35 +616,107 @@ const closeDrawer = () => {
   setTimeout(() => { selectedDept.value = null; }, 300);
 };
 
+// Add/Edit form state
+const deptForm = ref({ name: '', code: '', description: '', status: 'Active' });
+// Assign-head form state
+const assignForm = ref({ departmentId: '', officerId: '' });
+
 const openModal = (type, dept = null) => {
   activeModal.value = type;
-  if(dept) targetDept.value = dept;
+  if (dept) targetDept.value = dept;
+
+  if (type === 'add') {
+    deptForm.value = { name: '', code: '', description: '', status: 'Active' };
+  } else if (type === 'edit' && dept) {
+    deptForm.value = { name: dept.name, code: dept.code, description: dept.description || '', status: dept.rawStatus };
+  } else if (type === 'assign') {
+    assignForm.value = { departmentId: dept ? dept.id : '', officerId: '' };
+    if (eligibleHeads.value.length === 0) fetchEligibleHeads();
+  }
 };
 const closeModal = () => {
   activeModal.value = null;
   targetDept.value = null;
+  errorMessage.value = '';
+};
+
+const saveDepartment = async () => {
+  isSubmitting.value = true;
+  errorMessage.value = '';
+  try {
+    if (activeModal.value === 'add') {
+      await axios.post(`${API_BASE}/departments`, deptForm.value, authHeaders());
+    } else if (activeModal.value === 'edit' && targetDept.value) {
+      await axios.put(`${API_BASE}/departments/${targetDept.value.id}`, deptForm.value, authHeaders());
+    }
+    closeModal();
+    await fetchDepartments();
+  } catch (err) {
+    errorMessage.value = err.response?.data?.message || 'Failed to save department.';
+  } finally {
+    isSubmitting.value = false;
+  }
+};
+
+const confirmDeleteDepartment = async () => {
+  if (!targetDept.value) return;
+  isSubmitting.value = true;
+  errorMessage.value = '';
+  try {
+    await axios.delete(`${API_BASE}/departments/${targetDept.value.id}`, authHeaders());
+    closeModal();
+    await fetchDepartments();
+  } catch (err) {
+    errorMessage.value = err.response?.data?.message || 'Failed to delete department.';
+  } finally {
+    isSubmitting.value = false;
+  }
+};
+
+const assignHead = async () => {
+  if (!assignForm.value.departmentId || !assignForm.value.officerId) {
+    errorMessage.value = 'Select both a department and an officer.';
+    return;
+  }
+  isSubmitting.value = true;
+  errorMessage.value = '';
+  try {
+    await axios.patch(
+      `${API_BASE}/departments/${assignForm.value.departmentId}/assign-head`,
+      { officerId: assignForm.value.officerId },
+      authHeaders()
+    );
+    closeModal();
+    await fetchDepartments();
+  } catch (err) {
+    errorMessage.value = err.response?.data?.message || 'Failed to assign department head.';
+  } finally {
+    isSubmitting.value = false;
+  }
 };
 
 // Charts
 const barChartRef = ref(null);
 const radarChartRef = ref(null);
 
-onMounted(() => {
-  // Bar Chart: Complaints by Dept
+onMounted(async () => {
+  await fetchDepartments();
+
+  // Bar Chart: Complaints by Dept — built from the live department list
   new Chart(barChartRef.value, {
     type: 'bar',
     data: {
-      labels: ['Garbage', 'Roads', 'Lighting', 'Water', 'Drainage', 'Parks'],
+      labels: departments.value.map(d => d.name),
       datasets: [
         {
           label: 'Resolved',
-          data: [3260, 1800, 1159, 1755, 980, 420],
+          data: departments.value.map(d => d.resolved),
           backgroundColor: '#22C55E',
           borderRadius: 4,
         },
         {
           label: 'Pending',
-          data: [142, 305, 45, 85, 210, 12],
+          data: departments.value.map(d => d.pending),
           backgroundColor: '#EF4444',
           borderRadius: 4,
         }
@@ -634,7 +733,9 @@ onMounted(() => {
     }
   });
 
-  // Radar Chart: Performance
+  // Radar Chart: Performance — the backend doesn't expose a Speed/Quality/
+  // Satisfaction/Efficiency/Response breakdown yet, so this stays illustrative
+  // until that endpoint exists. Swap in real data once it's available.
   new Chart(radarChartRef.value, {
     type: 'radar',
     data: {

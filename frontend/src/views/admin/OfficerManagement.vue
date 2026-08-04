@@ -25,6 +25,16 @@
           </div>
         </header>
 
+        <!-- Error banner -->
+        <div v-if="errorMessage" class="mb-6 p-4 bg-red-50 border border-red-200 rounded-xl text-red-700 text-sm flex items-center justify-between">
+          <span>{{ errorMessage }}</span>
+          <button @click="fetchOfficers" class="font-semibold underline shrink-0 ml-4">Retry</button>
+        </div>
+
+        <!-- Loading state -->
+        <div v-if="isLoading" class="mb-8 text-center text-gray-400 py-10">Loading officers…</div>
+
+        <template v-else>
         <!-- Top Statistics Grid -->
         <section class="mb-8 grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-4">
           <div v-for="(stat, index) in topStats" :key="index" class="bg-white p-5 rounded-[14px] shadow-sm border border-gray-50 flex flex-col group hover:border-gray-200 hover:shadow-md transition-all">
@@ -275,13 +285,13 @@
                   <div class="w-10 h-10 rounded-full bg-blue-50 text-[#2563EB] flex items-center justify-center font-bold">{{ app.name.charAt(0) }}</div>
                   <div class="flex-1">
                     <h4 class="font-bold text-gray-900 text-sm">{{ app.name }}</h4>
-                    <p class="text-xs text-gray-500">{{ app.requestedDept }} • {{ app.exp }} Exp</p>
+                    <p class="text-xs text-gray-500">{{ app.requestedDept || 'Unassigned' }}</p>
                   </div>
                   <span class="text-[10px] text-gray-400">{{ app.date }}</span>
                 </div>
                 <div class="flex gap-2">
-                  <button class="flex-1 py-1.5 bg-[#22C55E] hover:bg-green-600 text-white rounded-lg text-xs font-medium transition-colors shadow-sm">Approve</button>
-                  <button class="flex-1 py-1.5 bg-gray-50 hover:bg-gray-100 text-gray-700 border border-gray-200 rounded-lg text-xs font-medium transition-colors">Review</button>
+                  <button @click="approveRegistration(app)" class="flex-1 py-1.5 bg-[#22C55E] hover:bg-green-600 text-white rounded-lg text-xs font-medium transition-colors shadow-sm">Approve</button>
+                  <button @click="rejectRegistration(app)" class="flex-1 py-1.5 bg-gray-50 hover:bg-gray-100 text-gray-700 border border-gray-200 rounded-lg text-xs font-medium transition-colors">Reject</button>
                 </div>
               </div>
               <div v-if="pendingRegistrations.length === 0" class="h-full flex flex-col items-center justify-center text-gray-500">
@@ -314,6 +324,7 @@
           </section>
 
         </div>
+        </template>
       </main>
     </div>
 
@@ -395,6 +406,9 @@
 
         <!-- Drawer Actions -->
         <div class="p-4 border-t border-gray-100 bg-white grid grid-cols-2 gap-3">
+          <button @click="router.push(`/admin/officerdetails/${selectedOfficer.id}`)" class="col-span-2 py-2.5 bg-blue-50 text-[#2563EB] font-semibold text-sm rounded-xl hover:bg-blue-100 transition-colors border border-blue-100">
+            View Full Details
+          </button>
           <button @click="openModal('edit', selectedOfficer)" class="py-2.5 bg-gray-50 border border-gray-200 text-gray-700 font-semibold text-sm rounded-xl hover:bg-gray-100 transition-colors">
             Edit Profile
           </button>
@@ -407,7 +421,7 @@
           <button v-if="selectedOfficer.status === 'Active'" @click="openModal('suspend', selectedOfficer)" class="py-2.5 bg-red-50 text-red-600 font-semibold text-sm rounded-xl hover:bg-red-100 transition-colors border border-red-100">
             Suspend
           </button>
-          <button v-else @click="handleActionClose" class="py-2.5 bg-green-50 text-green-600 font-semibold text-sm rounded-xl hover:bg-green-100 transition-colors border border-green-100">
+          <button v-else @click="submitReactivate(selectedOfficer)" :disabled="isSubmitting" class="py-2.5 bg-green-50 text-green-600 font-semibold text-sm rounded-xl hover:bg-green-100 transition-colors border border-green-100 disabled:opacity-60">
             Reactivate
           </button>
         </div>
@@ -494,15 +508,16 @@
         <h2 class="text-xl font-bold text-gray-900 mb-1">Transfer Department</h2>
         <p class="text-sm text-gray-500 mb-5">Reassign <strong class="text-gray-800">{{ targetOfficer?.name || 'Officer' }}</strong> to a new department.</p>
         
-        <form @submit.prevent="handleActionClose" class="space-y-4">
+        <form @submit.prevent="submitTransfer" class="space-y-4">
           <div class="p-3 bg-gray-50 border border-gray-200 rounded-xl text-sm mb-4">
             <span class="text-gray-500 block text-xs uppercase font-bold mb-0.5">Current Department</span>
             <span class="font-semibold text-gray-900">{{ targetOfficer?.department || 'Select from table first' }}</span>
           </div>
           <div>
             <label class="block text-sm font-medium text-gray-700 mb-1.5">New Department</label>
-            <select class="w-full px-4 py-2.5 border border-gray-200 rounded-xl focus:ring-2 focus:ring-[#2563EB]/20 outline-none">
-              <option v-for="dept in departmentList" :key="dept">{{ dept }}</option>
+            <select v-model="transferForm.departmentId" required class="w-full px-4 py-2.5 border border-gray-200 rounded-xl focus:ring-2 focus:ring-[#2563EB]/20 outline-none">
+              <option value="" disabled>Select a department</option>
+              <option v-for="dept in departmentOptions" :key="dept.id" :value="dept.id">{{ dept.name }}</option>
             </select>
           </div>
           <div>
@@ -529,27 +544,19 @@
         <div class="p-3 bg-red-50 border border-red-100 rounded-xl mb-4">
           <p class="text-sm text-red-700 font-medium">Warning: Suspending <strong class="text-red-900">{{targetOfficer?.name}}</strong> will immediately revoke their platform access.</p>
         </div>
-        <form @submit.prevent="handleActionClose" class="space-y-4">
+        <form @submit.prevent="submitSuspend" class="space-y-4">
           <div>
             <label class="block text-sm font-medium text-gray-700 mb-1.5">Reason for Suspension</label>
-            <select class="w-full px-4 py-2.5 border border-gray-200 rounded-xl focus:ring-2 focus:ring-red-500/20 outline-none">
+            <select v-model="suspendForm.reason" class="w-full px-4 py-2.5 border border-gray-200 rounded-xl focus:ring-2 focus:ring-red-500/20 outline-none">
               <option>Policy Violation</option>
               <option>Poor Performance Review</option>
               <option>Administrative Leave</option>
               <option>Other</option>
             </select>
           </div>
-          <div>
-            <label class="block text-sm font-medium text-gray-700 mb-1.5">Duration (Optional)</label>
-            <select class="w-full px-4 py-2.5 border border-gray-200 rounded-xl focus:ring-2 focus:ring-red-500/20 outline-none">
-              <option>Indefinite</option>
-              <option>1 Week</option>
-              <option>1 Month</option>
-            </select>
-          </div>
           <div class="pt-4 flex justify-end gap-3">
             <button type="button" @click="closeModal" class="px-5 py-2.5 text-sm font-medium text-gray-700 bg-gray-50 border border-gray-200 rounded-xl">Cancel</button>
-            <button type="submit" class="px-5 py-2.5 text-sm font-bold text-white bg-[#EF4444] hover:bg-red-700 rounded-xl shadow-sm">Confirm Suspension</button>
+            <button type="submit" :disabled="isSubmitting" class="px-5 py-2.5 text-sm font-bold text-white bg-[#EF4444] hover:bg-red-700 rounded-xl shadow-sm disabled:opacity-60">Confirm Suspension</button>
           </div>
         </form>
       </div>
@@ -574,6 +581,8 @@
 
 <script setup>
 import { ref, computed, onMounted, reactive } from 'vue';
+import { useRouter } from 'vue-router';
+import axios from 'axios';
 import Chart from 'chart.js/auto';
 
 // Icons
@@ -581,8 +590,12 @@ import {
   UserCog, Users, UserPlus, UserCheck, UserMinus, Building2, 
   ClipboardList, BarChart3, TrendingUp, Award, ShieldCheck, 
   Search, Eye, Pencil, RefreshCw, Trash2, Clock, Calendar, 
-  Mail, Phone, BadgeCheck, Activity, AlertTriangle, Key, X, Lightbulb
+  Mail, Phone, BadgeCheck, Activity, AlertTriangle, Key, X, Lightbulb, CheckCircle
 } from 'lucide-vue-next';
+
+const API_BASE = 'http://127.0.0.1:5000/api/admin';
+const router = useRouter();
+const authHeaders = () => ({ headers: { Authorization: `Bearer ${localStorage.getItem('token')}` } });
 
 // View State
 const sidebarOpen = ref(false);
@@ -591,46 +604,97 @@ const activeModal = ref(null);
 const selectedOfficer = ref(null);
 const targetOfficer = ref(null);
 const currentDate = new Date().toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
+const isLoading = ref(true);
+const errorMessage = ref('');
+const isSubmitting = ref(false);
 
-// --- Dummy Data ---
-const topStats = ref([
-  { label: 'Total Officers', value: '128', icon: Users, colorClass: 'text-[#2563EB] bg-blue-100', textClass: 'text-[#2563EB]' },
-  { label: 'Active Officers', value: '115', icon: UserCheck, colorClass: 'text-[#22C55E] bg-green-100', textClass: 'text-[#22C55E]' },
-  { label: 'Pending Approvals', value: '8', icon: Clock, colorClass: 'text-[#F59E0B] bg-yellow-100', textClass: 'text-[#F59E0B]' },
-  { label: 'Suspended', value: '5', icon: UserMinus, colorClass: 'text-[#EF4444] bg-red-100', textClass: 'text-[#EF4444]' },
-  { label: 'Departments', value: '12', icon: Building2, colorClass: 'text-purple-600 bg-purple-100', textClass: 'text-purple-600' },
-  { label: 'Avg Rating', value: '4.2/5', icon: Award, colorClass: 'text-indigo-600 bg-indigo-100', textClass: 'text-indigo-600' }
-]);
+// --- Live data — populated from the backend ---
+const STAT_META = {
+  total_officers:    { label: 'Total Officers',    icon: Users,      colorClass: 'text-[#2563EB] bg-blue-100',   textClass: 'text-[#2563EB]' },
+  active_officers:   { label: 'Active Officers',   icon: UserCheck,  colorClass: 'text-[#22C55E] bg-green-100',  textClass: 'text-[#22C55E]' },
+  pending_approvals: { label: 'Pending Approvals', icon: Clock,      colorClass: 'text-[#F59E0B] bg-yellow-100', textClass: 'text-[#F59E0B]' },
+  suspended:         { label: 'Suspended',         icon: UserMinus,  colorClass: 'text-[#EF4444] bg-red-100',    textClass: 'text-[#EF4444]' },
+  departments:       { label: 'Departments',       icon: Building2,  colorClass: 'text-purple-600 bg-purple-100', textClass: 'text-purple-600' },
+  avg_rating:        { label: 'Avg Rating',        icon: Award,      colorClass: 'text-indigo-600 bg-indigo-100', textClass: 'text-indigo-600' },
+};
+const STAT_ORDER = ['total_officers', 'active_officers', 'pending_approvals', 'suspended', 'departments', 'avg_rating'];
+const INSIGHT_ICONS = { 'Top Performer': Award, 'Most Active Dept': TrendingUp, 'Highest Workload': Activity };
+const ACTIVITY_COLORS = {
+  officer_approved: 'border-green-500', officer_rejected: 'border-red-500',
+  officer_suspended: 'border-red-500', officer_reactivated: 'border-green-500',
+  officer_transferred: 'border-yellow-500', officer_updated: 'border-blue-500',
+};
 
-const quickInsights = ref([
-  { label: 'Top Performer', value: 'Anita Patel (Roads)', icon: Award },
-  { label: 'Most Active Dept', value: 'Garbage Management', icon: TrendingUp },
-  { label: 'Highest Workload', value: 'Sanjay Kumar (142 Cmp)', icon: Activity }
-]);
+const topStats = ref([]);
+const quickInsights = ref([]);
+const officers = ref([]);
+const pendingRegistrations = ref([]);
+const recentActivities = ref([]);
+const departmentList = ref([]);        // department names, for filters/legacy selects
+const departmentOptions = ref([]);     // [{id, name}], needed for the transfer modal
 
-const departmentList = ['Garbage Management', 'Road Maintenance', 'Street Lighting', 'Drainage', 'Water Supply', 'Public Health', 'Parks & Gardens'];
+const timeAgo = (iso) => {
+  if (!iso) return '';
+  const diffMs = Date.now() - new Date(iso).getTime();
+  const mins = Math.floor(diffMs / 60000);
+  if (mins < 1) return 'Just now';
+  if (mins < 60) return `${mins} min ago`;
+  const hrs = Math.floor(mins / 60);
+  if (hrs < 24) return `${hrs} hr${hrs !== 1 ? 's' : ''} ago`;
+  const days = Math.floor(hrs / 24);
+  if (days < 7) return days === 1 ? 'Yesterday' : `${days} days ago`;
+  return new Date(iso).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+};
 
-const officers = ref([
-  { id: 1, name: 'Anita Patel', empId: 'OFC-1001', department: 'Road Maintenance', designation: 'Senior Civic Officer', email: 'anita.p@civicdesk.gov', phone: '+91 98765 11111', joined: 'Jan 2022', experience: '4 Years', resolved: 1450, pending: 45, avgTime: '24h', score: 95, citizenRating: 4.8, status: 'Active', avatar: 'https://i.pravatar.cc/150?img=5' },
-  { id: 2, name: 'Ramesh Singh', empId: 'OFC-1022', department: 'Garbage Management', designation: 'Department Head', email: 'ramesh.s@civicdesk.gov', phone: '+91 98765 22222', joined: 'Mar 2023', experience: '3 Years', resolved: 2100, pending: 112, avgTime: '18h', score: 88, citizenRating: 4.2, status: 'Active', avatar: 'https://i.pravatar.cc/150?img=11' },
-  { id: 3, name: 'Vikram Joshi', empId: 'OFC-1045', department: 'Street Lighting', designation: 'Field Officer', email: 'vikram.j@civicdesk.gov', phone: '+91 98765 33333', joined: 'Nov 2024', experience: '1.5 Years', resolved: 340, pending: 12, avgTime: '12h', score: 98, citizenRating: 4.9, status: 'Active', avatar: 'https://i.pravatar.cc/150?img=8' },
-  { id: 4, name: 'Sanjay Kumar', empId: 'OFC-1088', department: 'Drainage', designation: 'Inspector', email: 'sanjay.k@civicdesk.gov', phone: '+91 98765 44444', joined: 'Feb 2021', experience: '5 Years', resolved: 890, pending: 210, avgTime: '72h', score: 72, citizenRating: 3.5, status: 'Active', avatar: 'https://i.pravatar.cc/150?img=12' },
-  { id: 5, name: 'Priya Desai', empId: 'OFC-1102', department: 'Water Supply', designation: 'Field Officer', email: 'priya.d@civicdesk.gov', phone: '+91 98765 55555', joined: 'Aug 2025', experience: '8 Months', resolved: 120, pending: 5, avgTime: '36h', score: 85, citizenRating: 4.0, status: 'Pending', avatar: 'https://i.pravatar.cc/150?img=9' },
-  { id: 6, name: 'Arjun Verma', empId: 'OFC-1015', department: 'Public Health', designation: 'Senior Civic Officer', email: 'arjun.v@civicdesk.gov', phone: '+91 98765 66666', joined: 'Oct 2022', experience: '3.5 Years', resolved: 450, pending: 88, avgTime: 'N/A', score: 45, citizenRating: 2.1, status: 'Suspended', avatar: 'https://i.pravatar.cc/150?img=15' }
-]);
+const fetchOfficers = async () => {
+  isLoading.value = true;
+  errorMessage.value = '';
+  try {
+    const { data } = await axios.get(`${API_BASE}/officers`, authHeaders());
 
-const pendingRegistrations = ref([
-  { id: 1, name: 'Neha Gupta', requestedDept: 'Public Health', exp: '2', date: 'Today, 09:30 AM' },
-  { id: 2, name: 'Rahul Sharma', requestedDept: 'Road Maintenance', exp: '5', date: 'Yesterday, 14:15 PM' },
-  { id: 3, name: 'Amit Desai', requestedDept: 'Parks & Gardens', exp: '1', date: 'Jul 10, 2026' }
-]);
+    topStats.value = STAT_ORDER
+      .filter(key => key in data.top_stats)
+      .map(key => ({
+        ...STAT_META[key],
+        value: key === 'avg_rating'
+          ? (data.top_stats[key] != null ? `${data.top_stats[key]}/5` : 'N/A')
+          : data.top_stats[key],
+      }));
 
-const recentActivities = ref([
-  { id: 1, action: 'Officer Transferred', desc: 'Priya Desai transferred from Drainage to Water Supply.', time: '1 hr ago', admin: 'SysAdmin', color: 'border-yellow-500' },
-  { id: 2, action: 'Officer Suspended', desc: 'Arjun Verma suspended pending review.', time: '4 hrs ago', admin: 'SysAdmin', color: 'border-red-500' },
-  { id: 3, action: 'Account Created', desc: 'New account created for Vikram Joshi.', time: 'Yesterday', admin: 'SysAdmin', color: 'border-green-500' },
-  { id: 4, action: 'Password Reset', desc: 'Reset link sent to Ramesh Singh.', time: 'Jul 09', admin: 'Auto System', color: 'border-blue-500' }
-]);
+    quickInsights.value = data.quick_insights.map(i => ({ ...i, icon: INSIGHT_ICONS[i.label] || Lightbulb }));
+    officers.value = data.officers;
+    pendingRegistrations.value = data.pending_registrations;
+    recentActivities.value = data.recent_activities.map(a => ({
+      id: a.id,
+      action: a.action,
+      desc: a.description,
+      time: timeAgo(a.created_at),
+      admin: a.admin,
+      color: 'border-blue-500',
+    }));
+    departmentList.value = data.departments;
+    renderCharts();
+  } catch (err) {
+    if (err.response?.status === 401) router.push('/login');
+    errorMessage.value = err.response?.data?.message || 'Failed to load officers.';
+  } finally {
+    isLoading.value = false;
+  }
+};
+
+const fetchDepartmentOptions = async () => {
+  try {
+    const { data } = await axios.get(`${API_BASE}/departments`, authHeaders());
+    departmentOptions.value = data.departments.map(d => ({ id: d.id, name: d.name }));
+  } catch (err) {
+    // Non-fatal — the transfer modal just won't have options if this fails.
+  }
+};
+
+onMounted(() => {
+  fetchOfficers();
+  fetchDepartmentOptions();
+});
 
 // --- Filters & Sorting ---
 const filters = reactive({
@@ -704,23 +768,109 @@ const scrollTo = (id) => document.getElementById(id)?.scrollIntoView({ behavior:
 // Modal / Drawer interactions
 const openDrawer = (officer) => { selectedOfficer.value = officer; isDrawerOpen.value = true; };
 const closeDrawer = () => { isDrawerOpen.value = false; setTimeout(() => { selectedOfficer.value = null; }, 300); };
-const openModal = (type, officer = null) => { activeModal.value = type; if(officer) targetOfficer.value = officer; };
+const openModal = (type, officer = null) => {
+  activeModal.value = type;
+  if (officer) targetOfficer.value = officer;
+  if (type === 'suspend') suspendForm.reason = 'Policy Violation';
+  if (type === 'transfer') transferForm.departmentId = '';
+};
 const closeModal = () => { activeModal.value = null; targetOfficer.value = null; };
 const handleActionClose = () => { closeModal(); closeDrawer(); };
 
-// --- Charts ---
+// --- Backend-wired actions ---
+const suspendForm = reactive({ reason: 'Policy Violation' });
+const transferForm = reactive({ departmentId: '' });
+
+const approveRegistration = async (reg) => {
+  try {
+    await axios.patch(`${API_BASE}/users/${reg.id}/approve`, {}, authHeaders());
+    await fetchOfficers();
+  } catch (err) {
+    errorMessage.value = err.response?.data?.message || 'Failed to approve registration.';
+  }
+};
+
+const rejectRegistration = async (reg) => {
+  try {
+    await axios.patch(`${API_BASE}/users/${reg.id}/reject`, {}, authHeaders());
+    await fetchOfficers();
+  } catch (err) {
+    errorMessage.value = err.response?.data?.message || 'Failed to reject registration.';
+  }
+};
+
+const submitSuspend = async () => {
+  if (!targetOfficer.value) return;
+  isSubmitting.value = true;
+  try {
+    await axios.patch(
+      `${API_BASE}/officers/${targetOfficer.value.id}/suspend`,
+      { reason: suspendForm.reason },
+      authHeaders()
+    );
+    handleActionClose();
+    await fetchOfficers();
+  } catch (err) {
+    errorMessage.value = err.response?.data?.message || 'Failed to suspend officer.';
+  } finally {
+    isSubmitting.value = false;
+  }
+};
+
+const submitReactivate = async (officer) => {
+  if (!officer) return;
+  isSubmitting.value = true;
+  try {
+    await axios.patch(`${API_BASE}/officers/${officer.id}/reactivate`, {}, authHeaders());
+    handleActionClose();
+    await fetchOfficers();
+  } catch (err) {
+    errorMessage.value = err.response?.data?.message || 'Failed to reactivate officer.';
+  } finally {
+    isSubmitting.value = false;
+  }
+};
+
+const submitTransfer = async () => {
+  if (!targetOfficer.value || !transferForm.departmentId) return;
+  isSubmitting.value = true;
+  try {
+    await axios.patch(
+      `${API_BASE}/officers/${targetOfficer.value.id}/transfer`,
+      { departmentId: transferForm.departmentId },
+      authHeaders()
+    );
+    handleActionClose();
+    await fetchOfficers();
+  } catch (err) {
+    errorMessage.value = err.response?.data?.message || 'Failed to transfer officer.';
+  } finally {
+    isSubmitting.value = false;
+  }
+};
+
+// --- Charts — driven by the officers list once it loads ---
 const barChartRef = ref(null);
 const pieChartRef = ref(null);
+let barChart = null;
+let pieChart = null;
+const CHART_COLORS = ['#2563EB', '#1E40AF', '#3B82F6', '#60A5FA', '#93C5FD', '#BFDBFE', '#DBEAFE'];
 
-onMounted(() => {
-  // Bar Chart
-  new Chart(barChartRef.value, {
+const renderCharts = () => {
+  if (!barChartRef.value || !pieChartRef.value) return;
+
+  const topFive = [...officers.value]
+    .sort((a, b) => (b.resolved + b.pending) - (a.resolved + a.pending))
+    .slice(0, 5);
+
+  barChart?.destroy();
+  barChart = new Chart(barChartRef.value, {
     type: 'bar',
     data: {
-      labels: ['Anita', 'Ramesh', 'Vikram', 'Sanjay', 'Priya'],
+      labels: topFive.map(o => o.name.split(' ')[0]),
       datasets: [
-        { label: 'Resolved', data: [1450, 2100, 340, 890, 120], backgroundColor: '#22C55E', borderRadius: 4 },
-        { label: 'Pending', data: [45, 112, 12, 210, 5], backgroundColor: '#EF4444', borderRadius: 4 }
+        { label: 'Resolved', data: topFive.map(o => o.resolved), backgroundColor: '#22C55E', borderRadius: 4 },
+        { label: 'Pending', data: topFive.map(o => o.pending), backgroundColor: '#EF4444', borderRadius: 4 }
       ]
     },
     options: {
@@ -730,14 +880,18 @@ onMounted(() => {
     }
   });
 
-  // Pie Chart
-  new Chart(pieChartRef.value, {
+  const byDept = {};
+  officers.value.forEach(o => { const d = o.department || 'Unassigned'; byDept[d] = (byDept[d] || 0) + 1; });
+  const deptLabels = Object.keys(byDept);
+
+  pieChart?.destroy();
+  pieChart = new Chart(pieChartRef.value, {
     type: 'doughnut',
     data: {
-      labels: ['Garbage', 'Roads', 'Water', 'Lighting', 'Others'],
+      labels: deptLabels,
       datasets: [{
-        data: [35, 25, 20, 10, 10],
-        backgroundColor: ['#2563EB', '#1E40AF', '#3B82F6', '#60A5FA', '#93C5FD'],
+        data: deptLabels.map(l => byDept[l]),
+        backgroundColor: deptLabels.map((_, i) => CHART_COLORS[i % CHART_COLORS.length]),
         borderWidth: 0, hoverOffset: 4
       }]
     },
@@ -746,7 +900,7 @@ onMounted(() => {
       plugins: { legend: { position: 'right' } }
     }
   });
-});
+};
 </script>
 
 <style scoped>

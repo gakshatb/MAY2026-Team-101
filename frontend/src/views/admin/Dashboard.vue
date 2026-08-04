@@ -1,10 +1,6 @@
 <template>
-    <!-- Main Content Area -->
-    <div class="flex-1 flex flex-col relative overflow-hidden w-full">
-      
-      <!-- Scrollable Dashboard Content -->
-      <main class="flex-1 overflow-y-auto p-4 md:p-6 lg:p-8 font-sans animate-fade-in custom-scrollbar">
-        
+  <div class="font-sans animate-fade-in">
+
         <!-- Welcome Header -->
         <header class="mb-8 flex flex-col md:flex-row md:items-end justify-between gap-4">
           <div>
@@ -69,6 +65,7 @@
               <button 
                 v-for="(action, index) in quickActions" 
                 :key="index"
+                @click="router.push(action.route)"
                 class="flex flex-col items-center justify-center p-4 rounded-xl border border-gray-100 hover:border-[#2563EB] hover:bg-blue-50 text-gray-700 hover:text-[#2563EB] transition-colors duration-200"
               >
                 <component :is="action.icon" class="w-6 h-6 mb-2" />
@@ -101,7 +98,7 @@
           <section class="xl:col-span-2 bg-white rounded-[14px] shadow-sm border border-gray-50 overflow-hidden">
             <div class="p-6 border-b border-gray-100 flex justify-between items-center">
               <h2 class="text-lg font-bold text-gray-900">Department Performance</h2>
-              <button class="text-sm text-[#2563EB] font-medium hover:underline">View All</button>
+              <button @click="router.push('/admin/departmentmanagement')" class="text-sm text-[#2563EB] font-medium hover:underline">View All</button>
             </div>
             <div class="overflow-x-auto">
               <table class="w-full text-left border-collapse min-w-[600px]">
@@ -115,7 +112,10 @@
                   </tr>
                 </thead>
                 <tbody class="divide-y divide-gray-100 text-sm">
-                  <tr v-for="dept in departmentPerformance" :key="dept.id" class="hover:bg-gray-50 transition-colors">
+                  <tr v-if="!departmentPerformance.length">
+                    <td colspan="5" class="p-6 text-center text-gray-400">No complaint activity yet.</td>
+                  </tr>
+                  <tr v-for="dept in departmentPerformance" :key="dept.name" class="hover:bg-gray-50 transition-colors">
                     <td class="p-4 font-medium text-gray-900 flex items-center gap-3 whitespace-nowrap">
                       <div class="w-8 h-8 rounded bg-blue-100 text-blue-600 flex items-center justify-center shrink-0">
                         <Building2 class="w-4 h-4" />
@@ -133,7 +133,7 @@
                       </span>
                     </td>
                     <td class="p-4 text-right whitespace-nowrap">
-                      <button class="text-[#2563EB] hover:text-[#1E40AF] font-medium text-sm mr-3">Manage</button>
+                      <button @click="router.push('/admin/departmentmanagement')" class="text-[#2563EB] hover:text-[#1E40AF] font-medium text-sm mr-3">Manage</button>
                     </td>
                   </tr>
                 </tbody>
@@ -149,6 +149,9 @@
               </h2>
             </div>
             <div class="p-6 flex-1 overflow-y-auto space-y-4 max-h-[400px] custom-scrollbar">
+              <div v-if="!systemAlerts.length" class="text-sm text-gray-400 text-center py-6">
+                No active alerts. Everything looks normal.
+              </div>
               <div v-for="alert in systemAlerts" :key="alert.id" :class="`p-4 rounded-xl border-l-4 ${alert.borderClass} ${alert.bgClass}`">
                 <div class="flex justify-between items-start">
                   <h4 :class="`font-semibold text-sm ${alert.textClass}`">{{ alert.title }}</h4>
@@ -169,6 +172,9 @@
               <h2 class="text-lg font-bold text-gray-900">Pending Approvals</h2>
             </div>
             <div class="divide-y divide-gray-100">
+              <div v-if="!pendingApprovals.length" class="p-6 text-sm text-gray-400 text-center">
+                No pending approvals.
+              </div>
               <div v-for="approval in pendingApprovals" :key="approval.id" class="p-5 flex flex-col sm:flex-row sm:items-center justify-between hover:bg-gray-50 transition-colors gap-4">
                 <div class="flex items-center gap-4">
                   <div class="w-10 h-10 rounded-full bg-gray-100 flex items-center justify-center text-gray-500 shrink-0">
@@ -177,14 +183,16 @@
                   </div>
                   <div>
                     <p class="font-semibold text-gray-900 text-sm">{{ approval.name }}</p>
-                    <p class="text-xs text-gray-500">{{ approval.role }} • {{ approval.department }}</p>
+                    <p class="text-xs text-gray-500">{{ approval.role }} • {{ approval.department || 'Not assigned' }}</p>
                   </div>
                 </div>
                 <div class="flex gap-2 self-end sm:self-auto">
-                  <button class="px-3 py-1.5 text-sm bg-green-50 text-green-700 hover:bg-green-100 rounded-lg transition-colors font-medium flex items-center gap-1">
+                  <button @click="approveUser(approval.id)" :disabled="approval.busy"
+                    class="px-3 py-1.5 text-sm bg-green-50 text-green-700 hover:bg-green-100 rounded-lg transition-colors font-medium flex items-center gap-1 disabled:opacity-50">
                     <CheckCircle class="w-4 h-4" /> Approve
                   </button>
-                  <button class="px-3 py-1.5 text-sm bg-red-50 text-red-700 hover:bg-red-100 rounded-lg transition-colors font-medium flex items-center gap-1">
+                  <button @click="rejectUser(approval.id)" :disabled="approval.busy"
+                    class="px-3 py-1.5 text-sm bg-red-50 text-red-700 hover:bg-red-100 rounded-lg transition-colors font-medium flex items-center gap-1 disabled:opacity-50">
                     <XCircle class="w-4 h-4" /> Reject
                   </button>
                 </div>
@@ -199,6 +207,7 @@
             </div>
             <div class="p-6">
               <div class="relative border-l-2 border-gray-100 ml-3 space-y-6">
+                <p v-if="!platformActivity.length" class="text-sm text-gray-400 pl-6">No recent activity.</p>
                 <div v-for="activity in platformActivity" :key="activity.id" class="relative pl-6">
                   <span class="absolute -left-[9px] top-1 w-4 h-4 rounded-full bg-white border-2 border-[#2563EB]"></span>
                   <div class="flex flex-col sm:flex-row sm:justify-between sm:items-baseline mb-1">
@@ -212,12 +221,13 @@
           </section>
         </div>
 
-      </main>
-    </div>
+  </div>
 </template>
 
 <script setup>
 import { ref, onMounted, onUnmounted } from 'vue';
+import { useRouter } from 'vue-router';
+import axios from 'axios';
 import Chart from 'chart.js/auto';
 
 // Icons
@@ -227,8 +237,10 @@ import {
   AlertTriangle, ShieldCheck, XCircle, FolderKanban
 } from 'lucide-vue-next';
 
+const router = useRouter();
+
 // Layout State
-const sidebarOpen = ref(false);
+const isLoading = ref(true);
 
 // Clock Logic
 const currentTime = ref('');
@@ -241,81 +253,71 @@ const updateClock = () => {
   currentDate.value = now.toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
 };
 
-// Dummy Data
-const topStats = ref([
-  { label: 'Total Citizens', value: '45,231', icon: Users, colorClass: 'text-[#2563EB]', textClass: 'text-[#2563EB]', trend: '+12%', trendUp: true },
-  { label: 'Total Officers', value: '128', icon: UserCog, colorClass: 'text-[#1E40AF]', textClass: 'text-[#1E40AF]', trend: '+2%', trendUp: true },
-  { label: 'Total Workers', value: '845', icon: HardHat, colorClass: 'text-[#F59E0B]', textClass: 'text-[#F59E0B]', trend: '+5%', trendUp: true },
-  { label: 'Total Complaints', value: '12,405', icon: ClipboardList, colorClass: 'text-[#EF4444]', textClass: 'text-[#EF4444]', trend: '-3%', trendUp: false },
-  { label: 'Resolved Today', value: '342', icon: CheckCircle, colorClass: 'text-[#22C55E]', textClass: 'text-[#22C55E]', trend: '+18%', trendUp: true },
-]);
+// --- Top Stats: labels/icons are static, values come from the API ---
+const STAT_META = [
+  { key: 'total_citizens',   label: 'Total Citizens',   icon: Users,         colorClass: 'text-[#2563EB]', textClass: 'text-[#2563EB]' },
+  { key: 'total_officers',   label: 'Total Officers',   icon: UserCog,       colorClass: 'text-[#1E40AF]', textClass: 'text-[#1E40AF]' },
+  { key: 'total_workers',    label: 'Total Workers',    icon: HardHat,       colorClass: 'text-[#F59E0B]', textClass: 'text-[#F59E0B]' },
+  { key: 'total_complaints', label: 'Total Complaints', icon: ClipboardList, colorClass: 'text-[#EF4444]', textClass: 'text-[#EF4444]' },
+  { key: 'resolved_today',   label: 'Resolved Today',   icon: CheckCircle,   colorClass: 'text-[#22C55E]', textClass: 'text-[#22C55E]' },
+];
+const topStats = ref(STAT_META.map(m => ({ ...m, value: '0', trend: '—', trendUp: true })));
 
+// System Health has no real backing data source (no server/infra monitoring
+// exists in this app) — kept as a static placeholder rather than fabricated.
 const systemHealth = ref([
-  { label: 'Server Status', value: 'Operational', statusColor: 'bg-[#22C55E]' },
-  { label: 'Database Status', value: 'Healthy', statusColor: 'bg-[#22C55E]' },
-  { label: 'API Uptime', value: '99.98%', statusColor: 'bg-[#22C55E]' },
-  { label: 'Storage Usage', value: '68%', statusColor: 'bg-[#F59E0B]' },
-  { label: 'Active Sessions', value: '1,204', statusColor: 'bg-[#2563EB]' },
-  { label: 'Last Backup', value: '2 hrs ago', statusColor: 'bg-[#22C55E]' },
+  { label: 'Server Status', value: 'Not monitored', statusColor: 'bg-gray-300' },
+  { label: 'Database Status', value: 'Not monitored', statusColor: 'bg-gray-300' },
+  { label: 'API Uptime', value: 'Not monitored', statusColor: 'bg-gray-300' },
+  { label: 'Storage Usage', value: 'Not monitored', statusColor: 'bg-gray-300' },
+  { label: 'Active Sessions', value: 'Not monitored', statusColor: 'bg-gray-300' },
+  { label: 'Last Backup', value: 'Not monitored', statusColor: 'bg-gray-300' },
 ]);
 
 const quickActions = ref([
-  { label: 'Add Department', icon: Building2 },
-  { label: 'Approve Officers', icon: ShieldCheck },
-  { label: 'Announcement', icon: Megaphone },
-  { label: 'System Settings', icon: Server },
+  { label: 'Add Department', icon: Building2, route: '/admin/departmentmanagement' },
+  { label: 'Approve Officers', icon: ShieldCheck, route: '/admin/officermanagement' },
+  { label: 'Announcement', icon: Megaphone, route: '/admin/announcements' },
+  { label: 'System Settings', icon: Server, route: '/admin/systemanalytics' },
 ]);
 
-const departmentPerformance = ref([
-  { id: 1, name: 'Garbage Management', total: 3402, pending: 142, avgTime: '24h 15m', score: 92 },
-  { id: 2, name: 'Road Maintenance', total: 2105, pending: 305, avgTime: '72h 40m', score: 78 },
-  { id: 3, name: 'Water Supply', total: 1840, pending: 85, avgTime: '18h 20m', score: 95 },
-  { id: 4, name: 'Street Lighting', total: 1204, pending: 45, avgTime: '12h 10m', score: 98 },
-]);
+const departmentPerformance = ref([]);
+const systemAlerts = ref([]);
+const pendingApprovals = ref([]);
+const platformActivity = ref([]);
 
-const systemAlerts = ref([
-  { id: 1, title: 'Emergency Complaint Spike', message: 'Unusual volume of drainage complaints in Sector 4.', time: '10 mins ago', borderClass: 'border-[#EF4444]', bgClass: 'bg-red-50', textClass: 'text-[#EF4444]' },
-  { id: 2, title: 'Database Backup Required', message: 'Automated backup failed. Manual intervention needed.', time: '1 hr ago', borderClass: 'border-[#F59E0B]', bgClass: 'bg-yellow-50', textClass: 'text-[#F59E0B]' },
-  { id: 3, title: 'Inactive Officer', message: 'Officer Rahul Sharma hasn\'t logged in for 7 days.', time: '3 hrs ago', borderClass: 'border-[#2563EB]', bgClass: 'bg-blue-50', textClass: 'text-[#2563EB]' },
-]);
+const ALERT_STYLES = {
+  critical: { borderClass: 'border-[#EF4444]', bgClass: 'bg-red-50', textClass: 'text-[#EF4444]' },
+  warning:  { borderClass: 'border-[#F59E0B]', bgClass: 'bg-yellow-50', textClass: 'text-[#F59E0B]' },
+  info:     { borderClass: 'border-[#2563EB]', bgClass: 'bg-blue-50', textClass: 'text-[#2563EB]' },
+};
 
-const pendingApprovals = ref([
-  { id: 1, name: 'Priya Desai', role: 'Officer Request', department: 'Public Health', type: 'Officer' },
-  { id: 2, name: 'Amit Kumar', role: 'Worker App', department: 'Road Maintenance', type: 'Worker' },
-  { id: 3, name: 'Sanjay Singh', role: 'Officer Request', department: 'Animal Control', type: 'Officer' },
-]);
+const formatRelativeTime = (isoString) => {
+  if (!isoString) return '';
+  const diffMs = Date.now() - new Date(isoString).getTime();
+  const mins = Math.floor(diffMs / 60000);
+  if (mins < 1) return 'Just now';
+  if (mins < 60) return `${mins} min${mins > 1 ? 's' : ''} ago`;
+  const hrs = Math.floor(mins / 60);
+  if (hrs < 24) return `${hrs} hr${hrs > 1 ? 's' : ''} ago`;
+  const days = Math.floor(hrs / 24);
+  return `${days} day${days > 1 ? 's' : ''} ago`;
+};
 
-const platformActivity = ref([
-  { id: 1, action: 'Department Added', description: 'System Administrator created "Building Maintenance" department.', time: 'Today, 09:45 AM' },
-  { id: 2, action: 'Announcement Published', description: 'Monsoon safety guidelines published to all citizens.', time: 'Yesterday, 14:30 PM' },
-  { id: 3, action: 'Worker Approved', description: 'Officer approved 15 new workers for Garbage Management.', time: 'Yesterday, 11:15 AM' },
-  { id: 4, action: 'System Settings Changed', description: 'Updated complaint auto-escalation timer from 48h to 24h.', time: 'Oct 12, 10:00 AM' },
-]);
-
-// Chart Logic
+// --- Charts ---
 const growthChartRef = ref(null);
 const categoryChartRef = ref(null);
+let growthChart, categoryChart;
 
 const initializeCharts = () => {
-  new Chart(growthChartRef.value, {
+  growthChart = new Chart(growthChartRef.value, {
     type: 'line',
     data: {
-      labels: ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun'],
-      datasets: [{
-        label: 'New Citizens',
-        data: [1200, 1900, 2400, 2100, 3200, 4100],
-        borderColor: '#2563EB',
-        backgroundColor: 'rgba(37, 99, 235, 0.1)',
-        tension: 0.4,
-        fill: true,
-      },
-      {
-        label: 'New Workers',
-        data: [50, 120, 180, 140, 220, 280],
-        borderColor: '#22C55E',
-        backgroundColor: 'transparent',
-        tension: 0.4,
-      }]
+      labels: [],
+      datasets: [
+        { label: 'New Citizens', data: [], borderColor: '#2563EB', backgroundColor: 'rgba(37, 99, 235, 0.1)', tension: 0.4, fill: true },
+        { label: 'New Workers', data: [], borderColor: '#22C55E', backgroundColor: 'transparent', tension: 0.4 }
+      ]
     },
     options: {
       responsive: true,
@@ -325,13 +327,13 @@ const initializeCharts = () => {
     }
   });
 
-  new Chart(categoryChartRef.value, {
+  categoryChart = new Chart(categoryChartRef.value, {
     type: 'doughnut',
     data: {
-      labels: ['Garbage', 'Roads', 'Street Light', 'Drainage', 'Water', 'Others'],
+      labels: [],
       datasets: [{
-        data: [35, 20, 15, 12, 10, 8],
-        backgroundColor: ['#2563EB', '#1E40AF', '#F59E0B', '#EF4444', '#22C55E', '#94A3B8'],
+        data: [],
+        backgroundColor: ['#2563EB', '#1E40AF', '#F59E0B', '#EF4444', '#22C55E', '#94A3B8', '#A855F7', '#EC4899', '#14B8A6'],
         borderWidth: 0,
         hoverOffset: 4
       }]
@@ -345,14 +347,102 @@ const initializeCharts = () => {
   });
 };
 
+const fetchDashboard = async () => {
+  isLoading.value = true;
+  try {
+    const token = localStorage.getItem('token');
+    const { data } = await axios.get('http://127.0.0.1:5000/api/admin/dashboard', {
+      headers: { Authorization: `Bearer ${token}` }
+    });
+
+    topStats.value = STAT_META.map(m => {
+      const s = data.top_stats[m.key] || { value: 0, trend_pct: null };
+      return {
+        ...m,
+        value: s.value.toLocaleString(),
+        trend: s.trend_pct == null ? '—' : `${s.trend_pct >= 0 ? '+' : ''}${s.trend_pct}%`,
+        trendUp: s.trend_pct == null ? true : s.trend_pct >= 0,
+      };
+    });
+
+    departmentPerformance.value = data.department_performance || [];
+
+    systemAlerts.value = (data.alerts || []).map((a, idx) => ({
+      id: idx,
+      title: a.title,
+      message: a.message,
+      time: '',
+      ...(ALERT_STYLES[a.severity] || ALERT_STYLES.info),
+    }));
+
+    pendingApprovals.value = (data.pending_approvals || []).map(a => ({
+      ...a, type: a.role, busy: false,
+    }));
+
+    platformActivity.value = (data.platform_activity || []).map(a => ({
+      ...a, time: formatRelativeTime(a.created_at),
+    }));
+
+    if (growthChart && data.growth_chart) {
+      growthChart.data.labels = data.growth_chart.labels;
+      growthChart.data.datasets[0].data = data.growth_chart.new_citizens;
+      growthChart.data.datasets[1].data = data.growth_chart.new_workers;
+      growthChart.update();
+    }
+    if (categoryChart && data.category_breakdown) {
+      categoryChart.data.labels = Object.keys(data.category_breakdown);
+      categoryChart.data.datasets[0].data = Object.values(data.category_breakdown);
+      categoryChart.update();
+    }
+  } catch (err) {
+    if (err.response?.status === 401) router.push('/login');
+    console.error('Admin dashboard fetch error:', err);
+  } finally {
+    isLoading.value = false;
+  }
+};
+
+const approveUser = async (userId) => {
+  const target = pendingApprovals.value.find(a => a.id === userId);
+  if (target) target.busy = true;
+  try {
+    const token = localStorage.getItem('token');
+    await axios.patch(`http://127.0.0.1:5000/api/admin/users/${userId}/approve`, {}, {
+      headers: { Authorization: `Bearer ${token}` }
+    });
+    pendingApprovals.value = pendingApprovals.value.filter(a => a.id !== userId);
+  } catch (err) {
+    console.error('Approve failed:', err);
+    if (target) target.busy = false;
+  }
+};
+
+const rejectUser = async (userId) => {
+  const target = pendingApprovals.value.find(a => a.id === userId);
+  if (target) target.busy = true;
+  try {
+    const token = localStorage.getItem('token');
+    await axios.patch(`http://127.0.0.1:5000/api/admin/users/${userId}/reject`, {}, {
+      headers: { Authorization: `Bearer ${token}` }
+    });
+    pendingApprovals.value = pendingApprovals.value.filter(a => a.id !== userId);
+  } catch (err) {
+    console.error('Reject failed:', err);
+    if (target) target.busy = false;
+  }
+};
+
 onMounted(() => {
   updateClock();
   timerInterval = setInterval(updateClock, 1000);
   initializeCharts();
+  fetchDashboard();
 });
 
 onUnmounted(() => {
   if (timerInterval) clearInterval(timerInterval);
+  if (growthChart) growthChart.destroy();
+  if (categoryChart) categoryChart.destroy();
 });
 </script>
 
