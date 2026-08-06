@@ -26,6 +26,49 @@
           </div>
         </header>
 
+        <!-- Error banner (only for real fetch failures, not the no-id picker state) -->
+        <div v-if="errorMessage" class="mb-6 p-4 bg-red-50 border border-red-200 rounded-xl text-red-700 text-sm flex items-center justify-between">
+          <span>{{ errorMessage }}</span>
+          <button @click="fetchOfficer" class="font-semibold underline shrink-0 ml-4">Retry</button>
+        </div>
+
+        <!-- No officer selected: pick one from the roster instead of dead-ending -->
+        <template v-else-if="!route.params.id">
+          <div class="bg-white p-4 rounded-[14px] shadow-sm border border-gray-50 mb-6">
+            <div class="relative">
+              <Search class="w-4 h-4 text-gray-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
+              <input v-model="pickerSearch" type="text" placeholder="Search officers by name, email, or department…"
+                     class="w-full pl-10 pr-4 py-2.5 border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-[#2563EB]/20 outline-none" />
+            </div>
+          </div>
+
+          <div v-if="isPickerLoading" class="text-center text-gray-400 py-10">Loading officers…</div>
+
+          <div v-else-if="filteredPickerOfficers.length" class="bg-white rounded-[14px] shadow-sm border border-gray-50 divide-y divide-gray-50">
+            <button v-for="o in filteredPickerOfficers" :key="o.id" @click="router.push(`/admin/officerdetails/${o.id}`)"
+                    class="w-full flex items-center gap-4 p-4 hover:bg-gray-50 transition-colors text-left">
+              <img :src="o.avatar" :alt="o.name" class="w-11 h-11 rounded-full object-cover shrink-0" />
+              <div class="flex-1 min-w-0">
+                <p class="font-bold text-gray-900 truncate">{{ o.name }}</p>
+                <p class="text-xs text-gray-500 truncate">{{ o.designation }} · {{ o.department }}</p>
+              </div>
+              <span :class="['text-[10px] font-bold uppercase tracking-wider px-2 py-1 rounded shrink-0',
+                              o.status === 'Active' ? 'bg-green-100 text-green-700' : o.status === 'Suspended' ? 'bg-red-100 text-red-700' : 'bg-yellow-100 text-yellow-700']">
+                {{ o.status }}
+              </span>
+              <Eye class="w-4 h-4 text-gray-300 shrink-0" />
+            </button>
+          </div>
+
+          <div v-else class="text-center py-16 bg-white rounded-[14px] border border-gray-50">
+            <p class="text-gray-400">No officers match "{{ pickerSearch }}".</p>
+          </div>
+        </template>
+
+        <!-- Loading state -->
+        <div v-else-if="isLoading" class="text-center text-gray-400 py-10">Loading officer details…</div>
+
+        <template v-else-if="officer.id">
         <!-- Officer Profile Card (Hero Section) -->
         <section class="bg-white rounded-[14px] shadow-sm border border-gray-50 p-6 lg:p-8 mb-6 relative overflow-hidden flex flex-col lg:flex-row gap-8 items-start lg:items-center justify-between">
           <div class="absolute top-0 right-0 p-6 opacity-5 pointer-events-none">
@@ -58,11 +101,14 @@
             <button class="flex items-center justify-center gap-2 px-4 py-2.5 bg-gray-50 hover:bg-gray-100 text-gray-700 border border-gray-200 rounded-xl text-sm font-semibold transition-colors">
               <Pencil class="w-4 h-4" /> Edit Profile
             </button>
-            <button class="flex items-center justify-center gap-2 px-4 py-2.5 bg-[#2563EB] hover:bg-[#1E40AF] text-white rounded-xl text-sm font-semibold transition-colors shadow-sm">
+            <button @click="goToTransfer" class="flex items-center justify-center gap-2 px-4 py-2.5 bg-[#2563EB] hover:bg-[#1E40AF] text-white rounded-xl text-sm font-semibold transition-colors shadow-sm">
               <RefreshCw class="w-4 h-4" /> Transfer
             </button>
-            <button class="flex items-center justify-center gap-2 px-4 py-2.5 bg-red-50 hover:bg-red-100 text-red-600 border border-red-100 rounded-xl text-sm font-semibold transition-colors">
-              <UserX class="w-4 h-4" /> Suspend
+            <button @click="toggleSuspension" :disabled="isSubmitting"
+                    :class="officer.status === 'Active' ? 'bg-red-50 hover:bg-red-100 text-red-600 border-red-100' : 'bg-green-50 hover:bg-green-100 text-green-600 border-green-100'"
+                    class="flex items-center justify-center gap-2 px-4 py-2.5 border rounded-xl text-sm font-semibold transition-colors disabled:opacity-60">
+              <component :is="officer.status === 'Active' ? UserX : UserCheck" class="w-4 h-4" />
+              {{ officer.status === 'Active' ? 'Suspend' : 'Reactivate' }}
             </button>
             <button class="flex items-center justify-center gap-2 px-4 py-2.5 bg-yellow-50 hover:bg-yellow-100 text-yellow-700 border border-yellow-100 rounded-xl text-sm font-semibold transition-colors">
               <Key class="w-4 h-4" /> Reset Access
@@ -106,13 +152,11 @@
             </h3>
             <ul class="space-y-3 text-sm">
               <li class="flex justify-between border-b border-gray-50 pb-2"><span class="text-gray-500">Full Name</span><span class="font-medium text-gray-900">{{ personal.name }}</span></li>
-              <li class="flex justify-between border-b border-gray-50 pb-2"><span class="text-gray-500">Gender / DOB</span><span class="font-medium text-gray-900">{{ personal.gender }} • {{ personal.dob }}</span></li>
-              <li class="flex justify-between border-b border-gray-50 pb-2"><span class="text-gray-500">Blood Group</span><span class="font-medium text-red-500">{{ personal.bloodGroup }}</span></li>
-              <li class="flex flex-col border-b border-gray-50 pb-2">
+              <li class="flex justify-between border-b border-gray-50 pb-2"><span class="text-gray-500">Gender</span><span class="font-medium text-gray-900">{{ personal.gender }}</span></li>
+              <li class="flex flex-col pt-1">
                 <span class="text-gray-500 mb-1">Address</span>
-                <span class="font-medium text-gray-900">{{ personal.address }}, {{ personal.city }}, {{ personal.state }} - {{ personal.pin }}</span>
+                <span class="font-medium text-gray-900">{{ personal.address }}<template v-if="personal.city">, {{ personal.city }}, {{ personal.state }} - {{ personal.pin }}</template></span>
               </li>
-              <li class="flex justify-between pt-1"><span class="text-gray-500">Emergency</span><span class="font-bold text-gray-900">{{ personal.emergency }}</span></li>
             </ul>
           </div>
 
@@ -123,12 +167,11 @@
             </h3>
             <ul class="space-y-3 text-sm mb-5">
               <li class="flex justify-between border-b border-gray-50 pb-2"><span class="text-gray-500">Current Dept</span><span class="font-bold text-[#2563EB]">{{ dept.name }}</span></li>
-              <li class="flex justify-between border-b border-gray-50 pb-2"><span class="text-gray-500">Dept Head</span><span class="font-medium text-gray-900">{{ dept.head }}</span></li>
+              <li class="flex justify-between border-b border-gray-50 pb-2"><span class="text-gray-500">Dept Head</span><span class="font-medium text-gray-900">{{ dept.head || 'Unassigned' }}</span></li>
               <li class="flex justify-between border-b border-gray-50 pb-2"><span class="text-gray-500">Code & Since</span><span class="font-medium text-gray-900">{{ dept.code }} • {{ dept.since }}</span></li>
-              <li class="flex justify-between border-b border-gray-50 pb-2"><span class="text-gray-500">HQ Location</span><span class="font-medium text-gray-900">{{ dept.location }}</span></li>
-              <li class="flex justify-between pt-1"><span class="text-gray-500">Contact</span><span class="font-medium text-gray-900">{{ dept.contact }}</span></li>
+              <li class="flex justify-between pt-1"><span class="text-gray-500">Status</span><span class="font-medium text-gray-900">{{ dept.status }}</span></li>
             </ul>
-            <button class="w-full py-2 bg-blue-50 text-[#2563EB] hover:bg-blue-100 rounded-lg text-sm font-semibold transition-colors">
+            <button @click="router.push('/admin/departmentmanagement')" class="w-full py-2 bg-blue-50 text-[#2563EB] hover:bg-blue-100 rounded-lg text-sm font-semibold transition-colors">
               View Department Dashboard
             </button>
           </div>
@@ -139,11 +182,11 @@
               <ShieldCheck class="w-4 h-4 text-[#2563EB]" /> Security & Access
             </h3>
             <ul class="space-y-3 text-sm">
-              <li class="flex justify-between border-b border-gray-50 pb-2"><span class="text-gray-500">Last Login</span><span class="font-medium text-gray-900">{{ security.lastLogin }}</span></li>
-              <li class="flex justify-between border-b border-gray-50 pb-2"><span class="text-gray-500">Last Pwd Change</span><span class="font-medium text-gray-900">{{ security.lastPwd }}</span></li>
-              <li class="flex justify-between border-b border-gray-50 pb-2"><span class="text-gray-500">2FA Status</span><span :class="security.mfa ? 'text-green-600 font-bold' : 'text-red-500 font-bold'">{{ security.mfa ? 'Enabled' : 'Disabled' }}</span></li>
-              <li class="flex justify-between border-b border-gray-50 pb-2"><span class="text-gray-500">Failed Logins</span><span class="font-medium text-gray-900">{{ security.failedLogins }}</span></li>
-              <li class="flex justify-between pt-1"><span class="text-gray-500">Session Status</span><span class="font-bold text-green-600">Active</span></li>
+              <li class="flex flex-col pt-1">
+                <span class="text-gray-500 mb-1">Last Login</span>
+                <span class="font-medium text-gray-900" v-if="lastLogin">{{ lastLogin.at }} <span class="text-gray-400 text-xs">(IP: {{ lastLogin.ip }})</span></span>
+                <span class="font-medium text-gray-400" v-else>No login recorded yet</span>
+              </li>
             </ul>
           </div>
         </section>
@@ -195,7 +238,7 @@
                 </div>
                 <div class="p-3 bg-yellow-50 border border-yellow-100 rounded-xl text-center">
                   <p class="text-xs text-yellow-700 mb-1">Pending App.</p>
-                  <p class="text-lg font-bold text-yellow-700">{{ workerSummary.pendingApps }}</p>
+                  <p class="text-lg font-bold text-yellow-700">{{ workerSummary.pending }}</p>
                 </div>
               </div>
             </div>
@@ -208,11 +251,11 @@
               <div class="grid grid-cols-2 gap-3">
                 <div class="p-3 bg-blue-50/50 rounded-xl">
                   <p class="text-xs text-gray-500 mb-0.5">Best Month</p>
-                  <p class="font-bold text-[#2563EB] text-sm">March 2026</p>
+                  <p class="font-bold text-[#2563EB] text-sm">{{ quickInsights.bestMonth || 'N/A' }}</p>
                 </div>
                 <div class="p-3 bg-blue-50/50 rounded-xl">
                   <p class="text-xs text-gray-500 mb-0.5">Fastest Res.</p>
-                  <p class="font-bold text-[#2563EB] text-sm">4h 12m (Pothole)</p>
+                  <p class="font-bold text-[#2563EB] text-sm">{{ quickInsights.fastestResolution || 'N/A' }}</p>
                 </div>
               </div>
             </div>
@@ -240,6 +283,7 @@
                   </tr>
                 </thead>
                 <tbody class="divide-y divide-gray-50 text-sm">
+                  <tr v-if="recentComplaints.length === 0"><td colspan="5" class="p-6 text-center text-gray-400">No complaints assigned yet.</td></tr>
                   <tr v-for="comp in recentComplaints" :key="comp.id" class="hover:bg-gray-50 transition-colors">
                     <td class="p-4">
                       <p class="font-bold text-gray-900">{{ comp.id }}</p>
@@ -251,7 +295,7 @@
                       </span>
                     </td>
                     <td class="p-4 text-gray-700 font-medium">{{ comp.status }}</td>
-                    <td class="p-4 text-gray-600">{{ comp.worker }}</td>
+                    <td class="p-4 text-gray-600">{{ comp.worker || 'Unassigned' }}</td>
                     <td class="p-4 text-right">
                       <button class="p-1.5 text-gray-400 hover:text-[#2563EB] hover:bg-blue-50 rounded-lg transition-colors"><Eye class="w-4 h-4"/></button>
                     </td>
@@ -268,6 +312,7 @@
             </div>
             <div class="p-6 flex-1 overflow-y-auto max-h-[400px] custom-scrollbar">
               <div class="relative border-l-2 border-gray-100 ml-3 space-y-6">
+                <p v-if="adminActivities.length === 0" class="text-sm text-gray-400 pl-6">No administrative actions recorded yet.</p>
                 <div v-for="act in adminActivities" :key="act.id" class="relative pl-6">
                   <span class="absolute -left-[9px] top-1 w-4 h-4 rounded-full bg-white border-2 border-[#2563EB]"></span>
                   <div class="flex justify-between items-baseline mb-0.5">
@@ -281,23 +326,22 @@
           </div>
         </section>
 
-        <!-- Final Row: Feedback, Documents, Notifications -->
-        <section class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6 mb-8">
-          
-          <!-- Citizen Feedback -->
+        <!-- Citizen Feedback -->
+        <section class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
           <div class="bg-white p-6 rounded-[14px] shadow-sm border border-gray-50">
             <h3 class="text-sm font-bold text-gray-900 uppercase tracking-wider mb-4 flex items-center gap-2">
               <MessageSquare class="w-4 h-4 text-[#2563EB]" /> Citizen Feedback
             </h3>
             <div class="flex items-center gap-4 mb-5 p-4 bg-gray-50 rounded-xl border border-gray-100">
-              <div class="text-3xl font-bold text-[#2563EB]">{{ feedbackSummary.rating }}</div>
+              <div class="text-3xl font-bold text-[#2563EB]">{{ feedbackSummary.rating ?? 'N/A' }}</div>
               <div>
                 <div class="flex text-yellow-400"><Star class="w-4 h-4 fill-current" v-for="i in 4" :key="i"/><StarHalf class="w-4 h-4 fill-current"/></div>
                 <p class="text-xs text-gray-500 mt-1">Based on {{ feedbackSummary.totalReviews }} reviews</p>
               </div>
             </div>
             <div class="space-y-3">
-              <div v-for="fb in recentFeedbacks" :key="fb.id" class="p-3 border border-gray-100 rounded-xl">
+              <p v-if="recentFeedbacks.length === 0" class="text-sm text-gray-400">No feedback received yet.</p>
+              <div v-for="(fb, i) in recentFeedbacks" :key="i" class="p-3 border border-gray-100 rounded-xl">
                 <div class="flex justify-between items-start mb-1">
                   <p class="text-sm font-bold text-gray-900">{{ fb.name }}</p>
                   <span class="text-[10px] text-gray-400">{{ fb.date }}</span>
@@ -306,148 +350,188 @@
               </div>
             </div>
           </div>
-
-          <!-- Documents -->
-          <div class="bg-white p-6 rounded-[14px] shadow-sm border border-gray-50">
-            <h3 class="text-sm font-bold text-gray-900 uppercase tracking-wider mb-4 flex items-center gap-2">
-              <FileText class="w-4 h-4 text-[#2563EB]" /> Official Documents
-            </h3>
-            <div class="space-y-3">
-              <div v-for="doc in documents" :key="doc.id" class="flex items-center justify-between p-3 border border-gray-100 rounded-xl hover:border-[#2563EB] transition-colors group">
-                <div class="flex items-center gap-3">
-                  <div class="p-2 bg-blue-50 text-[#2563EB] rounded-lg"><FileText class="w-4 h-4"/></div>
-                  <div>
-                    <p class="text-sm font-semibold text-gray-900">{{ doc.name }}</p>
-                    <p class="text-[10px] text-gray-500">Uploaded: {{ doc.date }}</p>
-                  </div>
-                </div>
-                <button class="p-2 text-gray-400 hover:text-[#2563EB] transition-colors"><Download class="w-4 h-4"/></button>
-              </div>
-            </div>
-          </div>
-
-          <!-- Notifications/Alerts -->
-          <div class="bg-white p-6 rounded-[14px] shadow-sm border border-gray-50">
-            <h3 class="text-sm font-bold text-gray-900 uppercase tracking-wider mb-4 flex items-center gap-2">
-              <Bell class="w-4 h-4 text-[#2563EB]" /> Recent Notifications
-            </h3>
-            <div class="space-y-3">
-              <div v-for="noti in notifications" :key="noti.id" class="flex items-start gap-3 p-3 bg-gray-50 rounded-xl border border-gray-100">
-                <div :class="`mt-0.5 w-2 h-2 rounded-full shrink-0 ${noti.color}`"></div>
-                <div>
-                  <p class="text-sm font-medium text-gray-900 leading-tight">{{ noti.title }}</p>
-                  <p class="text-xs text-gray-500 mt-1">{{ noti.time }}</p>
-                </div>
-              </div>
-            </div>
-            <button class="w-full mt-4 py-2 text-[#2563EB] text-sm font-semibold hover:bg-blue-50 rounded-lg transition-colors">
-              View All Alerts
-            </button>
-          </div>
-
         </section>
+        </template>
       </main>
     </div>
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue';
+import { ref, computed, onMounted, watch } from 'vue';
+import { useRoute, useRouter } from 'vue-router';
+import axios from 'axios';
 import Chart from 'chart.js/auto';
 
 // Icons
 import { 
-  BadgeCheck, Calendar, Mail, Phone, Pencil, RefreshCw, UserX, Key, 
+  BadgeCheck, Calendar, Mail, Phone, Pencil, RefreshCw, UserX, UserCheck, Key, 
   ClipboardList, CheckCircle, Clock, Users, Building2, User, 
-  ShieldCheck, TrendingUp, Eye, Activity, FileText, Download, 
-  Bell, MessageSquare, Star, StarHalf, Lightbulb
+  ShieldCheck, TrendingUp, Eye, Activity, Search,
+  MessageSquare, Star, StarHalf, Lightbulb
 } from 'lucide-vue-next';
+
+const API_BASE = 'http://127.0.0.1:5000/api/admin';
+const route = useRoute();
+const router = useRouter();
+const authHeaders = () => ({ headers: { Authorization: `Bearer ${localStorage.getItem('token')}` } });
 
 // View State
 const sidebarOpen = ref(false);
 const currentDate = new Date().toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
+const isLoading = ref(true);
+const errorMessage = ref('');
+const isSubmitting = ref(false);
 
-// --- Dummy Data ---
-const officer = ref({
-  name: 'Anita Patel',
-  empId: 'OFC-1045',
-  designation: 'Senior Civic Officer',
-  department: 'Road Maintenance',
-  email: 'anita.p@civicdesk.gov',
-  phone: '+91 98765 11111',
-  joinedDate: 'Jan 15, 2022',
-  experience: '4+ Years',
-  status: 'Active',
-  avatar: 'https://i.pravatar.cc/150?img=5'
+// --- Live data — populated from GET /api/admin/officers/:id ---
+const officer = ref({});
+const topStats = ref([]);
+const personal = ref({});
+const dept = ref({});
+const lastLogin = ref(null);
+const workerSummary = ref({ total: 0, active: 0, completed: 0, pending: 0 });
+const performanceBars = ref([]);
+const recentComplaints = ref([]);
+const adminActivities = ref([]);
+const feedbackSummary = ref({ rating: null, totalReviews: 0 });
+const recentFeedbacks = ref([]);
+const quickInsights = ref({ bestMonth: null, fastestResolution: null });
+const statusBreakdown = ref({});
+const monthlyTrend = ref([]);
+
+// --- Officer picker — shown when this page is opened with no :id ---
+const isPickerLoading = ref(false);
+const pickerSearch = ref('');
+const pickerOfficers = ref([]);
+
+const fetchPickerOfficers = async () => {
+  isPickerLoading.value = true;
+  try {
+    const { data } = await axios.get(`${API_BASE}/officers`, authHeaders());
+    pickerOfficers.value = data.officers;
+  } catch (err) {
+    if (err.response?.status === 401) router.push('/login');
+    else errorMessage.value = err.response?.data?.message || 'Failed to load officer list.';
+  } finally {
+    isPickerLoading.value = false;
+  }
+};
+
+const filteredPickerOfficers = computed(() => {
+  const q = pickerSearch.value.trim().toLowerCase();
+  if (!q) return pickerOfficers.value;
+  return pickerOfficers.value.filter(o =>
+    o.name.toLowerCase().includes(q) ||
+    o.email.toLowerCase().includes(q) ||
+    (o.department || '').toLowerCase().includes(q)
+  );
 });
 
-const topStats = ref([
-  { label: 'Total Managed', value: '3,450', icon: ClipboardList, colorClass: 'text-[#2563EB] bg-blue-100', textClass: 'text-[#2563EB]' },
-  { label: 'Resolved', value: '3,210', icon: CheckCircle, colorClass: 'text-[#22C55E] bg-green-100', textClass: 'text-[#22C55E]' },
-  { label: 'Pending', value: '45', icon: Clock, colorClass: 'text-[#F59E0B] bg-yellow-100', textClass: 'text-[#F59E0B]' },
-  { label: 'Avg Time', value: '24h', icon: Activity, colorClass: 'text-purple-600 bg-purple-100', textClass: 'text-purple-600' },
-  { label: 'Satisfaction', value: '4.8/5', icon: Star, colorClass: 'text-yellow-500 bg-yellow-100', textClass: 'text-yellow-600' },
-  { label: 'Workers', value: '42', icon: Users, colorClass: 'text-[#1E40AF] bg-indigo-100', textClass: 'text-[#1E40AF]' },
-  { label: 'Dept Rank', value: '#2', icon: Building2, colorClass: 'text-pink-600 bg-pink-100', textClass: 'text-pink-600' },
-  { label: 'Score', value: '95%', icon: TrendingUp, colorClass: 'text-[#22C55E] bg-green-100', textClass: 'text-[#22C55E]' }
-]);
+const STAT_META = {
+  total_managed: { label: 'Total Managed', icon: ClipboardList, colorClass: 'text-[#2563EB] bg-blue-100', textClass: 'text-[#2563EB]' },
+  resolved:      { label: 'Resolved',      icon: CheckCircle,   colorClass: 'text-[#22C55E] bg-green-100', textClass: 'text-[#22C55E]' },
+  pending:       { label: 'Pending',       icon: Clock,         colorClass: 'text-[#F59E0B] bg-yellow-100', textClass: 'text-[#F59E0B]' },
+  avg_time:      { label: 'Avg Time',      icon: Activity,      colorClass: 'text-purple-600 bg-purple-100', textClass: 'text-purple-600' },
+  satisfaction:  { label: 'Satisfaction',  icon: Star,          colorClass: 'text-yellow-500 bg-yellow-100', textClass: 'text-yellow-600' },
+  workers:       { label: 'Workers',       icon: Users,         colorClass: 'text-[#1E40AF] bg-indigo-100', textClass: 'text-[#1E40AF]' },
+  dept_rank:     { label: 'Dept Rank',     icon: Building2,     colorClass: 'text-pink-600 bg-pink-100', textClass: 'text-pink-600' },
+  score:         { label: 'Score',         icon: TrendingUp,    colorClass: 'text-[#22C55E] bg-green-100', textClass: 'text-[#22C55E]' },
+};
 
-const personal = ref({
-  name: 'Anita Suresh Patel', gender: 'Female', dob: '12 Aug 1988', bloodGroup: 'O+',
-  address: 'Block A, Municipal Quarters', city: 'Pune', state: 'Maharashtra', pin: '411001',
-  emergency: '+91 99887 77665 (Spouse)'
-});
+const fetchOfficer = async () => {
+  isLoading.value = true;
+  errorMessage.value = '';
+  try {
+    const { data } = await axios.get(`${API_BASE}/officers/${route.params.id}`, authHeaders());
 
-const dept = ref({
-  name: 'Road Maintenance', head: 'Rajesh Verma (Director)', code: 'DEPT-RM',
-  since: 'Oct 2023', location: 'Zone 4 HQ, Ground Floor', email: 'roads.zone4@civicdesk.gov',
-  contact: '020-2553-1122'
-});
+    officer.value = {
+      ...data.officer,
+      joinedDate: data.officer.joined,
+    };
 
-const security = ref({
-  lastLogin: 'Today, 09:14 AM (IP: 192.168.1.4)', lastPwd: 'Mar 01, 2026', mfa: true,
-  failedLogins: '0 in last 30 days'
-});
+    topStats.value = [
+      { ...STAT_META.total_managed, value: data.top_stats.total_managed },
+      { ...STAT_META.resolved,      value: data.top_stats.resolved },
+      { ...STAT_META.pending,       value: data.top_stats.pending },
+      { ...STAT_META.avg_time,      value: data.top_stats.avg_time || 'N/A' },
+      { ...STAT_META.satisfaction,  value: data.top_stats.satisfaction != null ? `${data.top_stats.satisfaction}/5` : 'N/A' },
+      { ...STAT_META.workers,       value: data.worker_summary.total },
+      { ...STAT_META.dept_rank,     value: data.top_stats.dept_rank ? `#${data.top_stats.dept_rank}` : 'N/A' },
+      { ...STAT_META.score,         value: `${data.performance.resolution_rate}%` },
+    ];
 
-const workerSummary = ref({ assigned: 42, active: 38, pendingApps: 4, completed: 1845 });
+    personal.value = {
+      name: data.officer.name,
+      gender: data.officer.gender ? data.officer.gender.charAt(0).toUpperCase() + data.officer.gender.slice(1) : 'Not provided',
+      address: data.officer.address || 'Not provided',
+      city: data.officer.city || '',
+      state: data.officer.state || '',
+      pin: data.officer.pincode || '',
+    };
 
-const performanceBars = ref([
-  { label: 'Complaint Resolution Rate', value: 95, color: 'bg-green-500' },
-  { label: 'Task Assignment Speed', value: 88, color: 'bg-blue-500' },
-  { label: 'Citizen Satisfaction', value: 92, color: 'bg-indigo-500' },
-  { label: 'Department Contribution', value: 78, color: 'bg-yellow-500' }
-]);
+    dept.value = data.department;
+    lastLogin.value = data.last_login;
 
-const recentComplaints = ref([
-  { id: 'CMP-8842', category: 'Pothole Repair', priority: 'High', status: 'In Progress', worker: 'Rahul V.' },
-  { id: 'CMP-8841', category: 'Road Cave-in', priority: 'Emergency', status: 'Assigned', worker: 'Amit S.' },
-  { id: 'CMP-8830', category: 'Broken Pavement', priority: 'Medium', status: 'Resolved', worker: 'Pooja K.' },
-  { id: 'CMP-8825', category: 'Waterlogging (Road)', priority: 'High', status: 'Resolved', worker: 'Rahul V.' }
-]);
+    workerSummary.value = {
+      total: data.worker_summary.total,
+      active: data.worker_summary.active,
+      completed: data.worker_summary.completed,
+      pending: data.worker_summary.pending,
+    };
 
-const adminActivities = ref([
-  { id: 1, action: 'Profile Details Updated', date: 'Jun 15, 2026 - 14:30', admin: 'SysAdmin (Jane Doe)' },
-  { id: 2, action: 'Transferred to Road Maint.', date: 'Oct 01, 2023 - 09:00', admin: 'SysAdmin (Jane Doe)' },
-  { id: 3, action: 'Password Reset Forced', date: 'Jan 10, 2023 - 11:20', admin: 'Security Bot' },
-  { id: 4, action: 'Officer Account Created', date: 'Jan 15, 2022 - 10:00', admin: 'SysAdmin (Jane Doe)' }
-]);
+    performanceBars.value = [
+      { label: 'Complaint Resolution Rate', value: data.performance.resolution_rate, color: 'bg-green-500' },
+      ...(data.performance.citizen_satisfaction_pct != null
+        ? [{ label: 'Citizen Satisfaction', value: data.performance.citizen_satisfaction_pct, color: 'bg-indigo-500' }]
+        : []),
+    ];
 
-const feedbackSummary = ref({ rating: '4.8', totalReviews: 842 });
-const recentFeedbacks = ref([
-  { id: 1, name: 'Suresh Raina', date: '2 days ago', comment: 'The pothole was fixed within 24 hours. Very prompt action by the officer and team.' },
-  { id: 2, name: 'Kavita Sharma', date: '1 week ago', comment: 'Good work, but the debris was left on the side of the road for 2 days before clearing.' }
-]);
+    recentComplaints.value = data.recent_complaints;
+    adminActivities.value = data.admin_activities.map(a => ({
+      id: a.id, action: a.action, date: a.date, admin: a.admin,
+    }));
 
-const documents = ref([
-  { id: 1, name: 'Employee_ID_Scan.pdf', date: 'Jan 15, 2022' },
-  { id: 2, name: 'Appointment_Letter.pdf', date: 'Jan 10, 2022' },
-  { id: 3, name: 'Transfer_Order_RM.pdf', date: 'Oct 01, 2023' }
-]);
+    feedbackSummary.value = { rating: data.feedback.avg_rating, totalReviews: data.feedback.total_reviews };
+    recentFeedbacks.value = data.feedback.recent;
 
-const notifications = ref([
-  { id: 1, title: 'Worker application approved for Amit S.', time: '2 hours ago', color: 'bg-green-500' },
-  { id: 2, title: 'Emergency complaint CMP-8841 received.', time: '5 hours ago', color: 'bg-red-500' },
-  { id: 3, title: 'Monthly performance report generated.', time: 'Jul 01, 2026', color: 'bg-blue-500' }
-]);
+    quickInsights.value = {
+      bestMonth: data.quick_insights.best_month,
+      fastestResolution: data.quick_insights.fastest_resolution,
+    };
+
+    statusBreakdown.value = data.complaint_status_breakdown;
+    monthlyTrend.value = data.monthly_trend;
+
+    renderCharts();
+  } catch (err) {
+    if (err.response?.status === 401) router.push('/login');
+    else if (err.response?.status === 404) errorMessage.value = 'Officer not found.';
+    else errorMessage.value = err.response?.data?.message || 'Failed to load officer details.';
+  } finally {
+    isLoading.value = false;
+  }
+};
+
+// --- Suspend / Reactivate — same endpoints OfficerManagement.vue uses.
+// Transfer is intentionally NOT duplicated here (it needs the full department
+// picker built for OfficerManagement.vue); this page links there instead. ---
+const toggleSuspension = async () => {
+  if (!officer.value.id) return;
+  const suspending = officer.value.status === 'Active';
+  if (!window.confirm(suspending ? `Suspend ${officer.value.name}?` : `Reactivate ${officer.value.name}?`)) return;
+
+  isSubmitting.value = true;
+  try {
+    const action = suspending ? 'suspend' : 'reactivate';
+    await axios.patch(`${API_BASE}/officers/${officer.value.id}/${action}`, {}, authHeaders());
+    await fetchOfficer();
+  } catch (err) {
+    errorMessage.value = err.response?.data?.message || 'Action failed.';
+  } finally {
+    isSubmitting.value = false;
+  }
+};
+
+const goToTransfer = () => router.push('/admin/officermanagement');
 
 // --- UI Helpers ---
 const getStatusBadge = (status) => {
@@ -462,47 +546,55 @@ const getPriorityClass = (priority) => {
   }
 };
 
-// --- Charts Logic ---
+// --- Charts — driven by the officer's real complaint data once it loads ---
 const doughnutChartRef = ref(null);
 const lineChartRef = ref(null);
+let doughnutChart = null;
+let lineChart = null;
+const STATUS_COLORS = {
+  'Resolved': '#22C55E', 'Closed': '#16A34A', 'In Progress': '#3B82F6',
+  'Assigned': '#8B5CF6', 'Under Review': '#F59E0B', 'Pending': '#EF4444',
+};
 
-onMounted(() => {
-  // Doughnut Chart (Complaint Stats)
-  new Chart(doughnutChartRef.value, {
-    type: 'doughnut',
-    data: {
-      labels: ['Resolved', 'In Progress', 'Assigned', 'Pending', 'Rejected'],
-      datasets: [{
-        data: [3210, 85, 110, 45, 12],
-        backgroundColor: ['#22C55E', '#3B82F6', '#F59E0B', '#EF4444', '#94A3B8'],
-        borderWidth: 0,
-        hoverOffset: 4
-      }]
-    },
-    options: {
-      responsive: true, maintainAspectRatio: false, cutout: '65%',
-      plugins: { legend: { position: 'right', labels: { boxWidth: 12, font: { size: 10 } } } }
-    }
-  });
+const renderCharts = () => {
+  if (!doughnutChartRef.value || !lineChartRef.value) return;
 
-  // Line Chart (Monthly Performance)
-  new Chart(lineChartRef.value, {
+  const labels = Object.keys(statusBreakdown.value);
+  doughnutChart?.destroy();
+  if (labels.length) {
+    doughnutChart = new Chart(doughnutChartRef.value, {
+      type: 'doughnut',
+      data: {
+        labels,
+        datasets: [{
+          data: labels.map(l => statusBreakdown.value[l]),
+          backgroundColor: labels.map(l => STATUS_COLORS[l] || '#94A3B8'),
+          borderWidth: 0, hoverOffset: 4,
+        }]
+      },
+      options: {
+        responsive: true, maintainAspectRatio: false, cutout: '65%',
+        plugins: { legend: { position: 'right', labels: { boxWidth: 12, font: { size: 10 } } } }
+      }
+    });
+  }
+
+  lineChart?.destroy();
+  lineChart = new Chart(lineChartRef.value, {
     type: 'line',
     data: {
-      labels: ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun'],
+      labels: monthlyTrend.value.map(m => m.month),
       datasets: [
         {
           label: 'Complaints Managed',
-          data: [210, 245, 180, 320, 290, 340],
-          borderColor: '#2563EB',
-          backgroundColor: 'rgba(37, 99, 235, 0.1)',
+          data: monthlyTrend.value.map(m => m.managed),
+          borderColor: '#2563EB', backgroundColor: 'rgba(37, 99, 235, 0.1)',
           tension: 0.4, fill: true,
         },
         {
           label: 'Resolution Rate (%)',
-          data: [92, 94, 90, 95, 96, 95],
-          borderColor: '#22C55E',
-          borderDash: [5, 5],
+          data: monthlyTrend.value.map(m => m.resolution_rate),
+          borderColor: '#22C55E', borderDash: [5, 5],
           tension: 0.4, fill: false,
         }
       ]
@@ -510,13 +602,26 @@ onMounted(() => {
     options: {
       responsive: true, maintainAspectRatio: false,
       plugins: { legend: { position: 'top' } },
-      scales: { 
-        y: { beginAtZero: false, grid: { color: '#F3F4F6' } },
+      scales: {
+        y: { beginAtZero: true, grid: { color: '#F3F4F6' } },
         x: { grid: { display: false } }
       }
     }
   });
-});
+};
+
+const loadForCurrentRoute = () => {
+  errorMessage.value = '';
+  if (!route.params.id) {
+    isLoading.value = false;
+    fetchPickerOfficers();
+  } else {
+    fetchOfficer();
+  }
+};
+
+watch(() => route.params.id, loadForCurrentRoute);
+onMounted(loadForCurrentRoute);
 </script>
 
 <style scoped>

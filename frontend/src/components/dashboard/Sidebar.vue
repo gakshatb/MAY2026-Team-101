@@ -64,9 +64,9 @@ import { useRouter, useRoute } from 'vue-router'
 import axios from 'axios'
 import { 
   LayoutDashboard, PlusCircle, FolderOpen, 
-  MapPin, Bell, MessageSquare, User, 
+  MapPin, Bell, MessageSquare, User, UserSearch, 
   LogOut, Shield, Building2, 
-  Users, UserSearch, BarChart3, Megaphone, 
+  Users, BarChart3, Megaphone, 
   Activity, ClipboardList, FileText, UserPlus, 
   HardHat, Briefcase, ListTodo, Wrench, 
   CheckSquare, PieChart
@@ -120,7 +120,7 @@ const menuItems = computed(() => {
         { name: 'System Analytics', icon: BarChart3, route: '/admin/systemanalytics' },
         { name: 'Announcements', icon: Megaphone, route: '/admin/announcements' },
         { name: 'Activity Logs', icon: Activity, route: '/admin/activitylogs' },
-        { name: 'Notifications', icon: Bell, route: '/admin/notifications' }
+        { name: 'Notifications', icon: Bell, route: '/admin/notifications' },
       ]
       
     case 'Officer':

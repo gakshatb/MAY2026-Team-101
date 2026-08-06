@@ -19,14 +19,22 @@
               Monitor platform activities, user actions, and administrative events across CivicDesk.
             </p>
           </div>
-          <div class="flex flex-col items-end gap-1 shrink-0">
-            <div class="bg-white px-4 py-2 rounded-[14px] shadow-sm border border-gray-100 flex items-center gap-2">
-              <Clock class="w-4 h-4 text-[#2563EB]" />
-              <span class="text-sm font-semibold text-gray-700">{{ currentDate }}</span>
-            </div>
-            <span class="text-[10px] text-gray-400 font-medium">Last Updated: Just now</span>
+          <div class="bg-white px-4 py-2 rounded-[14px] shadow-sm border border-gray-100 flex items-center gap-2 shrink-0">
+            <Clock class="w-4 h-4 text-[#2563EB]" />
+            <span class="text-sm font-semibold text-gray-700">{{ currentDate }}</span>
           </div>
         </header>
+
+        <!-- Error banner -->
+        <div v-if="errorMessage" class="mb-6 p-4 bg-red-50 border border-red-200 rounded-xl text-red-700 text-sm flex items-center justify-between">
+          <span>{{ errorMessage }}</span>
+          <button @click="fetchLogs" class="font-semibold underline shrink-0 ml-4">Retry</button>
+        </div>
+
+        <!-- Loading state -->
+        <div v-if="isLoading" class="text-center text-gray-400 py-10">Loading activity logs…</div>
+
+        <template v-else>
 
         <!-- Top Statistics Grid -->
         <section class="mb-6 grid grid-cols-2 md:grid-cols-4 xl:grid-cols-8 gap-3">
@@ -52,7 +60,7 @@
                  <Download class="w-5 h-5 mb-2 text-gray-400 group-hover:text-[#2563EB]" />
                  <span class="text-xs font-semibold text-center leading-tight">Export<br>Logs</span>
                </button>
-               <button @click="openExportModal" class="flex flex-col items-center justify-center p-3 rounded-xl border border-gray-100 hover:border-[#22C55E] hover:bg-green-50 text-gray-700 hover:text-[#22C55E] transition-colors group">
+               <button @click="exportCSV" class="flex flex-col items-center justify-center p-3 rounded-xl border border-gray-100 hover:border-[#22C55E] hover:bg-green-50 text-gray-700 hover:text-[#22C55E] transition-colors group">
                  <FileText class="w-5 h-5 mb-2 text-gray-400 group-hover:text-[#22C55E]" />
                  <span class="text-xs font-semibold text-center leading-tight">Download<br>CSV</span>
                </button>
@@ -68,7 +76,7 @@
                  <ShieldAlert class="w-5 h-5 mb-2 text-gray-400 group-hover:text-[#EF4444]" />
                  <span class="text-xs font-semibold text-center leading-tight">Security<br>Events</span>
                </button>
-               <button class="flex flex-col items-center justify-center p-3 rounded-xl border border-gray-100 hover:border-[#2563EB] hover:bg-blue-50 text-gray-700 hover:text-[#2563EB] transition-colors group">
+               <button @click="fetchLogs" class="flex flex-col items-center justify-center p-3 rounded-xl border border-gray-100 hover:border-[#2563EB] hover:bg-blue-50 text-gray-700 hover:text-[#2563EB] transition-colors group">
                  <RefreshCw class="w-5 h-5 mb-2 text-gray-400 group-hover:text-[#2563EB]" />
                  <span class="text-xs font-semibold text-center leading-tight">Refresh<br>Logs</span>
                </button>
@@ -79,10 +87,10 @@
               <BarChart3 class="w-4 h-4 text-[#2563EB]" /> Log Statistics
              </h2>
              <div class="grid grid-cols-2 gap-3 flex-1">
-               <div class="p-3 bg-gray-50 rounded-xl border border-gray-100"><p class="text-[10px] text-gray-500 font-bold uppercase mb-0.5">Most Active Mod.</p><p class="text-sm font-bold text-[#2563EB]">Complaints</p></div>
-               <div class="p-3 bg-gray-50 rounded-xl border border-gray-100"><p class="text-[10px] text-gray-500 font-bold uppercase mb-0.5">Peak Login</p><p class="text-sm font-bold text-gray-900">09:00 - 10:00 AM</p></div>
-               <div class="p-3 bg-gray-50 rounded-xl border border-gray-100"><p class="text-[10px] text-gray-500 font-bold uppercase mb-0.5">Highest Day</p><p class="text-sm font-bold text-gray-900">Monday (1.2k)</p></div>
-               <div class="p-3 bg-gray-50 rounded-xl border border-gray-100"><p class="text-[10px] text-gray-500 font-bold uppercase mb-0.5">Avg Daily Events</p><p class="text-sm font-bold text-green-600">845</p></div>
+               <div class="p-3 bg-gray-50 rounded-xl border border-gray-100"><p class="text-[10px] text-gray-500 font-bold uppercase mb-0.5">Most Active Module</p><p class="text-sm font-bold text-[#2563EB]">{{ logStats.most_active_module }}</p></div>
+               <div class="p-3 bg-gray-50 rounded-xl border border-gray-100"><p class="text-[10px] text-gray-500 font-bold uppercase mb-0.5">Peak Login</p><p class="text-sm font-bold text-gray-900">{{ logStats.peak_login_hour }}</p></div>
+               <div class="p-3 bg-gray-50 rounded-xl border border-gray-100"><p class="text-[10px] text-gray-500 font-bold uppercase mb-0.5">Busiest Day</p><p class="text-sm font-bold text-gray-900">{{ logStats.busiest_day }}</p></div>
+               <div class="p-3 bg-gray-50 rounded-xl border border-gray-100"><p class="text-[10px] text-gray-500 font-bold uppercase mb-0.5">Avg Daily Events</p><p class="text-sm font-bold text-green-600">{{ logStats.avg_daily_events }}</p></div>
              </div>
           </div>
         </section>
@@ -101,22 +109,21 @@
             </div>
             <div class="w-full md:w-2/3 grid grid-cols-2 md:grid-cols-4 gap-3">
               <select v-model="filters.role" class="bg-gray-50 border border-gray-200 text-gray-700 text-sm rounded-xl px-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-[#2563EB]/20 w-full">
-                <option value="All">All Roles</option><option value="Administrator">Administrator</option><option value="Officer">Officer</option><option value="Worker">Worker</option><option value="Citizen">Citizen</option>
+                <option value="All">All Roles</option><option value="Admin">Admin</option><option value="Officer">Officer</option><option value="Worker">Worker</option><option value="Citizen">Citizen</option>
               </select>
               <select v-model="filters.module" class="bg-gray-50 border border-gray-200 text-gray-700 text-sm rounded-xl px-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-[#2563EB]/20 w-full">
-                <option value="All">All Modules</option><option value="Authentication">Authentication</option><option value="Complaint">Complaint</option><option value="Department">Department</option><option value="Security">Security</option>
+                <option value="All">All Modules</option><option value="Authentication">Authentication</option><option value="Profile">Profile</option><option value="Complaint">Complaint</option><option value="Officer">Officer</option><option value="Department">Department</option>
               </select>
               <select v-model="filters.status" class="bg-gray-50 border border-gray-200 text-gray-700 text-sm rounded-xl px-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-[#2563EB]/20 w-full">
-                <option value="All">All Status</option><option value="Success">Success</option><option value="Warning">Warning</option><option value="Error">Error</option><option value="Critical">Critical</option>
+                <option value="All">All Status</option><option value="Success">Success</option><option value="Warning">Warning</option><option value="Critical">Critical</option>
               </select>
               <select v-model="filters.date" class="bg-gray-50 border border-gray-200 text-gray-700 text-sm rounded-xl px-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-[#2563EB]/20 w-full">
-                <option value="Today">Today</option><option value="Yesterday">Yesterday</option><option value="Last 7 Days">Last 7 Days</option><option value="Last 30 Days">Last 30 Days</option>
+                <option value="All Time">All Time</option><option value="Today">Today</option><option value="Yesterday">Yesterday</option><option value="Last 7 Days">Last 7 Days</option><option value="Last 30 Days">Last 30 Days</option>
               </select>
             </div>
           </div>
           <div class="flex justify-end gap-3 border-t border-gray-100 pt-4">
-            <button @click="resetFilters" class="px-5 py-2 bg-gray-50 text-gray-600 text-sm font-semibold border border-gray-200 rounded-xl hover:bg-gray-100 transition-colors">Reset</button>
-            <button class="px-5 py-2 bg-[#2563EB] text-white text-sm font-semibold rounded-xl hover:bg-[#1E40AF] transition-colors shadow-sm">Apply Filters</button>
+            <button @click="resetFilters" class="px-5 py-2 bg-gray-50 text-gray-600 text-sm font-semibold border border-gray-200 rounded-xl hover:bg-gray-100 transition-colors">Reset Filters</button>
           </div>
         </section>
 
@@ -131,7 +138,7 @@
                   <th class="p-4 whitespace-nowrap">Module</th>
                   <th class="p-4 whitespace-nowrap">Action & Description</th>
                   <th class="p-4 whitespace-nowrap text-center">Status</th>
-                  <th class="p-4 whitespace-nowrap">IP / Device</th>
+                  <th class="p-4 whitespace-nowrap">IP Address</th>
                   <th class="p-4 whitespace-nowrap text-right">Actions</th>
                 </tr>
               </thead>
@@ -157,13 +164,12 @@
                   </td>
                   <td class="p-4 text-xs text-gray-500">
                     <p class="font-mono text-gray-700">{{ log.ip }}</p>
-                    <p>{{ log.device }}</p>
                   </td>
                   <td class="p-4 text-right" @click.stop>
                     <div class="flex items-center justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                       <button @click="openDrawer(log)" class="p-1.5 text-gray-400 hover:text-[#2563EB] hover:bg-blue-50 rounded-lg" title="View Details"><Eye class="w-4 h-4" /></button>
-                      <button class="p-1.5 text-gray-400 hover:text-[#2563EB] hover:bg-blue-50 rounded-lg" title="Copy Log ID"><Copy class="w-4 h-4" /></button>
-                      <button class="p-1.5 text-gray-400 hover:text-[#22C55E] hover:bg-green-50 rounded-lg" title="Export Entry"><Download class="w-4 h-4" /></button>
+                      <button @click="navigator.clipboard.writeText(log.id)" class="p-1.5 text-gray-400 hover:text-[#2563EB] hover:bg-blue-50 rounded-lg" title="Copy Log ID"><Copy class="w-4 h-4" /></button>
+                      <button @click="downloadBlob(JSON.stringify(log, null, 2), `${log.id}.json`, 'application/json')" class="p-1.5 text-gray-400 hover:text-[#22C55E] hover:bg-green-50 rounded-lg" title="Export Entry"><Download class="w-4 h-4" /></button>
                     </div>
                   </td>
                 </tr>
@@ -173,16 +179,9 @@
               </tbody>
             </table>
           </div>
-          <!-- Pagination -->
+          <!-- Result count -->
           <div class="p-4 border-t border-gray-100 flex items-center justify-between text-sm text-gray-500 bg-gray-50/50">
-            <span>Showing 1 to {{ filteredLogs.length }} of 8,452 logs</span>
-            <div class="flex gap-1">
-              <button class="px-3 py-1 border border-gray-200 bg-white rounded-md hover:bg-gray-50">Prev</button>
-              <button class="px-3 py-1 border border-gray-200 bg-[#2563EB] text-white rounded-md">1</button>
-              <button class="px-3 py-1 border border-gray-200 bg-white rounded-md hover:bg-gray-50">2</button>
-              <button class="px-3 py-1 border border-gray-200 bg-white rounded-md hover:bg-gray-50">3</button>
-              <button class="px-3 py-1 border border-gray-200 bg-white rounded-md hover:bg-gray-50">Next</button>
-            </div>
+            <span>Showing {{ filteredLogs.length }} of {{ logs.length }} most recent logs</span>
           </div>
         </section>
 
@@ -284,9 +283,8 @@
                   <h4 class="font-bold text-gray-900 text-sm group-hover:text-[#2563EB] transition-colors">{{ sec.event }}</h4>
                   <span :class="['px-2 py-0.5 rounded text-[9px] font-bold uppercase', sec.severity === 'High' ? 'bg-red-100 text-red-700' : 'bg-yellow-100 text-yellow-700']">{{ sec.severity }}</span>
                 </div>
-                <div class="flex justify-between items-end mt-2">
+                <div class="flex justify-end items-end mt-2">
                   <span class="text-2xl font-bold text-gray-800">{{ sec.count }}</span>
-                  <span class="text-[10px] text-gray-500">Latest: {{ sec.latest }}</span>
                 </div>
               </div>
             </div>
@@ -328,12 +326,12 @@
                 </div>
                 <div class="text-right">
                   <p class="font-bold text-gray-900 text-sm">{{ user.count }} <span class="text-[10px] font-normal text-gray-500">Logs</span></p>
-                  <button class="text-[10px] text-[#2563EB] font-semibold hover:underline mt-1">Profile</button>
                 </div>
               </div>
             </div>
           </div>
         </section>
+        </template>
 
       </main>
     </div>
@@ -370,12 +368,6 @@
               <div><span class="text-xs text-gray-500 block mb-0.5">Module</span><span class="text-sm font-medium text-gray-900">{{ selectedLog.module }}</span></div>
               <div><span class="text-xs text-gray-500 block mb-0.5">Action</span><span class="text-sm font-bold text-[#2563EB]">{{ selectedLog.action }}</span></div>
               <div><span class="text-xs text-gray-500 block mb-0.5">Description</span><span class="text-sm text-gray-700 leading-snug block">{{ selectedLog.desc }}</span></div>
-              
-              <!-- Value Changes (If applicable) -->
-              <div v-if="selectedLog.oldValue" class="mt-4 pt-3 border-t border-gray-200 grid grid-cols-2 gap-3">
-                <div><span class="text-[10px] font-bold text-red-500 uppercase block mb-1">Old Value</span><span class="text-xs text-gray-600 font-mono bg-red-50 p-1.5 rounded block line-clamp-2">{{ selectedLog.oldValue }}</span></div>
-                <div><span class="text-[10px] font-bold text-green-600 uppercase block mb-1">New Value</span><span class="text-xs text-gray-600 font-mono bg-green-50 p-1.5 rounded block line-clamp-2">{{ selectedLog.newValue }}</span></div>
-              </div>
             </div>
           </div>
 
@@ -384,19 +376,15 @@
             <h3 class="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-2">Client Information</h3>
             <div class="bg-gray-50 p-4 rounded-xl border border-gray-100 space-y-2 text-xs">
               <div class="flex justify-between"><span class="text-gray-500">IP Address</span><span class="font-mono text-gray-900">{{ selectedLog.ip }}</span></div>
-              <div class="flex justify-between"><span class="text-gray-500">Device</span><span class="font-medium text-gray-900">{{ selectedLog.device }}</span></div>
-              <div class="flex justify-between"><span class="text-gray-500">Browser</span><span class="font-medium text-gray-900">{{ selectedLog.browser }}</span></div>
-              <div class="flex justify-between"><span class="text-gray-500">OS</span><span class="font-medium text-gray-900">{{ selectedLog.os }}</span></div>
-              <div class="flex justify-between"><span class="text-gray-500">Location</span><span class="font-medium text-gray-900">{{ selectedLog.location }}</span></div>
             </div>
           </div>
         </div>
 
         <div class="p-4 border-t border-gray-100 bg-white grid grid-cols-2 gap-3">
-          <button class="py-2.5 bg-gray-50 border border-gray-200 text-gray-700 text-sm font-semibold rounded-xl hover:bg-gray-100 flex items-center justify-center gap-2">
+          <button @click="navigator.clipboard.writeText(JSON.stringify(selectedLog, null, 2))" class="py-2.5 bg-gray-50 border border-gray-200 text-gray-700 text-sm font-semibold rounded-xl hover:bg-gray-100 flex items-center justify-center gap-2">
             <Copy class="w-4 h-4"/> Copy JSON
           </button>
-          <button class="py-2.5 bg-[#2563EB] text-white text-sm font-semibold rounded-xl hover:bg-[#1E40AF] shadow-sm flex items-center justify-center gap-2">
+          <button @click="downloadBlob(JSON.stringify(selectedLog, null, 2), `${selectedLog.id}.json`, 'application/json')" class="py-2.5 bg-[#2563EB] text-white text-sm font-semibold rounded-xl hover:bg-[#1E40AF] shadow-sm flex items-center justify-center gap-2">
             <Download class="w-4 h-4"/> Export Log
           </button>
         </div>
@@ -407,28 +395,23 @@
     <div v-if="exportModalOpen" class="fixed inset-0 z-[60] flex items-center justify-center p-4">
       <div class="absolute inset-0 bg-slate-900/60 backdrop-blur-sm transition-opacity" @click="closeExportModal"></div>
       <div class="relative bg-white rounded-2xl shadow-xl w-full max-w-md p-6 transform transition-all">
-        <h2 class="text-xl font-bold text-gray-900 mb-1">Export Audit Logs</h2>
-        <p class="text-sm text-gray-500 mb-5">Select format and filters for the exported data.</p>
+        <h2 class="text-xl font-bold text-gray-900 mb-1">Export Activity Logs</h2>
+        <p class="text-sm text-gray-500 mb-5">Exports whatever's currently filtered on the page.</p>
         
         <div class="space-y-4">
           <div>
             <label class="block text-sm font-medium text-gray-700 mb-1.5">Export Format</label>
             <div class="grid grid-cols-2 gap-2">
-              <button class="p-3 border border-[#2563EB] bg-blue-50 text-[#2563EB] font-bold text-sm rounded-xl">CSV</button>
-              <button class="p-3 border border-gray-200 text-gray-700 hover:bg-gray-50 font-bold text-sm rounded-xl">PDF</button>
-              <button class="p-3 border border-gray-200 text-gray-700 hover:bg-gray-50 font-bold text-sm rounded-xl">Excel</button>
-              <button class="p-3 border border-gray-200 text-gray-700 hover:bg-gray-50 font-bold text-sm rounded-xl">JSON</button>
+              <button @click="exportFormat = 'csv'" :class="exportFormat === 'csv' ? 'border-[#2563EB] bg-blue-50 text-[#2563EB]' : 'border-gray-200 text-gray-700 hover:bg-gray-50'" class="p-3 border font-bold text-sm rounded-xl transition-colors">CSV</button>
+              <button @click="exportFormat = 'json'" :class="exportFormat === 'json' ? 'border-[#2563EB] bg-blue-50 text-[#2563EB]' : 'border-gray-200 text-gray-700 hover:bg-gray-50'" class="p-3 border font-bold text-sm rounded-xl transition-colors">JSON</button>
+              <button disabled title="Not available yet" class="p-3 border border-gray-100 text-gray-300 font-bold text-sm rounded-xl cursor-not-allowed">PDF</button>
+              <button disabled title="Not available yet" class="p-3 border border-gray-100 text-gray-300 font-bold text-sm rounded-xl cursor-not-allowed">Excel</button>
             </div>
           </div>
-          <div>
-            <label class="block text-sm font-medium text-gray-700 mb-1.5">Date Range</label>
-            <select class="w-full px-4 py-2.5 border border-gray-200 rounded-xl focus:ring-2 focus:ring-[#2563EB]/20 outline-none text-sm">
-              <option>Last 7 Days (Default)</option><option>Last 30 Days</option><option>All Time</option>
-            </select>
-          </div>
+          <p class="text-xs text-gray-500">Will export <span class="font-bold text-gray-900">{{ filteredLogs.length }}</span> log{{ filteredLogs.length === 1 ? '' : 's' }} matching the current filters.</p>
           <div class="pt-4 flex justify-end gap-3 border-t border-gray-100">
             <button @click="closeExportModal" class="px-5 py-2.5 text-sm font-medium text-gray-700 bg-gray-50 border border-gray-200 rounded-xl">Cancel</button>
-            <button @click="closeExportModal" class="px-5 py-2.5 text-sm font-bold text-white bg-[#2563EB] hover:bg-[#1E40AF] rounded-xl shadow-sm flex items-center gap-2"><Download class="w-4 h-4"/> Export</button>
+            <button @click="runExport" class="px-5 py-2.5 text-sm font-bold text-white bg-[#2563EB] hover:bg-[#1E40AF] rounded-xl shadow-sm flex items-center gap-2"><Download class="w-4 h-4"/> Export</button>
           </div>
         </div>
       </div>
@@ -438,6 +421,8 @@
 
 <script setup>
 import { ref, computed, onMounted, reactive } from 'vue';
+import { useRouter } from 'vue-router';
+import axios from 'axios';
 import Chart from 'chart.js/auto';
 
 // Icons
@@ -448,58 +433,70 @@ import {
   CheckCircle, XCircle, BarChart3, PieChart, TrendingUp, TrendingDown, X
 } from 'lucide-vue-next';
 
+const API_BASE = 'http://127.0.0.1:5000/api/admin';
+const router = useRouter();
+const authHeaders = () => ({ headers: { Authorization: `Bearer ${localStorage.getItem('token')}` } });
+
 // View State
 const sidebarOpen = ref(false);
 const isDrawerOpen = ref(false);
 const exportModalOpen = ref(false);
 const selectedLog = ref(null);
 const currentDate = new Date().toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+const isLoading = ref(true);
+const errorMessage = ref('');
+const exportFormat = ref('csv');
 
-// --- Dummy Data ---
-const topStats = ref([
-  { label: 'Total Events', value: '1.2M', trend: 5, icon: Activity, colorClass: 'text-blue-600 bg-blue-100', textClass: 'text-blue-600' },
-  { label: 'Today', value: '8,452', trend: 12, icon: Clock, colorClass: 'text-indigo-600 bg-indigo-100', textClass: 'text-indigo-600' },
-  { label: 'Admin Actions', value: '142', trend: -2, icon: UserCog, colorClass: 'text-purple-600 bg-purple-100', textClass: 'text-purple-600' },
-  { label: 'Officer Actions', value: '3.4k', trend: 8, icon: Shield, colorClass: 'text-teal-600 bg-teal-100', textClass: 'text-teal-600' },
-  { label: 'Worker Actions', value: '2.1k', trend: 15, icon: ClipboardList, colorClass: 'text-yellow-600 bg-yellow-100', textClass: 'text-yellow-600' },
-  { label: 'Citizen Actions', value: '2.8k', trend: -4, icon: Users, colorClass: 'text-green-600 bg-green-100', textClass: 'text-green-600' },
-  { label: 'Security Events', value: '24', trend: -10, icon: ShieldAlert, colorClass: 'text-red-600 bg-red-100', textClass: 'text-red-600' },
-  { label: 'System Events', value: '56', trend: 2, icon: Monitor, colorClass: 'text-gray-600 bg-gray-100', textClass: 'text-gray-600' }
-]);
+// --- Live data — populated from GET /api/admin/activity-logs ---
+const STAT_META = {
+  total_events:    { label: 'Total Events',    icon: Activity,    colorClass: 'text-blue-600 bg-blue-100',   textClass: 'text-blue-600' },
+  today:           { label: 'Today',           icon: Clock,       colorClass: 'text-indigo-600 bg-indigo-100', textClass: 'text-indigo-600' },
+  admin_actions:   { label: 'Admin Actions',   icon: UserCog,     colorClass: 'text-purple-600 bg-purple-100', textClass: 'text-purple-600' },
+  officer_actions: { label: 'Officer Actions', icon: Shield,      colorClass: 'text-teal-600 bg-teal-100',   textClass: 'text-teal-600' },
+  worker_actions:  { label: 'Worker Actions',  icon: ClipboardList, colorClass: 'text-yellow-600 bg-yellow-100', textClass: 'text-yellow-600' },
+  citizen_actions: { label: 'Citizen Actions', icon: Users,       colorClass: 'text-green-600 bg-green-100', textClass: 'text-green-600' },
+  security_events: { label: 'Security Events', icon: ShieldAlert, colorClass: 'text-red-600 bg-red-100',     textClass: 'text-red-600' },
+  system_events:   { label: 'System Events',   icon: Monitor,     colorClass: 'text-gray-600 bg-gray-100',   textClass: 'text-gray-600' },
+};
+const STAT_ORDER = ['total_events', 'today', 'admin_actions', 'officer_actions', 'worker_actions', 'citizen_actions', 'security_events', 'system_events'];
 
-const securityEvents = ref([
-  { id: 1, event: 'Failed Login Attempts', severity: 'High', count: 45, latest: '10 mins ago' },
-  { id: 2, event: 'Unauthorized Access', severity: 'High', count: 2, latest: 'Yesterday' },
-  { id: 3, event: 'Password Resets', severity: 'Medium', count: 124, latest: '1 hr ago' },
-  { id: 4, event: 'Account Suspensions', severity: 'Medium', count: 3, latest: '2 days ago' }
-]);
+const topStats = ref([]);
+const logStats = ref({ most_active_module: 'N/A', peak_login_hour: 'N/A', busiest_day: 'N/A', avg_daily_events: 0 });
+const securityEvents = ref([]);
+const activeUsers = ref([]);
+const criticalEvents = ref([]);
+const logs = ref([]);
+const heatmap = ref(Array.from({ length: 7 }, () => Array(24).fill(0)));
+const mostFrequentActivities = ref([]);
+const roleDistribution = ref({ Admin: 0, Officer: 0, Worker: 0, Citizen: 0 });
 
-const activeUsers = ref([
-  { name: 'Anita Patel', role: 'Officer', count: 1420 },
-  { name: 'System Admin', role: 'Administrator', count: 850 },
-  { name: 'Rahul V.', role: 'Worker', count: 620 },
-  { name: 'Jane Doe', role: 'Citizen', count: 45 }
-]);
+const fetchLogs = async () => {
+  isLoading.value = true;
+  errorMessage.value = '';
+  try {
+    const { data } = await axios.get(`${API_BASE}/activity-logs`, authHeaders());
 
-const criticalEvents = ref([
-  { id: 1, action: 'Officer Account Suspended', time: '10:30 AM', desc: 'Arjun Verma suspended by Administrator.', user: 'SysAdmin', color: 'border-red-500' },
-  { id: 2, action: 'Emergency Complaint', time: '09:15 AM', desc: 'Major Road Cave-in reported in Ward 4.', user: 'Citizen_842', color: 'border-orange-500' },
-  { id: 3, action: 'System Settings Updated', time: 'Yesterday', desc: 'Global timeout setting changed to 30 mins.', user: 'SysAdmin', color: 'border-yellow-500' },
-  { id: 4, action: 'Department Deleted', time: 'Jul 10', desc: 'Legacy department removed from system.', user: 'SysAdmin', color: 'border-red-500' }
-]);
+    topStats.value = STAT_ORDER.map(key => ({ ...STAT_META[key], value: data.top_stats[key] }));
+    logStats.value = data.log_stats;
+    securityEvents.value = data.security_events;
+    activeUsers.value = data.active_users;
+    criticalEvents.value = data.critical_events;
+    logs.value = data.logs;
+    heatmap.value = data.heatmap;
+    mostFrequentActivities.value = data.most_frequent_activities;
+    roleDistribution.value = data.role_distribution;
 
-const logs = ref([
-  { id: 'LOG-884291', date: 'Jul 12, 2026', time: '12:45:00', user: 'System Admin', role: 'Administrator', department: 'System', action: 'Update System Settings', desc: 'Changed session timeout from 60 to 30 mins.', module: 'Settings', status: 'Success', ip: '192.168.1.10', device: 'Desktop', browser: 'Chrome 115', os: 'Windows 11', location: 'Pune, India', oldValue: '60 mins', newValue: '30 mins' },
-  { id: 'LOG-884290', date: 'Jul 12, 2026', time: '12:40:15', user: 'Anita Patel', role: 'Officer', department: 'Road Maintenance', action: 'Assign Complaint', desc: 'Assigned CMP-842 to Worker Rahul V.', module: 'Complaint', status: 'Success', ip: '10.0.0.52', device: 'Desktop', browser: 'Firefox 110', os: 'Windows 10', location: 'Pune, India' },
-  { id: 'LOG-884289', date: 'Jul 12, 2026', time: '12:35:10', user: 'Unknown', role: 'Citizen', department: '', action: 'Failed Login', desc: 'Invalid credentials provided.', module: 'Authentication', status: 'Warning', ip: '45.22.11.9', device: 'Mobile', browser: 'Safari Mobile', os: 'iOS 16', location: 'Mumbai, India' },
-  { id: 'LOG-884288', date: 'Jul 12, 2026', time: '12:15:00', user: 'Rahul V.', role: 'Worker', department: 'Road Maintenance', action: 'Status Update', desc: 'Marked CMP-840 as Resolved.', module: 'Complaint', status: 'Success', ip: '10.0.1.22', device: 'Mobile', browser: 'Chrome Mobile', os: 'Android 13', location: 'Pune, India', oldValue: 'In Progress', newValue: 'Resolved' },
-  { id: 'LOG-884287', date: 'Jul 12, 2026', time: '11:50:00', user: 'System Admin', role: 'Administrator', department: 'System', action: 'Suspend Officer', desc: 'Account suspension for Arjun Verma.', module: 'Officer', status: 'Critical', ip: '192.168.1.10', device: 'Desktop', browser: 'Chrome 115', os: 'Windows 11', location: 'Pune, India', oldValue: 'Active', newValue: 'Suspended' },
-  { id: 'LOG-884286', date: 'Jul 12, 2026', time: '11:00:22', user: 'Jane Doe', role: 'Citizen', department: '', action: 'Submit Complaint', desc: 'New complaint CMP-845 (Garbage).', module: 'Complaint', status: 'Success', ip: '112.19.44.2', device: 'Desktop', browser: 'Edge 114', os: 'Windows 11', location: 'Pune, India' },
-  { id: 'LOG-884285', date: 'Jul 12, 2026', time: '10:15:05', user: 'DB Service', role: 'System', department: 'Database', action: 'Connection Error', desc: 'Timeout connecting to replica DB.', module: 'Security', status: 'Error', ip: '127.0.0.1', device: 'Server', browser: 'N/A', os: 'Linux', location: 'AWS ap-south-1' }
-]);
+    renderCharts();
+  } catch (err) {
+    if (err.response?.status === 401) router.push('/login');
+    else errorMessage.value = err.response?.data?.message || 'Failed to load activity logs.';
+  } finally {
+    isLoading.value = false;
+  }
+};
 
 // --- Filters & Search Logic ---
-const filters = reactive({ search: '', role: 'All', module: 'All', status: 'All', date: 'Today' });
+const filters = reactive({ search: '', role: 'All', module: 'All', status: 'All', date: 'All Time' });
 
 const filteredLogs = computed(() => {
   let result = logs.value;
@@ -510,18 +507,34 @@ const filteredLogs = computed(() => {
   if (filters.role !== 'All') result = result.filter(l => l.role === filters.role);
   if (filters.module !== 'All') result = result.filter(l => l.module === filters.module);
   if (filters.status !== 'All') result = result.filter(l => l.status === filters.status);
+  if (filters.date !== 'All Time') {
+    const now = new Date();
+    const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    result = result.filter(l => {
+      const t = new Date(l.created_at);
+      switch (filters.date) {
+        case 'Today': return t >= startOfToday;
+        case 'Yesterday': {
+          const startOfYesterday = new Date(startOfToday); startOfYesterday.setDate(startOfYesterday.getDate() - 1);
+          return t >= startOfYesterday && t < startOfToday;
+        }
+        case 'Last 7 Days': return t >= new Date(startOfToday.getTime() - 7 * 86400000);
+        case 'Last 30 Days': return t >= new Date(startOfToday.getTime() - 30 * 86400000);
+        default: return true;
+      }
+    });
+  }
   return result;
 });
 
-const resetFilters = () => { filters.search = ''; filters.role = 'All'; filters.module = 'All'; filters.status = 'All'; filters.date = 'Today'; };
+const resetFilters = () => { filters.search = ''; filters.role = 'All'; filters.module = 'All'; filters.status = 'All'; filters.date = 'All Time'; };
 
 // --- UI Helpers ---
 const getRoleBadge = (role) => {
   switch(role) {
-    case 'Administrator': return 'bg-purple-100 text-purple-700';
+    case 'Admin': return 'bg-purple-100 text-purple-700';
     case 'Officer': return 'bg-blue-100 text-blue-700';
     case 'Worker': return 'bg-yellow-100 text-yellow-700';
-    case 'System': return 'bg-gray-200 text-gray-700';
     default: return 'bg-teal-100 text-teal-700'; // Citizen
   }
 };
@@ -529,19 +542,18 @@ const getStatusBadge = (status) => {
   switch(status) {
     case 'Success': return 'bg-green-100 text-green-700';
     case 'Warning': return 'bg-yellow-100 text-yellow-700';
-    case 'Error': return 'bg-red-100 text-red-700';
     case 'Critical': return 'bg-red-600 text-white shadow-sm border border-red-700';
     default: return 'bg-gray-100 text-gray-700';
   }
 };
 
-// Heatmap logic
+// Heatmap — real day x hour counts from the backend, color-scaled by the matrix's own max.
+const heatmapMax = computed(() => Math.max(1, ...heatmap.value.flat()));
 const getHeatmapColor = (dayIndex, hourIndex) => {
-  // Generate random looking but deterministic opacity based on indices for dummy data
-  const val = (Math.sin(dayIndex * 12 + hourIndex * 3) + 1) / 2; // 0 to 1
-  if (hourIndex > 1 && hourIndex < 6) return 'rgba(37, 99, 235, 0.05)'; // Night time low activity
-  if (hourIndex > 9 && hourIndex < 18) return `rgba(37, 99, 235, ${0.4 + val * 0.6})`; // Peak hours
-  return `rgba(37, 99, 235, ${0.1 + val * 0.3})`;
+  const val = heatmap.value[dayIndex]?.[hourIndex] || 0;
+  if (val === 0) return 'rgba(37, 99, 235, 0.05)';
+  const intensity = val / heatmapMax.value;
+  return `rgba(37, 99, 235, ${0.15 + intensity * 0.75})`;
 };
 
 const scrollTo = (id) => document.getElementById(id)?.scrollIntoView({ behavior: 'smooth' });
@@ -552,34 +564,72 @@ const closeDrawer = () => { isDrawerOpen.value = false; setTimeout(() => { selec
 const openExportModal = () => { exportModalOpen.value = true; };
 const closeExportModal = () => { exportModalOpen.value = false; };
 
+// --- Real client-side export (CSV/JSON) of whatever's currently filtered.
+// PDF/Excel aren't implemented — no library for that is wired up — so those
+// two format buttons stay visually present but disabled rather than faking
+// a download that doesn't work. ---
+const downloadBlob = (content, filename, type) => {
+  const blob = new Blob([content], { type });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = filename;
+  document.body.appendChild(a); a.click(); document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+};
+
+const exportCSV = () => {
+  const cols = ['id', 'date', 'time', 'user', 'role', 'department', 'action', 'desc', 'module', 'status', 'ip'];
+  const header = cols.join(',');
+  const rows = filteredLogs.value.map(l => cols.map(c => `"${String(l[c] ?? '').replace(/"/g, '""')}"`).join(','));
+  downloadBlob([header, ...rows].join('\n'), `activity-logs-${Date.now()}.csv`, 'text/csv');
+  closeExportModal();
+};
+
+const exportJSON = () => {
+  downloadBlob(JSON.stringify(filteredLogs.value, null, 2), `activity-logs-${Date.now()}.json`, 'application/json');
+  closeExportModal();
+};
+
+const runExport = () => {
+  if (exportFormat.value === 'csv') exportCSV();
+  else if (exportFormat.value === 'json') exportJSON();
+};
+
 // --- Charts Logic ---
 const horizontalBarChartRef = ref(null);
 const pieChartRef = ref(null);
+let barChart = null;
+let pieChart = null;
+const ROLE_COLORS = { Admin: '#9333EA', Officer: '#2563EB', Worker: '#F59E0B', Citizen: '#14B8A6' };
 
-onMounted(() => {
+const renderCharts = () => {
+  if (!horizontalBarChartRef.value || !pieChartRef.value) return;
   Chart.defaults.font.family = 'Inter, sans-serif';
   Chart.defaults.color = '#64748b';
 
-  // 1. Horizontal Bar (Most Frequent Activities)
-  new Chart(horizontalBarChartRef.value, {
+  barChart?.destroy();
+  barChart = new Chart(horizontalBarChartRef.value, {
     type: 'bar',
     data: {
-      labels: ['Complaint Updates', 'User Logins', 'Worker Assignments', 'Department Changes', 'Profile Updates', 'Announcements'],
-      datasets: [{ label: 'Event Count', data: [4500, 3200, 1800, 420, 350, 120], backgroundColor: '#2563EB', borderRadius: 4 }]
+      labels: mostFrequentActivities.value.map(a => a.label),
+      datasets: [{ label: 'Event Count', data: mostFrequentActivities.value.map(a => a.count), backgroundColor: '#2563EB', borderRadius: 4 }]
     },
     options: { indexAxis: 'y', responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { x: { grid: { color: '#F3F4F6' } }, y: { grid: { display: false } } } }
   });
 
-  // 2. Pie Chart (Role-wise)
-  new Chart(pieChartRef.value, {
+  const roleLabels = Object.keys(roleDistribution.value);
+  pieChart?.destroy();
+  pieChart = new Chart(pieChartRef.value, {
     type: 'pie',
     data: {
-      labels: ['Administrator', 'Officer', 'Worker', 'Citizen', 'System'],
-      datasets: [{ data: [15, 30, 25, 25, 5], backgroundColor: ['#9333EA', '#2563EB', '#F59E0B', '#14B8A6', '#94A3B8'], borderWidth: 0 }]
+      labels: roleLabels,
+      datasets: [{ data: roleLabels.map(r => roleDistribution.value[r]), backgroundColor: roleLabels.map(r => ROLE_COLORS[r] || '#94A3B8'), borderWidth: 0 }]
     },
     options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'right', labels: { boxWidth: 10, font: { size: 10 } } } } }
   });
-});
+};
+
+onMounted(fetchLogs);
 </script>
 
 <style scoped>

@@ -882,6 +882,7 @@ def officer_details(officer_id):
 
     assigned_complaints = Complaint.query.filter_by(assigned_officer=officer.id).all()
 
+    # Department rank — this officer's score vs every other officer in the same department.
     dept_rank = None
     if officer.department_id:
         dept_officers = User.query.filter_by(role='Officer', department_id=officer.department_id).all()
@@ -896,10 +897,12 @@ def officer_details(officer_id):
                 dept_rank = i
                 break
 
+    # Complaint status breakdown, for the doughnut chart.
     status_breakdown = {}
     for c in assigned_complaints:
         status_breakdown[c.status] = status_breakdown.get(c.status, 0) + 1
 
+    # Monthly trend — last 6 months, complaints managed + resolution rate.
     monthly_trend = []
     today = now_ist().date()
     for i in range(5, -1, -1):
@@ -922,6 +925,8 @@ def officer_details(officer_id):
             "resolution_rate": rate,
         })
 
+    # Worker summary — workers in this officer's department, and how many of
+    # this officer's assignments they've completed.
     worker_summary = {"total": 0, "active": 0, "pending": 0, "completed": 0}
     if officer.department_id:
         dept_workers = User.query.filter_by(role='Worker', department_id=officer.department_id).all()
@@ -935,6 +940,7 @@ def officer_details(officer_id):
             .count()
         )
 
+    # Quick insights — best month by volume, fastest resolution.
     quick_insights = {"best_month": None, "fastest_resolution": None}
     if monthly_trend:
         best = max(monthly_trend, key=lambda m: m["managed"])
@@ -950,6 +956,7 @@ def officer_details(officer_id):
         else:
             quick_insights["fastest_resolution"] = f"{int(hours // 24)}d {int(hours % 24)}h ({fastest.category})"
 
+    # Recent complaints (latest 6), with the assigned worker's name if any.
     recent = sorted(assigned_complaints, key=lambda c: c.created_at, reverse=True)[:6]
     recent_complaints = []
     for c in recent:
@@ -963,6 +970,7 @@ def officer_details(officer_id):
             "worker": worker.name if worker else None,
         })
 
+    # Feedback on this officer's complaints.
     fb_rows = (
         Feedback.query.join(Complaint, Feedback.complaint_id == Complaint.id)
         .filter(Complaint.assigned_officer == officer.id)
@@ -980,6 +988,7 @@ def officer_details(officer_id):
             "comment": f.comments,
         })
 
+    # Last login — most recent 'login' ActivityLog row for this user.
     last_login_row = (
         ActivityLog.query.filter_by(user_id=officer.id, activity_type='login')
         .order_by(ActivityLog.created_at.desc())
@@ -992,6 +1001,7 @@ def officer_details(officer_id):
             "ip": last_login_row.ip_address,
         }
 
+    # Administrative history — officer lifecycle events that name this officer.
     admin_rows = (
         ActivityLog.query.filter(
             ActivityLog.activity_type.in_([
@@ -1076,80 +1086,219 @@ def officer_details(officer_id):
 
 
 # ─────────────────────────────────────────────────────────────────────────
-# System-wide notification feed — powers admin Notifications.vue
+# System-wide notification feed for admins — powers Notifications.vue
 # ─────────────────────────────────────────────────────────────────────────
-_NOTIFICATION_CATEGORY_MAP = {
-    'officer_approved':    'approvals',
-    'officer_rejected':    'suspensions',
-    'officer_suspended':   'suspensions',
-    'officer_reactivated': 'suspensions',
-    'department_created':  'departments',
-    'department_updated':  'departments',
-    'department_deleted':  'departments',
+NOTIFICATION_CATEGORIES = {
+    'officer_approved':     'approvals',
+    'officer_rejected':     'approvals',
+    'officer_suspended':    'suspensions',
+    'officer_reactivated':  'suspensions',
+    'department_created':   'departments',
+    'department_updated':   'departments',
+    'department_deleted':   'departments',
 }
-
-_NOTIFICATION_TITLES = {
-    'officer_approved':    'Officer Approved',
-    'officer_rejected':    'Officer Rejected',
-    'officer_suspended':   'Officer Suspended',
-    'officer_reactivated': 'Officer Reactivated',
-    'department_created':  'Department Created',
-    'department_updated':  'Department Updated',
-    'department_deleted':  'Department Deleted',
-}
+OPEN_COMPLAINT_STATUSES = ('Pending', 'Under Review', 'Assigned', 'In Progress')
 
 
 @admin_bp.route('/notifications', methods=['GET'])
 @role_required('Admin')
 def admin_notifications():
-    """.... Returns a list of recent notifications for the admin dashboard, including
-    officer approvals, suspensions, department changes, and escalated complaints."""
-    log_rows = (
-        db.session.query(ActivityLog, User)
-        .join(User, ActivityLog.user_id == User.id)
-        .filter(ActivityLog.activity_type.in_(_NOTIFICATION_CATEGORY_MAP.keys()))
+    limit = min(int(request.args.get('limit', 50)), 200)
+
+    rows = (
+        ActivityLog.query
+        .filter(ActivityLog.activity_type.in_(NOTIFICATION_CATEGORIES.keys()))
         .order_by(ActivityLog.created_at.desc())
-        .limit(100)
+        .limit(200)
         .all()
     )
-
-    items = []
-    for log, actor in log_rows:
-        items.append({
-            "id":           f"log-{log.id}",
-            "category":     _NOTIFICATION_CATEGORY_MAP[log.activity_type],
-            "title":        _NOTIFICATION_TITLES[log.activity_type],
-            "message":      log.description,
-            "admin":        actor.name,
-            "complaint_id": None,
-            "created_at":   log.created_at.isoformat() if log.created_at else None,
+    notifications = []
+    for a in rows:
+        admin_user = User.query.get(a.user_id)
+        notifications.append({
+            "id":          f"activity-{a.id}",
+            "category":    NOTIFICATION_CATEGORIES[a.activity_type],
+            "title":       a.activity_type.replace('_', ' ').title(),
+            "message":     a.description,
+            "admin":       admin_user.name if admin_user else 'System',
+            "created_at":  a.created_at.isoformat(),
         })
 
     escalated = (
-        Complaint.query.filter_by(is_escalated=True).all()
+        Complaint.query
+        .filter(Complaint.is_escalated.is_(True), Complaint.status.in_(OPEN_COMPLAINT_STATUSES))
+        .order_by(Complaint.created_at.desc())
+        .limit(200)
+        .all()
     )
-    escalated.sort(key=lambda c: c.updated_at or c.created_at, reverse=True)
-    escalated = escalated[:50]
     for c in escalated:
-        when = c.updated_at or c.created_at
-        items.append({
-            "id":           f"esc-{c.id}",
-            "category":     "escalations",
-            "title":        "Complaint Escalated",
-            "message":      f"{c.category} complaint escalated in {c.location}.",
-            "admin":        None,
-            "complaint_id": f"CMP-{c.id:05d}",
-            "created_at":   when.isoformat() if when else None,
+        notifications.append({
+            "id":            f"escalation-{c.id}",
+            "category":      "escalations",
+            "title":         f"Escalated: {c.category}",
+            "message":       f"{c.title} — {c.priority} priority, currently {c.status}.",
+            "admin":         None,
+            "complaint_id":  f"CMP-{c.id:05d}",
+            "created_at":    c.created_at.isoformat(),
         })
 
-    items.sort(key=lambda n: n["created_at"] or "", reverse=True)
+    notifications.sort(key=lambda n: n["created_at"], reverse=True)
+    notifications = notifications[:limit]
 
     summary = {
-        "total":       len(items),
-        "approvals":   sum(1 for n in items if n["category"] == "approvals"),
-        "suspensions": sum(1 for n in items if n["category"] == "suspensions"),
-        "departments": sum(1 for n in items if n["category"] == "departments"),
-        "escalations": sum(1 for n in items if n["category"] == "escalations"),
+        "total":       len(notifications),
+        "approvals":   sum(1 for n in notifications if n["category"] == "approvals"),
+        "suspensions": sum(1 for n in notifications if n["category"] == "suspensions"),
+        "departments": sum(1 for n in notifications if n["category"] == "departments"),
+        "escalations": sum(1 for n in notifications if n["category"] == "escalations"),
     }
 
-    return jsonify(success=True, notifications=items, summary=summary), 200
+    return jsonify(success=True, summary=summary, notifications=notifications), 200
+
+
+# ─────────────────────────────────────────────────────────────────────────
+# Activity Logs — powers ActivityLogs.vue
+# ─────────────────────────────────────────────────────────────────────────
+ACTIVITY_MODULE = {
+    'register': 'Authentication', 'login': 'Authentication', 'logout': 'Authentication',
+    'password_changed': 'Authentication', 'password_reset_requested': 'Authentication',
+    'password_reset_completed': 'Authentication',
+    'profile_updated': 'Profile', 'profile_photo_updated': 'Profile', 'profile_photo_removed': 'Profile',
+    'complaint_submitted': 'Complaint', 'feedback_submitted': 'Complaint',
+    'officer_approved': 'Officer', 'officer_rejected': 'Officer', 'officer_suspended': 'Officer',
+    'officer_reactivated': 'Officer', 'officer_updated': 'Officer', 'officer_transferred': 'Officer',
+    'department_created': 'Department', 'department_updated': 'Department', 'department_deleted': 'Department',
+}
+ACTIVITY_STATUS = {
+    'officer_rejected': 'Critical', 'officer_suspended': 'Critical',
+    'department_deleted': 'Warning',
+}
+
+DAY_NAMES = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
+
+
+@admin_bp.route('/activity-logs', methods=['GET'])
+@role_required('Admin')
+def activity_logs():
+    limit = min(int(request.args.get('limit', 500)), 1000)
+    now = now_ist()
+    today_start = now.replace(hour=0, minute=0, second=0, microsecond=0)
+
+    rows = ActivityLog.query.order_by(ActivityLog.created_at.desc()).limit(limit).all()
+    user_ids = {r.user_id for r in rows if r.user_id}
+    users = {u.id: u for u in User.query.filter(User.id.in_(user_ids)).all()} if user_ids else {}
+    dept_ids = {u.department_id for u in users.values() if u.department_id}
+    depts = {d.id: d for d in Department.query.filter(Department.id.in_(dept_ids)).all()} if dept_ids else {}
+
+    logs = []
+    role_counts = {'Admin': 0, 'Officer': 0, 'Worker': 0, 'Citizen': 0}
+    module_counts = {}
+    action_counts = {}
+    latest_by_type = {}
+    today_count = 0
+    heatmap = [[0] * 24 for _ in range(7)]
+    user_activity_counts = {}
+
+    for r in rows:
+        u = users.get(r.user_id)
+        role = u.role if u else 'Citizen'
+        dept_name = depts[u.department_id].department_name if (u and u.department_id in depts) else ''
+        module = ACTIVITY_MODULE.get(r.activity_type, 'Other')
+        status = ACTIVITY_STATUS.get(r.activity_type, 'Success')
+
+        logs.append({
+            "id":          f"LOG-{r.id:06d}",
+            "date":        r.created_at.strftime('%b %d, %Y'),
+            "time":        r.created_at.strftime('%H:%M:%S'),
+            "created_at":  r.created_at.isoformat(),
+            "user":        u.name if u else 'Unknown',
+            "role":        role,
+            "department":  dept_name,
+            "action":      r.activity_type.replace('_', ' ').title(),
+            "desc":        r.description,
+            "module":      module,
+            "status":      status,
+            "ip":          r.ip_address or 'N/A',
+        })
+
+        if role in role_counts:
+            role_counts[role] += 1
+        module_counts[module] = module_counts.get(module, 0) + 1
+        action_counts[r.activity_type] = action_counts.get(r.activity_type, 0) + 1
+        latest_by_type.setdefault(r.activity_type, r.created_at)  # rows are desc-ordered, so first hit = latest
+        if r.created_at >= today_start:
+            today_count += 1
+        heatmap[r.created_at.weekday()][r.created_at.hour] += 1
+        if u:
+            user_activity_counts.setdefault(u.id, {"name": u.name, "role": role, "count": 0})
+            user_activity_counts[u.id]["count"] += 1
+
+    top_stats = {
+        "total_events":    len(logs),
+        "today":           today_count,
+        "admin_actions":   role_counts['Admin'],
+        "officer_actions": role_counts['Officer'],
+        "worker_actions":  role_counts['Worker'],
+        "citizen_actions": role_counts['Citizen'],
+        "security_events": action_counts.get('officer_suspended', 0) + action_counts.get('officer_rejected', 0),
+        "system_events":   module_counts.get('Department', 0),
+    }
+
+    most_frequent = sorted(
+        [{"label": k.replace('_', ' ').title(), "count": v} for k, v in action_counts.items()],
+        key=lambda x: x["count"], reverse=True
+    )[:6]
+
+    # Log-statistics card: most active module, peak login hour, busiest day, avg/day
+    most_active_module = max(module_counts, key=module_counts.get) if module_counts else 'N/A'
+    login_hours = [r.created_at.hour for r in rows if r.activity_type == 'login']
+    if login_hours:
+        from collections import Counter
+        peak_hour = Counter(login_hours).most_common(1)[0][0]
+        peak_login = f"{peak_hour:02d}:00 - {(peak_hour + 1) % 24:02d}:00"
+    else:
+        peak_login = 'N/A'
+    day_totals = [sum(heatmap[d]) for d in range(7)]
+    busiest_day_idx = day_totals.index(max(day_totals)) if any(day_totals) else None
+    busiest_day = f"{DAY_NAMES[busiest_day_idx]} ({day_totals[busiest_day_idx]})" if busiest_day_idx is not None else 'N/A'
+    span_days = max((now.date() - rows[-1].created_at.date()).days, 1) if rows else 1
+    avg_daily = round(len(logs) / span_days, 1)
+
+    log_stats = {
+        "most_active_module": most_active_module,
+        "peak_login_hour":    peak_login,
+        "busiest_day":        busiest_day,
+        "avg_daily_events":   avg_daily,
+    }
+
+    def _latest_str(activity_type):
+        ts = latest_by_type.get(activity_type)
+        return ts.strftime('%b %d, %H:%M') if ts else 'N/A'
+
+    security_events = [
+        {"event": "Password Resets",      "severity": "Medium", "count": action_counts.get('password_reset_completed', 0), "latest": _latest_str('password_reset_completed')},
+        {"event": "Account Suspensions",  "severity": "High",   "count": action_counts.get('officer_suspended', 0),        "latest": _latest_str('officer_suspended')},
+        {"event": "Account Rejections",   "severity": "Medium", "count": action_counts.get('officer_rejected', 0),         "latest": _latest_str('officer_rejected')},
+    ]
+
+    critical_rows = [l for l in logs if l["status"] == "Critical"][:6]
+    critical_events = [{
+        "id": l["id"], "action": l["action"], "time": l["date"] + ' ' + l["time"],
+        "desc": l["desc"], "user": l["user"],
+        "color": "border-red-500",
+    } for l in critical_rows]
+
+    active_users = sorted(user_activity_counts.values(), key=lambda x: x["count"], reverse=True)[:6]
+
+    return jsonify(
+        success=True,
+        top_stats=top_stats,
+        log_stats=log_stats,
+        most_frequent_activities=most_frequent,
+        role_distribution=role_counts,
+        heatmap=heatmap,
+        security_events=security_events,
+        critical_events=critical_events,
+        active_users=active_users,
+        logs=logs,
+    ), 200
