@@ -32,10 +32,13 @@
             </div>
           </div>
 
-          <!-- Illustration Placeholder -->
-          <div
-            class="w-full h-56 bg-slate-200 rounded-[14px] border-2 border-dashed border-slate-300 flex items-center justify-center text-slate-500">
-            [ Smart City / Citizen Illustration ]
+          <!-- Illustration -->
+          <div class="w-full h-56 rounded-[14px] overflow-hidden shadow-lg border border-slate-100">
+            <img 
+              src="../../assets/register.jpg" 
+              alt="CivicDesk Registration" 
+              class="w-full h-full object-cover"
+            />
           </div>
         </div>
       </section>
