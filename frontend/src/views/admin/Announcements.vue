@@ -25,6 +25,16 @@
           </div>
         </header>
 
+        <!-- Error banner -->
+        <div v-if="errorMessage" class="mb-6 p-4 bg-red-50 border border-red-200 rounded-xl text-red-700 text-sm flex items-center justify-between">
+          <span>{{ errorMessage }}</span>
+          <button @click="fetchAnnouncements" class="font-semibold underline shrink-0 ml-4">Retry</button>
+        </div>
+
+        <!-- Loading state -->
+        <div v-if="isLoading" class="text-center text-gray-400 py-10">Loading announcements…</div>
+
+        <template v-else>
         <!-- Top Statistics Grid -->
         <section class="mb-6 grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-4">
           <div v-for="(stat, index) in topStats" :key="index" class="bg-white p-5 rounded-[14px] shadow-sm border border-gray-50 flex flex-col group hover:border-[#2563EB] hover:shadow-md transition-all">
@@ -48,11 +58,11 @@
             <Clock class="w-5 h-5 shrink-0 text-gray-400" />
             <span class="text-sm">Schedule</span>
           </button>
-          <button class="flex items-center gap-3 p-3.5 bg-white border border-gray-100 text-gray-700 rounded-[14px] hover:border-gray-300 hover:bg-gray-50 transition-colors font-medium">
+          <button @click="filters.status = 'Draft'; scrollTo('table')" class="flex items-center gap-3 p-3.5 bg-white border border-gray-100 text-gray-700 rounded-[14px] hover:border-gray-300 hover:bg-gray-50 transition-colors font-medium">
             <FileText class="w-5 h-5 shrink-0 text-gray-400" />
             <span class="text-sm">Drafts</span>
           </button>
-          <button class="flex items-center gap-3 p-3.5 bg-white border border-gray-100 text-gray-700 rounded-[14px] hover:border-gray-300 hover:bg-gray-50 transition-colors font-medium">
+          <button @click="filters.status = 'Archived'; scrollTo('table')" class="flex items-center gap-3 p-3.5 bg-white border border-gray-100 text-gray-700 rounded-[14px] hover:border-gray-300 hover:bg-gray-50 transition-colors font-medium">
             <Archive class="w-5 h-5 shrink-0 text-gray-400" />
             <span class="text-sm">Archived</span>
           </button>
@@ -85,6 +95,7 @@
               <AlertTriangle class="w-4 h-4 text-[#EF4444]" /> Pinned & Critical
             </h2>
             <div class="flex-1 space-y-3">
+              <p v-if="pinnedAnnouncements.length === 0" class="text-sm text-gray-400">Nothing pinned right now — pin an announcement from its details view.</p>
               <div v-for="pin in pinnedAnnouncements" :key="pin.id" class="p-3 bg-red-50 border border-red-100 rounded-xl flex items-center justify-between group">
                 <div class="flex items-center gap-3">
                   <div class="w-2 h-2 rounded-full bg-red-500 animate-pulse"></div>
@@ -93,7 +104,7 @@
                     <p class="text-xs text-red-700 font-medium">{{ pin.audience }} • {{ pin.views }} views</p>
                   </div>
                 </div>
-                <button class="px-3 py-1.5 bg-white border border-red-200 text-red-600 text-xs font-bold rounded-lg hover:bg-red-600 hover:text-white transition-colors shadow-sm">
+                <button @click="openDrawerById(pin.id)" class="px-3 py-1.5 bg-white border border-red-200 text-red-600 text-xs font-bold rounded-lg hover:bg-red-600 hover:text-white transition-colors shadow-sm">
                   Manage
                 </button>
               </div>
@@ -129,6 +140,7 @@
             </select>
             <select v-model="filters.priority" class="bg-gray-50 border border-gray-200 text-gray-700 text-sm rounded-xl px-3 py-2.5 focus:ring-2 focus:ring-[#2563EB]/20 focus:outline-none w-full sm:w-auto">
               <option value="All">All Priorities</option>
+              <option value="Emergency">Emergency</option>
               <option value="Critical">Critical</option>
               <option value="Important">Important</option>
               <option value="Normal">Normal</option>
@@ -138,6 +150,7 @@
               <option value="Maintenance">Maintenance</option>
               <option value="Policy">Policy</option>
               <option value="Alert">Alert</option>
+              <option value="Holiday">Holiday</option>
               <option value="General">General</option>
             </select>
             <select v-model="filters.sort" class="bg-gray-50 border border-gray-200 text-gray-700 text-sm rounded-xl px-3 py-2.5 focus:ring-2 focus:ring-[#2563EB]/20 focus:outline-none w-full sm:w-auto">
@@ -152,7 +165,7 @@
         </section>
 
         <!-- Announcements Data Table (Desktop) -->
-        <section class="hidden lg:block bg-white rounded-[14px] shadow-sm border border-gray-50 overflow-hidden mb-8">
+        <section id="table" class="hidden lg:block bg-white rounded-[14px] shadow-sm border border-gray-50 overflow-hidden mb-8">
           <div class="overflow-x-auto">
             <table class="w-full text-left border-collapse">
               <thead>
@@ -198,7 +211,7 @@
                     <div class="flex items-center justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                       <button @click="openDrawer(ann)" class="p-1.5 text-gray-400 hover:text-[#2563EB] hover:bg-blue-50 rounded-lg" title="View"><Eye class="w-4 h-4" /></button>
                       <button @click="openModal('edit', ann)" class="p-1.5 text-gray-400 hover:text-gray-700 hover:bg-gray-100 rounded-lg" title="Edit"><Pencil class="w-4 h-4" /></button>
-                      <button v-if="ann.status !== 'Published'" class="p-1.5 text-gray-400 hover:text-green-600 hover:bg-green-50 rounded-lg" title="Publish"><Send class="w-4 h-4" /></button>
+                      <button v-if="ann.status !== 'Published'" @click="quickPublish(ann)" class="p-1.5 text-gray-400 hover:text-green-600 hover:bg-green-50 rounded-lg" title="Publish"><Send class="w-4 h-4" /></button>
                       <button v-if="ann.status !== 'Archived'" @click="openModal('archive', ann)" class="p-1.5 text-gray-400 hover:text-yellow-600 hover:bg-yellow-50 rounded-lg" title="Archive"><Archive class="w-4 h-4" /></button>
                       <button @click="openModal('delete', ann)" class="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg" title="Delete"><Trash2 class="w-4 h-4" /></button>
                     </div>
@@ -247,7 +260,7 @@
         <!-- Analytics Charts Grid -->
         <section id="analytics" class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-6 mb-8">
           <div class="bg-white p-6 rounded-[14px] shadow-sm border border-gray-50">
-             <h3 class="text-xs font-bold text-gray-900 uppercase tracking-wider mb-4 flex items-center gap-2"><LineChart class="w-4 h-4 text-[#2563EB]"/> Views by Month</h3>
+             <h3 class="text-xs font-bold text-gray-900 uppercase tracking-wider mb-4 flex items-center gap-2"><LineChart class="w-4 h-4 text-[#2563EB]"/> Created by Month</h3>
              <div class="relative h-48 w-full"><canvas ref="viewsChartRef"></canvas></div>
           </div>
           <div class="bg-white p-6 rounded-[14px] shadow-sm border border-gray-50">
@@ -264,8 +277,8 @@
           </div>
         </section>
 
-        <!-- Bottom Grid: Activity, Templates, Comments -->
-        <section class="grid grid-cols-1 xl:grid-cols-3 gap-6 mb-6">
+        <!-- Bottom Grid: Activity, Templates -->
+        <section class="grid grid-cols-1 xl:grid-cols-2 gap-6 mb-6">
           
           <!-- Recent Activity -->
           <div class="bg-white rounded-[14px] shadow-sm border border-gray-50 p-6 flex flex-col h-[400px]">
@@ -274,6 +287,7 @@
             </h3>
             <div class="flex-1 overflow-y-auto custom-scrollbar">
               <div class="relative border-l-2 border-gray-100 ml-3 space-y-6">
+                <p v-if="recentActivity.length === 0" class="text-sm text-gray-400 pl-5">No activity yet.</p>
                 <div v-for="act in recentActivity" :key="act.id" class="relative pl-5">
                   <span :class="`absolute -left-[9px] top-1 w-4 h-4 rounded-full bg-white border-2 ${act.color}`"></span>
                   <div class="flex justify-between items-baseline mb-0.5">
@@ -298,31 +312,15 @@
                   <h4 class="font-bold text-gray-900 text-sm group-hover:text-[#2563EB] transition-colors">{{ tpl.name }}</h4>
                   <p class="text-xs text-gray-500">{{ tpl.category }}</p>
                 </div>
-                <button class="px-3 py-1.5 bg-gray-50 border border-gray-200 text-gray-700 text-xs font-bold rounded-lg hover:bg-[#2563EB] hover:text-white transition-colors">
+                <button @click="useTemplate(tpl)" class="px-3 py-1.5 bg-gray-50 border border-gray-200 text-gray-700 text-xs font-bold rounded-lg hover:bg-[#2563EB] hover:text-white transition-colors">
                   Use
                 </button>
               </div>
             </div>
           </div>
 
-          <!-- Recent Comments Placeholder -->
-          <div class="bg-white rounded-[14px] shadow-sm border border-gray-50 p-6 flex flex-col h-[400px]">
-            <h3 class="text-sm font-bold text-gray-900 uppercase tracking-wider mb-5 flex items-center gap-2">
-              <MessageSquare class="w-4 h-4 text-[#2563EB]" /> Recent Comments
-            </h3>
-            <div class="flex-1 overflow-y-auto custom-scrollbar space-y-4 pr-2">
-              <div v-for="comment in comments" :key="comment.id" class="p-3 bg-gray-50 border border-gray-100 rounded-xl">
-                <div class="flex justify-between items-start mb-1">
-                  <p class="text-xs font-bold text-gray-900">{{ comment.user }}</p>
-                  <span class="text-[10px] text-gray-400">{{ comment.date }}</span>
-                </div>
-                <p class="text-xs text-gray-600 mb-2">"{{ comment.text }}"</p>
-                <p class="text-[10px] text-[#2563EB] font-medium truncate">On: {{ comment.announcement }}</p>
-              </div>
-            </div>
-          </div>
-
         </section>
+        </template>
       </main>
     </div>
 
@@ -352,29 +350,23 @@
             <div class="col-span-2"><p class="text-xs text-gray-500 mb-0.5">Total Views</p><p class="font-bold text-[#2563EB] flex items-center gap-1"><Eye class="w-4 h-4"/> {{ selectedAnn.views }} Views</p></div>
           </div>
 
-          <div>
-            <h3 class="text-xs font-bold text-gray-400 uppercase tracking-wider mb-2">Description / Content</h3>
-            <div class="text-sm text-gray-700 leading-relaxed space-y-2">
-              <p>This is a detailed description placeholder for <strong>{{ selectedAnn.title }}</strong>.</p>
-              <p>In a production environment, this area would render rich text or HTML content allowing administrators to format policies, maintenance schedules, or emergency alerts properly with bullet points, bold text, and links.</p>
-            </div>
+          <div v-if="selectedAnn.summary">
+            <h3 class="text-xs font-bold text-gray-400 uppercase tracking-wider mb-2">Summary</h3>
+            <p class="text-sm text-gray-700 leading-relaxed">{{ selectedAnn.summary }}</p>
           </div>
 
           <div>
-            <h3 class="text-xs font-bold text-gray-400 uppercase tracking-wider mb-2">Attachments</h3>
-            <div class="flex items-center gap-3 p-3 border border-gray-200 rounded-xl hover:bg-gray-50 transition-colors cursor-pointer">
-              <div class="p-2 bg-blue-50 text-[#2563EB] rounded-lg"><FileText class="w-4 h-4"/></div>
-              <div class="flex-1"><p class="text-sm font-semibold text-gray-900">Official_Notice.pdf</p><p class="text-[10px] text-gray-500">2.4 MB</p></div>
-              <Download class="w-4 h-4 text-gray-400"/>
-            </div>
+            <h3 class="text-xs font-bold text-gray-400 uppercase tracking-wider mb-2">Full Content</h3>
+            <div class="text-sm text-gray-700 leading-relaxed whitespace-pre-line">{{ selectedAnn.content }}</div>
           </div>
         </div>
 
-        <div class="p-4 border-t border-gray-100 bg-white grid grid-cols-3 gap-3">
-          <button @click="openModal('edit', selectedAnn)" class="py-2.5 bg-gray-50 border border-gray-200 text-gray-700 text-sm font-semibold rounded-xl hover:bg-gray-100">Edit</button>
-          <button v-if="selectedAnn.status !== 'Published'" class="py-2.5 bg-[#2563EB] text-white text-sm font-semibold rounded-xl hover:bg-[#1E40AF] shadow-sm">Publish</button>
+        <div class="p-4 border-t border-gray-100 bg-white grid grid-cols-2 gap-3">
+          <button @click="openModal('edit', selectedAnn)" class="py-2.5 bg-gray-50 border border-gray-200 text-gray-700 text-sm font-semibold rounded-xl hover:bg-gray-100 flex items-center justify-center gap-2"><Pencil class="w-4 h-4"/> Edit</button>
+          <button @click="togglePin(selectedAnn)" class="py-2.5 bg-purple-50 border border-purple-200 text-purple-700 text-sm font-semibold rounded-xl hover:bg-purple-100">{{ selectedAnn.isPinned ? 'Unpin' : 'Pin' }}</button>
+          <button v-if="selectedAnn.status !== 'Published'" @click="quickPublish(selectedAnn)" class="py-2.5 bg-[#2563EB] text-white text-sm font-semibold rounded-xl hover:bg-[#1E40AF] shadow-sm">Publish</button>
           <button v-if="selectedAnn.status !== 'Archived'" @click="openModal('archive', selectedAnn)" class="py-2.5 bg-yellow-50 text-yellow-700 border border-yellow-200 text-sm font-semibold rounded-xl hover:bg-yellow-100">Archive</button>
-          <button v-if="selectedAnn.status === 'Archived'" @click="openModal('delete', selectedAnn)" class="py-2.5 bg-red-50 text-red-600 border border-red-200 text-sm font-semibold rounded-xl hover:bg-red-100">Delete</button>
+          <button @click="openModal('delete', selectedAnn)" class="py-2.5 bg-red-50 text-red-600 border border-red-200 text-sm font-semibold rounded-xl hover:bg-red-100 col-span-2">Delete Permanently</button>
         </div>
       </div>
     </div>
@@ -393,59 +385,63 @@
           <button @click="closeModal" class="p-2 bg-gray-50 text-gray-500 rounded-full hover:bg-gray-100 transition-colors"><X class="w-5 h-5"/></button>
         </div>
         
-        <form @submit.prevent="handleActionClose" class="space-y-5">
+        <form @submit.prevent="submitPublishOrSave" class="space-y-5">
+          <div v-if="formError" class="p-3 bg-red-50 border border-red-200 rounded-xl text-red-700 text-sm">{{ formError }}</div>
           <div>
             <label class="block text-sm font-medium text-gray-700 mb-1.5">Announcement Title</label>
-            <input type="text" class="w-full px-4 py-2.5 border border-gray-200 rounded-xl focus:ring-2 focus:ring-[#2563EB]/20 focus:border-[#2563EB] outline-none" placeholder="e.g. Scheduled Maintenance for Sector 4" />
+            <input v-model="form.title" type="text" required minlength="3" class="w-full px-4 py-2.5 border border-gray-200 rounded-xl focus:ring-2 focus:ring-[#2563EB]/20 focus:border-[#2563EB] outline-none" placeholder="e.g. Scheduled Maintenance for Sector 4" />
           </div>
           
           <div class="grid grid-cols-1 md:grid-cols-3 gap-5">
             <div>
               <label class="block text-sm font-medium text-gray-700 mb-1.5">Category</label>
-              <select class="w-full px-4 py-2.5 border border-gray-200 rounded-xl focus:ring-2 focus:ring-[#2563EB]/20 focus:border-[#2563EB] outline-none">
+              <select v-model="form.category" class="w-full px-4 py-2.5 border border-gray-200 rounded-xl focus:ring-2 focus:ring-[#2563EB]/20 focus:border-[#2563EB] outline-none">
                 <option>Maintenance</option><option>Policy</option><option>Alert</option><option>Holiday</option><option>General</option>
               </select>
             </div>
             <div>
               <label class="block text-sm font-medium text-gray-700 mb-1.5">Target Audience</label>
-              <select class="w-full px-4 py-2.5 border border-gray-200 rounded-xl focus:ring-2 focus:ring-[#2563EB]/20 focus:border-[#2563EB] outline-none">
+              <select v-model="form.audience" class="w-full px-4 py-2.5 border border-gray-200 rounded-xl focus:ring-2 focus:ring-[#2563EB]/20 focus:border-[#2563EB] outline-none">
                 <option>All Users</option><option>Citizens</option><option>Officers</option><option>Workers</option>
               </select>
             </div>
             <div>
               <label class="block text-sm font-medium text-gray-700 mb-1.5">Priority</label>
-              <select class="w-full px-4 py-2.5 border border-gray-200 rounded-xl focus:ring-2 focus:ring-[#2563EB]/20 focus:border-[#2563EB] outline-none">
+              <select v-model="form.priority" class="w-full px-4 py-2.5 border border-gray-200 rounded-xl focus:ring-2 focus:ring-[#2563EB]/20 focus:border-[#2563EB] outline-none">
                 <option>Normal</option><option>Important</option><option>Critical</option><option>Emergency</option>
               </select>
             </div>
           </div>
 
           <div>
-            <label class="block text-sm font-medium text-gray-700 mb-1.5">Short Summary</label>
-            <textarea rows="2" class="w-full px-4 py-2.5 border border-gray-200 rounded-xl focus:ring-2 focus:ring-[#2563EB]/20 focus:border-[#2563EB] outline-none resize-none custom-scrollbar" placeholder="Brief summary visible on cards..."></textarea>
+            <label class="block text-sm font-medium text-gray-700 mb-1.5">Short Summary <span class="text-gray-400 font-normal">(optional)</span></label>
+            <textarea v-model="form.summary" rows="2" class="w-full px-4 py-2.5 border border-gray-200 rounded-xl focus:ring-2 focus:ring-[#2563EB]/20 focus:border-[#2563EB] outline-none resize-none custom-scrollbar" placeholder="Brief summary visible on cards..."></textarea>
           </div>
           
           <div>
             <label class="block text-sm font-medium text-gray-700 mb-1.5">Full Description</label>
-            <textarea rows="5" class="w-full px-4 py-2.5 border border-gray-200 rounded-xl focus:ring-2 focus:ring-[#2563EB]/20 focus:border-[#2563EB] outline-none resize-none custom-scrollbar" placeholder="Detailed content..."></textarea>
+            <textarea v-model="form.content" required minlength="10" rows="5" class="w-full px-4 py-2.5 border border-gray-200 rounded-xl focus:ring-2 focus:ring-[#2563EB]/20 focus:border-[#2563EB] outline-none resize-none custom-scrollbar" placeholder="Detailed content..."></textarea>
           </div>
 
           <div class="grid grid-cols-1 md:grid-cols-2 gap-5">
              <div>
-              <label class="block text-sm font-medium text-gray-700 mb-1.5">Publish Date</label>
-              <input type="datetime-local" class="w-full px-4 py-2.5 border border-gray-200 rounded-xl focus:ring-2 focus:ring-[#2563EB]/20 outline-none" />
+              <label class="block text-sm font-medium text-gray-700 mb-1.5">
+                Publish Date <span v-if="activeModal === 'edit'" class="text-gray-400 font-normal">(set via Publish button)</span>
+                <span v-else class="text-gray-400 font-normal">(leave blank to publish immediately)</span>
+              </label>
+              <input v-model="form.publishAt" :disabled="activeModal === 'edit'" type="datetime-local" class="w-full px-4 py-2.5 border border-gray-200 rounded-xl focus:ring-2 focus:ring-[#2563EB]/20 outline-none disabled:bg-gray-50 disabled:text-gray-400" />
             </div>
             <div>
               <label class="block text-sm font-medium text-gray-700 mb-1.5">Expiry Date (Optional)</label>
-              <input type="datetime-local" class="w-full px-4 py-2.5 border border-gray-200 rounded-xl focus:ring-2 focus:ring-[#2563EB]/20 outline-none" />
+              <input v-model="form.expiryAt" type="datetime-local" class="w-full px-4 py-2.5 border border-gray-200 rounded-xl focus:ring-2 focus:ring-[#2563EB]/20 outline-none" />
             </div>
           </div>
           
           <div class="pt-6 flex justify-end gap-3 mt-4 border-t border-gray-100">
             <button type="button" @click="closeModal" class="px-6 py-2.5 text-sm font-medium text-gray-700 bg-gray-50 border border-gray-200 rounded-xl transition-colors">Cancel</button>
-            <button type="button" class="px-6 py-2.5 text-sm font-bold text-[#2563EB] bg-blue-50 hover:bg-blue-100 border border-blue-100 rounded-xl transition-colors">Save Draft</button>
-            <button type="submit" class="px-6 py-2.5 text-sm font-bold text-white bg-[#2563EB] hover:bg-[#1E40AF] rounded-xl transition-colors shadow-sm">
-              {{ activeModal === 'create' ? 'Publish Now' : 'Save Changes' }}
+            <button v-if="activeModal === 'create'" type="button" :disabled="isSubmitting" @click="submitDraft" class="px-6 py-2.5 text-sm font-bold text-[#2563EB] bg-blue-50 hover:bg-blue-100 border border-blue-100 rounded-xl transition-colors disabled:opacity-60">Save Draft</button>
+            <button type="submit" :disabled="isSubmitting" class="px-6 py-2.5 text-sm font-bold text-white bg-[#2563EB] hover:bg-[#1E40AF] rounded-xl transition-colors shadow-sm disabled:opacity-60">
+              {{ activeModal === 'create' ? 'Publish / Schedule' : 'Save Changes' }}
             </button>
           </div>
         </form>
@@ -458,7 +454,7 @@
         <p class="text-sm text-gray-500 mb-6">Archived announcements will no longer be visible to users but remain in the system records.</p>
         <div class="flex justify-center gap-3">
           <button @click="closeModal" class="px-5 py-2.5 text-sm font-medium text-gray-700 bg-gray-50 border border-gray-200 rounded-xl">Cancel</button>
-          <button @click="handleActionClose" class="px-5 py-2.5 text-sm font-bold text-white bg-yellow-500 hover:bg-yellow-600 rounded-xl shadow-sm">Archive</button>
+          <button @click="submitArchive" :disabled="isSubmitting" class="px-5 py-2.5 text-sm font-bold text-white bg-yellow-500 hover:bg-yellow-600 rounded-xl shadow-sm disabled:opacity-60">Archive</button>
         </div>
       </div>
 
@@ -469,7 +465,7 @@
         <p class="text-sm text-gray-500 mb-6">This announcement will be permanently removed. This action cannot be undone.</p>
         <div class="flex justify-center gap-3">
           <button @click="closeModal" class="px-5 py-2.5 text-sm font-medium text-gray-700 bg-gray-50 border border-gray-200 rounded-xl">Cancel</button>
-          <button @click="handleActionClose" class="px-5 py-2.5 text-sm font-bold text-white bg-red-600 hover:bg-red-700 rounded-xl shadow-sm">Delete</button>
+          <button @click="submitDelete" :disabled="isSubmitting" class="px-5 py-2.5 text-sm font-bold text-white bg-red-600 hover:bg-red-700 rounded-xl shadow-sm disabled:opacity-60">Delete</button>
         </div>
       </div>
       
@@ -478,6 +474,8 @@
 
 <script setup>
 import { ref, computed, onMounted, reactive } from 'vue';
+import { useRouter } from 'vue-router';
+import axios from 'axios';
 import Chart from 'chart.js/auto';
 
 // Icons
@@ -485,8 +483,12 @@ import {
   Megaphone, Bell, MessageSquare, Newspaper, ClipboardList, 
   Calendar, Clock, Users, ShieldAlert, AlertTriangle, FileText, 
   Search, Eye, Pencil, Trash2, Archive, Copy, Send, BarChart3, 
-  PieChart, TrendingUp, X, Download
+  PieChart, LineChart, TrendingUp, X, Download
 } from 'lucide-vue-next';
+
+const API_BASE = 'http://127.0.0.1:5000/api/admin';
+const router = useRouter();
+const authHeaders = () => ({ headers: { Authorization: `Bearer ${localStorage.getItem('token')}` } });
 
 // View State
 const sidebarOpen = ref(false);
@@ -495,57 +497,65 @@ const activeModal = ref(null);
 const selectedAnn = ref(null);
 const targetAnn = ref(null);
 const currentDate = new Date().toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
+const isLoading = ref(true);
+const errorMessage = ref('');
+const isSubmitting = ref(false);
 
-// --- Dummy Data ---
-const topStats = ref([
-  { label: 'Total Announcements', value: '245', icon: Newspaper, colorClass: 'text-[#2563EB] bg-blue-100', textClass: 'text-[#2563EB]' },
-  { label: 'Published', value: '180', icon: Send, colorClass: 'text-[#22C55E] bg-green-100', textClass: 'text-[#22C55E]' },
-  { label: 'Scheduled', value: '15', icon: Clock, colorClass: 'text-[#F59E0B] bg-yellow-100', textClass: 'text-[#F59E0B]' },
-  { label: 'Drafts', value: '8', icon: FileText, colorClass: 'text-gray-600 bg-gray-100', textClass: 'text-gray-600' },
-  { label: 'Archived', value: '42', icon: Archive, colorClass: 'text-red-600 bg-red-100', textClass: 'text-red-600' },
-  { label: 'Total Views', value: '45.2K', icon: Eye, colorClass: 'text-purple-600 bg-purple-100', textClass: 'text-purple-600' }
-]);
+// --- Live data — populated from GET /api/admin/announcements ---
+const STAT_META = {
+  total:       { label: 'Total Announcements', icon: Newspaper, colorClass: 'text-[#2563EB] bg-blue-100', textClass: 'text-[#2563EB]' },
+  published:   { label: 'Published',   icon: Send,    colorClass: 'text-[#22C55E] bg-green-100',  textClass: 'text-[#22C55E]' },
+  scheduled:   { label: 'Scheduled',   icon: Clock,   colorClass: 'text-[#F59E0B] bg-yellow-100', textClass: 'text-[#F59E0B]' },
+  drafts:      { label: 'Drafts',      icon: FileText, colorClass: 'text-gray-600 bg-gray-100',   textClass: 'text-gray-600' },
+  archived:    { label: 'Archived',    icon: Archive, colorClass: 'text-red-600 bg-red-100',      textClass: 'text-red-600' },
+  total_views: { label: 'Total Views', icon: Eye,     colorClass: 'text-purple-600 bg-purple-100', textClass: 'text-purple-600' },
+};
+const STAT_ORDER = ['total', 'published', 'scheduled', 'drafts', 'archived', 'total_views'];
 
-const quickInsights = ref([
-  { label: 'Most Viewed', value: 'New Platform Update v2.0 (1.2k)' },
-  { label: 'Most Active Audience', value: 'Citizens (65%)' },
-  { label: 'Top Category', value: 'Maintenance Alerts' },
-  { label: 'Latest Published', value: 'Water Supply Issue (Today)' }
-]);
+const topStats = ref([]);
+const quickInsights = ref([]);
+const pinnedAnnouncements = ref([]);
+const announcements = ref([]);
+const recentActivity = ref([]);
+const categoryDist = ref({});
+const audienceDist = ref({});
+const priorityDist = ref({});
+const monthlyCreated = ref([]);
 
-const pinnedAnnouncements = ref([
-  { id: 1, title: 'Severe Cyclone Warning - Zones 1-3', audience: 'All Users', views: 8450 },
-  { id: 2, title: 'System Downtime Scheduled for Sunday', audience: 'Officers & Workers', views: 1240 }
-]);
-
-const announcements = ref([
-  { id: 'ANN-1045', title: 'Severe Cyclone Warning - Zones 1-3', category: 'Alert', audience: 'All Users', priority: 'Emergency', status: 'Published', publishDate: 'Jul 12, 2026', expiryDate: 'Jul 15, 2026', views: 8450, author: 'Admin Jane' },
-  { id: 'ANN-1044', title: 'Water Supply Issue in Sector 4', category: 'Maintenance', audience: 'Citizens', priority: 'Important', status: 'Published', publishDate: 'Jul 11, 2026', expiryDate: 'Jul 13, 2026', views: 3200, author: 'Admin John' },
-  { id: 'ANN-1043', title: 'System Downtime Scheduled for Sunday', category: 'Maintenance', audience: 'Officers', priority: 'Critical', status: 'Scheduled', publishDate: 'Jul 15, 2026', expiryDate: 'Jul 16, 2026', views: 0, author: 'Admin Jane' },
-  { id: 'ANN-1042', title: 'New Safety Protocol for Field Work', category: 'Policy', audience: 'Workers', priority: 'Important', status: 'Draft', publishDate: '-', expiryDate: '-', views: 0, author: 'Admin Sarah' },
-  { id: 'ANN-1041', title: 'Independence Day Holiday Notice', category: 'Holiday', audience: 'All Users', priority: 'Normal', status: 'Published', publishDate: 'Jul 01, 2026', expiryDate: 'Aug 16, 2026', views: 12500, author: 'Admin Jane' },
-  { id: 'ANN-1020', title: 'Q1 Performance Review Criteria', category: 'General', audience: 'Officers', priority: 'Normal', status: 'Archived', publishDate: 'Jan 10, 2026', expiryDate: 'Feb 10, 2026', views: 420, author: 'Admin John' }
-]);
-
+// Quick-start presets — pre-fill the create form. These aren't stored
+// anywhere (no template-storage model exists); they're just convenient
+// starting points, not saved data.
 const templates = ref([
-  { name: 'Routine Maintenance Notice', category: 'Maintenance' },
-  { name: 'Emergency Weather Alert', category: 'Alert' },
-  { name: 'Public Holiday Declaration', category: 'Holiday' },
-  { name: 'Internal Policy Update', category: 'Policy' }
+  { name: 'Routine Maintenance Notice', category: 'Maintenance', priority: 'Normal', audience: 'All Users' },
+  { name: 'Emergency Weather Alert', category: 'Alert', priority: 'Emergency', audience: 'All Users' },
+  { name: 'Public Holiday Declaration', category: 'Holiday', priority: 'Normal', audience: 'All Users' },
+  { name: 'Internal Policy Update', category: 'Policy', priority: 'Important', audience: 'Officers' },
 ]);
 
-const recentActivity = ref([
-  { id: 1, action: 'Announcement Published', desc: 'Severe Cyclone Warning broadcasted to All Users.', time: '2 hours ago', admin: 'Jane Doe', color: 'border-green-500' },
-  { id: 2, action: 'Announcement Scheduled', desc: 'System Downtime set for Jul 15.', time: '5 hours ago', admin: 'Jane Doe', color: 'border-[#2563EB]' },
-  { id: 3, action: 'Draft Saved', desc: 'New Safety Protocol saved to drafts.', time: 'Yesterday', admin: 'Sarah Smith', color: 'border-gray-400' },
-  { id: 4, action: 'Announcement Archived', desc: 'Q2 Reports notice moved to archive.', time: 'Jul 10', admin: 'John Doe', color: 'border-yellow-500' }
-]);
+const fetchAnnouncements = async () => {
+  isLoading.value = true;
+  errorMessage.value = '';
+  try {
+    const { data } = await axios.get(`${API_BASE}/announcements`, authHeaders());
 
-const comments = ref([
-  { id: 1, user: 'Rahul Sharma (Citizen)', date: 'Today, 10:30 AM', text: 'Will the water supply be restored by evening?', announcement: 'Water Supply Issue in Sector 4' },
-  { id: 2, user: 'Amit Patel (Officer)', date: 'Yesterday, 14:15 PM', text: 'Noted. Forwarded to all field workers in my zone.', announcement: 'Severe Cyclone Warning' },
-  { id: 3, user: 'Sanjay Kumar (Worker)', date: 'Jul 10', text: 'Where can I find the attachment?', announcement: 'New Safety Protocol' }
-]);
+    topStats.value = STAT_ORDER.map(key => ({ ...STAT_META[key], value: data.top_stats[key] }));
+    quickInsights.value = data.quick_insights;
+    pinnedAnnouncements.value = data.pinned;
+    announcements.value = data.announcements;
+    recentActivity.value = data.recent_activity.map(a => ({ ...a, color: 'border-[#2563EB]' }));
+    categoryDist.value = data.category_distribution;
+    audienceDist.value = data.audience_distribution;
+    priorityDist.value = data.priority_distribution;
+    monthlyCreated.value = data.monthly_created;
+
+    renderCharts();
+  } catch (err) {
+    if (err.response?.status === 401) router.push('/login');
+    else errorMessage.value = err.response?.data?.message || 'Failed to load announcements.';
+  } finally {
+    isLoading.value = false;
+  }
+};
 
 // --- Filters & Sorting ---
 const filters = reactive({
@@ -566,9 +576,8 @@ const filteredAnnouncements = computed(() => {
 
   result.sort((a, b) => {
     if (filters.sort === 'Views') return b.views - a.views;
-    // Basic string comparison for date sorting as fallback
-    if (filters.sort === 'Oldest') return a.id.localeCompare(b.id);
-    return b.id.localeCompare(a.id); // Newest
+    if (filters.sort === 'Oldest') return new Date(a.createdAt) - new Date(b.createdAt);
+    return new Date(b.createdAt) - new Date(a.createdAt); // Newest
   });
 
   return result;
@@ -611,60 +620,188 @@ const scrollTo = (id) => document.getElementById(id)?.scrollIntoView({ behavior:
 // Modal / Drawer interactions
 const openDrawer = (ann) => { selectedAnn.value = ann; isDrawerOpen.value = true; };
 const closeDrawer = () => { isDrawerOpen.value = false; setTimeout(() => { selectedAnn.value = null; }, 300); };
-const openModal = (type, ann = null) => { activeModal.value = type; if(ann) targetAnn.value = ann; };
-const closeModal = () => { activeModal.value = null; targetAnn.value = null; };
+const openDrawerById = (annId) => {
+  const ann = announcements.value.find(a => a.id === annId);
+  if (ann) openDrawer(ann);
+};
+
+const blankForm = () => ({ title: '', summary: '', content: '', category: 'General', priority: 'Normal', audience: 'All Users', publishAt: '', expiryAt: '' });
+const form = reactive(blankForm());
+const formError = ref('');
+
+const resetForm = () => Object.assign(form, blankForm());
+
+const openModal = (type, ann = null) => {
+  activeModal.value = type;
+  formError.value = '';
+  if (ann) targetAnn.value = ann;
+  if (type === 'edit' && ann) {
+    Object.assign(form, {
+      title: ann.title, summary: ann.summary || '', content: ann.content,
+      category: ann.category, priority: ann.priority, audience: ann.audience,
+      publishAt: '', expiryAt: ann.expiryAt ? toDatetimeLocal(ann.expiryAt) : '',
+    });
+  } else if (type === 'create') {
+    resetForm();
+  }
+};
+const closeModal = () => { activeModal.value = null; targetAnn.value = null; formError.value = ''; };
 const handleActionClose = () => { closeModal(); closeDrawer(); };
+
+const toDatetimeLocal = (dateStr) => {
+  // dateStr here is the display-formatted date (e.g. 'Aug 06, 2026') — good enough
+  // for a starting point in the expiry field; admin can adjust freely.
+  const d = new Date(dateStr);
+  if (isNaN(d)) return '';
+  return d.toISOString().slice(0, 16);
+};
+
+const useTemplate = (tpl) => {
+  resetForm();
+  form.title = tpl.name;
+  form.category = tpl.category;
+  form.priority = tpl.priority;
+  form.audience = tpl.audience;
+  activeModal.value = 'create';
+  formError.value = '';
+};
+
+// --- Backend-wired actions ---
+const submitDraft = async () => {
+  if (form.title.trim().length < 3) { formError.value = 'Title must be at least 3 characters.'; return; }
+  if (form.content.trim().length < 10) { formError.value = 'Content must be at least 10 characters.'; return; }
+  isSubmitting.value = true;
+  try {
+    await axios.post(`${API_BASE}/announcements`, { ...form, action: 'draft' }, authHeaders());
+    closeModal();
+    await fetchAnnouncements();
+  } catch (err) {
+    formError.value = err.response?.data?.message || 'Failed to save draft.';
+  } finally {
+    isSubmitting.value = false;
+  }
+};
+
+const submitPublishOrSave = async () => {
+  if (form.title.trim().length < 3) { formError.value = 'Title must be at least 3 characters.'; return; }
+  if (form.content.trim().length < 10) { formError.value = 'Content must be at least 10 characters.'; return; }
+  isSubmitting.value = true;
+  try {
+    if (activeModal.value === 'create') {
+      await axios.post(`${API_BASE}/announcements`, { ...form, action: 'publish' }, authHeaders());
+    } else {
+      await axios.put(`${API_BASE}/announcements/${targetAnn.value.rawId}`, form, authHeaders());
+    }
+    closeModal();
+    await fetchAnnouncements();
+  } catch (err) {
+    formError.value = err.response?.data?.message || 'Failed to save announcement.';
+  } finally {
+    isSubmitting.value = false;
+  }
+};
+
+const quickPublish = async (ann) => {
+  try {
+    await axios.patch(`${API_BASE}/announcements/${ann.rawId}/publish`, {}, authHeaders());
+    await fetchAnnouncements();
+    if (selectedAnn.value?.rawId === ann.rawId) closeDrawer();
+  } catch (err) {
+    errorMessage.value = err.response?.data?.message || 'Failed to publish.';
+  }
+};
+
+const submitArchive = async () => {
+  if (!targetAnn.value) return;
+  isSubmitting.value = true;
+  try {
+    await axios.patch(`${API_BASE}/announcements/${targetAnn.value.rawId}/archive`, {}, authHeaders());
+    handleActionClose();
+    await fetchAnnouncements();
+  } catch (err) {
+    errorMessage.value = err.response?.data?.message || 'Failed to archive.';
+  } finally {
+    isSubmitting.value = false;
+  }
+};
+
+const submitDelete = async () => {
+  if (!targetAnn.value) return;
+  isSubmitting.value = true;
+  try {
+    await axios.delete(`${API_BASE}/announcements/${targetAnn.value.rawId}`, authHeaders());
+    handleActionClose();
+    await fetchAnnouncements();
+  } catch (err) {
+    errorMessage.value = err.response?.data?.message || 'Failed to delete.';
+  } finally {
+    isSubmitting.value = false;
+  }
+};
+
+const togglePin = async (ann) => {
+  try {
+    const { data } = await axios.patch(`${API_BASE}/announcements/${ann.rawId}/pin`, {}, authHeaders());
+    if (selectedAnn.value?.rawId === ann.rawId) selectedAnn.value.isPinned = data.announcement.isPinned;
+    await fetchAnnouncements();
+  } catch (err) {
+    errorMessage.value = err.response?.data?.message || 'Failed to update pin.';
+  }
+};
 
 // --- Charts Logic ---
 const viewsChartRef = ref(null);
 const categoryChartRef = ref(null);
 const audienceChartRef = ref(null);
 const priorityChartRef = ref(null);
+let createdChart = null, categoryChart = null, audienceChart = null, priorityChart = null;
 
-onMounted(() => {
+const renderCharts = () => {
+  if (!viewsChartRef.value || !categoryChartRef.value || !audienceChartRef.value || !priorityChartRef.value) return;
   Chart.defaults.font.family = 'Inter, sans-serif';
   Chart.defaults.color = '#64748b';
 
-  // 1. Line Chart
-  new Chart(viewsChartRef.value, {
+  // 1. Line Chart — announcements created per month (real; there's no
+  // recipient-facing view tracking yet to chart views by month instead)
+  createdChart?.destroy();
+  createdChart = new Chart(viewsChartRef.value, {
     type: 'line',
     data: {
-      labels: ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun'],
-      datasets: [{ label: 'Total Views', data: [1200, 1500, 1100, 2100, 1800, 2400], borderColor: '#2563EB', backgroundColor: 'rgba(37, 99, 235, 0.1)', tension: 0.4, fill: true }]
+      labels: monthlyCreated.value.map(m => m.month),
+      datasets: [{ label: 'Announcements Created', data: monthlyCreated.value.map(m => m.count), borderColor: '#2563EB', backgroundColor: 'rgba(37, 99, 235, 0.1)', tension: 0.4, fill: true }]
     },
-    options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { y: { grid: { color: '#F3F4F6' } }, x: { grid: { display: false } } } }
+    options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { y: { beginAtZero: true, ticks: { stepSize: 1 }, grid: { color: '#F3F4F6' } }, x: { grid: { display: false } } } }
   });
 
   // 2. Pie Chart (Category)
-  new Chart(categoryChartRef.value, {
+  const catLabels = Object.keys(categoryDist.value);
+  categoryChart?.destroy();
+  categoryChart = new Chart(categoryChartRef.value, {
     type: 'pie',
-    data: {
-      labels: ['Maintenance', 'Policy', 'Alert', 'General'],
-      datasets: [{ data: [40, 25, 20, 15], backgroundColor: ['#2563EB', '#1E40AF', '#EF4444', '#94A3B8'], borderWidth: 0 }]
-    },
+    data: { labels: catLabels, datasets: [{ data: catLabels.map(l => categoryDist.value[l]), backgroundColor: ['#2563EB', '#1E40AF', '#EF4444', '#F59E0B', '#94A3B8'], borderWidth: 0 }] },
     options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'right', labels: { boxWidth: 10, font: { size: 10 } } } } }
   });
 
   // 3. Bar Chart (Audience)
-  new Chart(audienceChartRef.value, {
+  const audLabels = Object.keys(audienceDist.value);
+  audienceChart?.destroy();
+  audienceChart = new Chart(audienceChartRef.value, {
     type: 'bar',
-    data: {
-      labels: ['All', 'Citizens', 'Officers', 'Workers'],
-      datasets: [{ label: 'Announcements', data: [45, 120, 35, 45], backgroundColor: '#3B82F6', borderRadius: 4 }]
-    },
-    options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { y: { grid: { color: '#F3F4F6' } }, x: { grid: { display: false } } } }
+    data: { labels: audLabels, datasets: [{ label: 'Announcements', data: audLabels.map(l => audienceDist.value[l]), backgroundColor: '#3B82F6', borderRadius: 4 }] },
+    options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { y: { beginAtZero: true, ticks: { stepSize: 1 }, grid: { color: '#F3F4F6' } }, x: { grid: { display: false } } } }
   });
 
   // 4. Doughnut Chart (Priority)
-  new Chart(priorityChartRef.value, {
+  const prioLabels = Object.keys(priorityDist.value);
+  priorityChart?.destroy();
+  priorityChart = new Chart(priorityChartRef.value, {
     type: 'doughnut',
-    data: {
-      labels: ['Emergency', 'Critical', 'Important', 'Normal'],
-      datasets: [{ data: [5, 10, 35, 50], backgroundColor: ['#EF4444', '#DC2626', '#F59E0B', '#3B82F6'], borderWidth: 0 }]
-    },
+    data: { labels: prioLabels, datasets: [{ data: prioLabels.map(l => priorityDist.value[l]), backgroundColor: ['#EF4444', '#DC2626', '#F59E0B', '#3B82F6'], borderWidth: 0 }] },
     options: { responsive: true, maintainAspectRatio: false, cutout: '70%', plugins: { legend: { position: 'right', labels: { boxWidth: 10, font: { size: 10 } } } } }
   });
-});
+};
+
+onMounted(fetchAnnouncements);
 </script>
 
 <style scoped>

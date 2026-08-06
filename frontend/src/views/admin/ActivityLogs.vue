@@ -168,7 +168,7 @@
                   <td class="p-4 text-right" @click.stop>
                     <div class="flex items-center justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                       <button @click="openDrawer(log)" class="p-1.5 text-gray-400 hover:text-[#2563EB] hover:bg-blue-50 rounded-lg" title="View Details"><Eye class="w-4 h-4" /></button>
-                      <button @click="navigator.clipboard.writeText(log.id)" class="p-1.5 text-gray-400 hover:text-[#2563EB] hover:bg-blue-50 rounded-lg" title="Copy Log ID"><Copy class="w-4 h-4" /></button>
+                      <button @click="copyText(log.id)" class="p-1.5 text-gray-400 hover:text-[#2563EB] hover:bg-blue-50 rounded-lg" title="Copy Log ID"><Copy class="w-4 h-4" /></button>
                       <button @click="downloadBlob(JSON.stringify(log, null, 2), `${log.id}.json`, 'application/json')" class="p-1.5 text-gray-400 hover:text-[#22C55E] hover:bg-green-50 rounded-lg" title="Export Entry"><Download class="w-4 h-4" /></button>
                     </div>
                   </td>
@@ -381,7 +381,7 @@
         </div>
 
         <div class="p-4 border-t border-gray-100 bg-white grid grid-cols-2 gap-3">
-          <button @click="navigator.clipboard.writeText(JSON.stringify(selectedLog, null, 2))" class="py-2.5 bg-gray-50 border border-gray-200 text-gray-700 text-sm font-semibold rounded-xl hover:bg-gray-100 flex items-center justify-center gap-2">
+          <button @click="copyText(JSON.stringify(selectedLog, null, 2))" class="py-2.5 bg-gray-50 border border-gray-200 text-gray-700 text-sm font-semibold rounded-xl hover:bg-gray-100 flex items-center justify-center gap-2">
             <Copy class="w-4 h-4"/> Copy JSON
           </button>
           <button @click="downloadBlob(JSON.stringify(selectedLog, null, 2), `${selectedLog.id}.json`, 'application/json')" class="py-2.5 bg-[#2563EB] text-white text-sm font-semibold rounded-xl hover:bg-[#1E40AF] shadow-sm flex items-center justify-center gap-2">
@@ -564,10 +564,8 @@ const closeDrawer = () => { isDrawerOpen.value = false; setTimeout(() => { selec
 const openExportModal = () => { exportModalOpen.value = true; };
 const closeExportModal = () => { exportModalOpen.value = false; };
 
-// --- Real client-side export (CSV/JSON) of whatever's currently filtered.
-// PDF/Excel aren't implemented — no library for that is wired up — so those
-// two format buttons stay visually present but disabled rather than faking
-// a download that doesn't work. ---
+const copyText = (text) => navigator.clipboard.writeText(text);
+
 const downloadBlob = (content, filename, type) => {
   const blob = new Blob([content], { type });
   const url = URL.createObjectURL(blob);
