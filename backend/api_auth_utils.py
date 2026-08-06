@@ -55,6 +55,12 @@ ACTIVITY_TYPES = {
     'department_created',
     'department_updated',
     'department_deleted',
+    'announcement_created',
+    'announcement_updated',
+    'announcement_published',
+    'announcement_scheduled',
+    'announcement_archived',
+    'announcement_deleted',
 }
 
 

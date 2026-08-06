@@ -4,7 +4,7 @@ from urllib.parse import quote
 from flask import Blueprint, jsonify, request # type: ignore
 from flask_jwt_extended import get_jwt_identity # type: ignore
 
-from models import db, User, Complaint, Department, ActivityLog, Feedback, Assignment, now_ist
+from models import db, User, Complaint, Department, ActivityLog, Feedback, Assignment, Announcement, now_ist
 from api_auth_utils import log_activity, role_required
 
 admin_bp = Blueprint('admin', __name__, url_prefix='/api/admin')
@@ -1173,7 +1173,6 @@ ACTIVITY_STATUS = {
     'officer_rejected': 'Critical', 'officer_suspended': 'Critical',
     'department_deleted': 'Warning',
 }
-
 DAY_NAMES = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
 
 
@@ -1194,7 +1193,6 @@ def activity_logs():
     role_counts = {'Admin': 0, 'Officer': 0, 'Worker': 0, 'Citizen': 0}
     module_counts = {}
     action_counts = {}
-    latest_by_type = {}
     today_count = 0
     heatmap = [[0] * 24 for _ in range(7)]
     user_activity_counts = {}
@@ -1225,7 +1223,6 @@ def activity_logs():
             role_counts[role] += 1
         module_counts[module] = module_counts.get(module, 0) + 1
         action_counts[r.activity_type] = action_counts.get(r.activity_type, 0) + 1
-        latest_by_type.setdefault(r.activity_type, r.created_at)  # rows are desc-ordered, so first hit = latest
         if r.created_at >= today_start:
             today_count += 1
         heatmap[r.created_at.weekday()][r.created_at.hour] += 1
@@ -1271,14 +1268,10 @@ def activity_logs():
         "avg_daily_events":   avg_daily,
     }
 
-    def _latest_str(activity_type):
-        ts = latest_by_type.get(activity_type)
-        return ts.strftime('%b %d, %H:%M') if ts else 'N/A'
-
     security_events = [
-        {"event": "Password Resets",      "severity": "Medium", "count": action_counts.get('password_reset_completed', 0), "latest": _latest_str('password_reset_completed')},
-        {"event": "Account Suspensions",  "severity": "High",   "count": action_counts.get('officer_suspended', 0),        "latest": _latest_str('officer_suspended')},
-        {"event": "Account Rejections",   "severity": "Medium", "count": action_counts.get('officer_rejected', 0),         "latest": _latest_str('officer_rejected')},
+        {"event": "Password Resets",      "severity": "Medium", "count": action_counts.get('password_reset_completed', 0)},
+        {"event": "Account Suspensions",  "severity": "High",   "count": action_counts.get('officer_suspended', 0)},
+        {"event": "Account Rejections",   "severity": "Medium", "count": action_counts.get('officer_rejected', 0)},
     ]
 
     critical_rows = [l for l in logs if l["status"] == "Critical"][:6]
@@ -1302,3 +1295,300 @@ def activity_logs():
         active_users=active_users,
         logs=logs,
     ), 200
+
+
+# ─────────────────────────────────────────────────────────────────────────
+# Announcements — powers Announcements.vue
+# ─────────────────────────────────────────────────────────────────────────
+VALID_ANN_STATUS    = {'Draft', 'Scheduled', 'Published', 'Archived'}
+VALID_ANN_CATEGORY  = {'Maintenance', 'Policy', 'Alert', 'Holiday', 'General'}
+VALID_ANN_PRIORITY  = {'Emergency', 'Critical', 'Important', 'Normal'}
+VALID_ANN_AUDIENCE  = {'All Users', 'Citizens', 'Officers', 'Workers'}
+
+
+def _serialize_announcement(a, author_name):
+    return {
+        "id":         f"ANN-{a.id:04d}",
+        "rawId":      a.id,
+        "title":      a.title,
+        "summary":    a.summary,
+        "content":    a.content,
+        "category":   a.category,
+        "priority":   a.priority,
+        "audience":   a.audience,
+        "status":     a.status,
+        "isPinned":   a.is_pinned,
+        "views":      a.views,
+        "publishDate": a.publish_at.strftime('%b %d, %Y') if a.publish_at else '-',
+        "expiryDate":  a.expiry_at.strftime('%b %d, %Y') if a.expiry_at else '-',
+        "author":     author_name,
+        "createdAt":  a.created_at.isoformat(),
+    }
+
+
+@admin_bp.route('/announcements', methods=['GET'])
+@role_required('Admin')
+def list_announcements():
+    rows = Announcement.query.order_by(Announcement.created_at.desc()).all()
+    author_ids = {a.author_id for a in rows}
+    authors = {u.id: u.name for u in User.query.filter(User.id.in_(author_ids)).all()} if author_ids else {}
+
+    announcements = [_serialize_announcement(a, authors.get(a.author_id, 'Unknown')) for a in rows]
+
+    top_stats = {
+        "total":     len(rows),
+        "published": sum(1 for a in rows if a.status == 'Published'),
+        "scheduled": sum(1 for a in rows if a.status == 'Scheduled'),
+        "drafts":    sum(1 for a in rows if a.status == 'Draft'),
+        "archived":  sum(1 for a in rows if a.status == 'Archived'),
+        "total_views": sum(a.views for a in rows),
+    }
+
+    published_rows = [a for a in rows if a.status == 'Published']
+    most_viewed = max(rows, key=lambda a: a.views, default=None)
+    audience_counts = {}
+    for a in rows:
+        audience_counts[a.audience] = audience_counts.get(a.audience, 0) + 1
+    top_audience = max(audience_counts, key=audience_counts.get) if audience_counts else None
+    category_counts = {}
+    for a in rows:
+        category_counts[a.category] = category_counts.get(a.category, 0) + 1
+    top_category = max(category_counts, key=category_counts.get) if category_counts else None
+    latest_published = max(published_rows, key=lambda a: a.publish_at or a.created_at, default=None)
+
+    quick_insights = [
+        {"label": "Most Viewed", "value": f"{most_viewed.title} ({most_viewed.views})" if most_viewed else 'N/A'},
+        {"label": "Most Active Audience", "value": f"{top_audience} ({audience_counts[top_audience]})" if top_audience else 'N/A'},
+        {"label": "Top Category", "value": top_category or 'N/A'},
+        {"label": "Latest Published", "value": latest_published.title if latest_published else 'N/A'},
+    ]
+
+    pinned = [
+        {"id": f"ANN-{a.id:04d}", "title": a.title, "audience": a.audience, "views": a.views}
+        for a in rows if a.is_pinned
+    ]
+
+    priority_dist = {p: sum(1 for a in rows if a.priority == p) for p in VALID_ANN_PRIORITY}
+    category_dist = {c: category_counts.get(c, 0) for c in VALID_ANN_CATEGORY}
+    audience_dist = {aud: audience_counts.get(aud, 0) for aud in VALID_ANN_AUDIENCE}
+
+    # Created-per-month, last 6 months (real — there's no view-tracking yet to chart instead)
+    monthly_created = []
+    today = now_ist().date()
+    for i in range(5, -1, -1):
+        y, m = today.year, today.month
+        m -= i
+        while m <= 0:
+            m += 12; y -= 1
+        month_start = datetime(y, m, 1)
+        next_m, next_y = (m + 1, y) if m < 12 else (1, y + 1)
+        month_end = datetime(next_y, next_m, 1)
+        count = sum(1 for a in rows if a.created_at and month_start <= a.created_at < month_end)
+        monthly_created.append({"month": month_start.strftime('%b'), "count": count})
+
+    ann_activity_types = [
+        'announcement_created', 'announcement_updated', 'announcement_published',
+        'announcement_scheduled', 'announcement_archived', 'announcement_deleted',
+    ]
+    activity_rows = (
+        ActivityLog.query.filter(ActivityLog.activity_type.in_(ann_activity_types))
+        .order_by(ActivityLog.created_at.desc()).limit(10).all()
+    )
+    recent_activity = []
+    for act in activity_rows:
+        admin_user = User.query.get(act.user_id)
+        recent_activity.append({
+            "id": act.id,
+            "action": act.activity_type.replace('announcement_', 'Announcement ').replace('_', ' ').title(),
+            "desc": act.description,
+            "time": act.created_at.strftime('%b %d, %Y - %I:%M %p'),
+            "admin": admin_user.name if admin_user else 'System',
+        })
+
+    return jsonify(
+        success=True,
+        top_stats=top_stats,
+        quick_insights=quick_insights,
+        pinned=pinned,
+        priority_distribution=priority_dist,
+        category_distribution=category_dist,
+        audience_distribution=audience_dist,
+        monthly_created=monthly_created,
+        recent_activity=recent_activity,
+        announcements=announcements,
+    ), 200
+
+
+@admin_bp.route('/announcements', methods=['POST'])
+@role_required('Admin')
+def create_announcement():
+    data = request.get_json() or {}
+    title = (data.get('title') or '').strip()
+    content = (data.get('content') or '').strip()
+    summary = (data.get('summary') or '').strip() or None
+    category = data.get('category', 'General')
+    priority = data.get('priority', 'Normal')
+    audience = data.get('audience', 'All Users')
+    action = data.get('action', 'draft')  # 'draft' | 'publish'
+    publish_at_raw = data.get('publishAt')
+    expiry_at_raw = data.get('expiryAt')
+
+    if len(title) < 3:
+        return jsonify(message="Title must be at least 3 characters."), 400
+    if len(content) < 10:
+        return jsonify(message="Content must be at least 10 characters."), 400
+    if category not in VALID_ANN_CATEGORY:
+        return jsonify(message=f"Invalid category. Choose from: {', '.join(sorted(VALID_ANN_CATEGORY))}."), 400
+    if priority not in VALID_ANN_PRIORITY:
+        return jsonify(message=f"Invalid priority. Choose from: {', '.join(sorted(VALID_ANN_PRIORITY))}."), 400
+    if audience not in VALID_ANN_AUDIENCE:
+        return jsonify(message=f"Invalid audience. Choose from: {', '.join(sorted(VALID_ANN_AUDIENCE))}."), 400
+
+    publish_at = None
+    expiry_at = None
+    try:
+        if publish_at_raw:
+            publish_at = datetime.fromisoformat(publish_at_raw)
+        if expiry_at_raw:
+            expiry_at = datetime.fromisoformat(expiry_at_raw)
+    except ValueError:
+        return jsonify(message="Invalid date format."), 400
+
+    if action == 'publish':
+        if publish_at and publish_at > now_ist():
+            status = 'Scheduled'
+        else:
+            status = 'Published'
+            publish_at = now_ist()
+    else:
+        status = 'Draft'
+
+    admin_id = int(get_jwt_identity())
+    ann = Announcement(
+        title=title, summary=summary, content=content, category=category,
+        priority=priority, audience=audience, status=status,
+        publish_at=publish_at, expiry_at=expiry_at, author_id=admin_id,
+    )
+    db.session.add(ann)
+    db.session.flush()
+
+    activity_type = 'announcement_scheduled' if status == 'Scheduled' else \
+        ('announcement_published' if status == 'Published' else 'announcement_created')
+    log_activity(admin_id, activity_type, f'{"Scheduled" if status == "Scheduled" else status} announcement "{title}".')
+    db.session.commit()
+
+    author = User.query.get(admin_id)
+    return jsonify(success=True, announcement=_serialize_announcement(ann, author.name)), 201
+
+
+@admin_bp.route('/announcements/<int:ann_id>', methods=['PUT'])
+@role_required('Admin')
+def update_announcement(ann_id):
+    ann = Announcement.query.get(ann_id)
+    if not ann:
+        return jsonify(message="Announcement not found."), 404
+
+    data = request.get_json() or {}
+    title = (data.get('title') or '').strip()
+    content = (data.get('content') or '').strip()
+
+    if len(title) < 3:
+        return jsonify(message="Title must be at least 3 characters."), 400
+    if len(content) < 10:
+        return jsonify(message="Content must be at least 10 characters."), 400
+
+    category = data.get('category', ann.category)
+    priority = data.get('priority', ann.priority)
+    audience = data.get('audience', ann.audience)
+    if category not in VALID_ANN_CATEGORY:
+        return jsonify(message=f"Invalid category. Choose from: {', '.join(sorted(VALID_ANN_CATEGORY))}."), 400
+    if priority not in VALID_ANN_PRIORITY:
+        return jsonify(message=f"Invalid priority. Choose from: {', '.join(sorted(VALID_ANN_PRIORITY))}."), 400
+    if audience not in VALID_ANN_AUDIENCE:
+        return jsonify(message=f"Invalid audience. Choose from: {', '.join(sorted(VALID_ANN_AUDIENCE))}."), 400
+
+    ann.title = title
+    ann.content = content
+    ann.summary = (data.get('summary') or '').strip() or None
+    ann.category = category
+    ann.priority = priority
+    ann.audience = audience
+    try:
+        ann.expiry_at = datetime.fromisoformat(data['expiryAt']) if data.get('expiryAt') else None
+    except ValueError:
+        return jsonify(message="Invalid expiry date format."), 400
+
+    admin_id = int(get_jwt_identity())
+    log_activity(admin_id, 'announcement_updated', f'Updated announcement "{title}".')
+    db.session.commit()
+
+    author = User.query.get(ann.author_id)
+    return jsonify(success=True, announcement=_serialize_announcement(ann, author.name if author else 'Unknown')), 200
+
+
+@admin_bp.route('/announcements/<int:ann_id>', methods=['DELETE'])
+@role_required('Admin')
+def delete_announcement(ann_id):
+    ann = Announcement.query.get(ann_id)
+    if not ann:
+        return jsonify(message="Announcement not found."), 404
+
+    title = ann.title
+    admin_id = int(get_jwt_identity())
+    log_activity(admin_id, 'announcement_deleted', f'Deleted announcement "{title}".')
+    db.session.delete(ann)
+    db.session.commit()
+    return jsonify(success=True, message=f'"{title}" deleted.'), 200
+
+
+@admin_bp.route('/announcements/<int:ann_id>/publish', methods=['PATCH'])
+@role_required('Admin')
+def publish_announcement(ann_id):
+    ann = Announcement.query.get(ann_id)
+    if not ann:
+        return jsonify(message="Announcement not found."), 404
+    if ann.status == 'Published':
+        return jsonify(message="Already published."), 400
+
+    ann.status = 'Published'
+    ann.publish_at = now_ist()
+
+    admin_id = int(get_jwt_identity())
+    log_activity(admin_id, 'announcement_published', f'Published announcement "{ann.title}".')
+    db.session.commit()
+
+    author = User.query.get(ann.author_id)
+    return jsonify(success=True, announcement=_serialize_announcement(ann, author.name if author else 'Unknown')), 200
+
+
+@admin_bp.route('/announcements/<int:ann_id>/archive', methods=['PATCH'])
+@role_required('Admin')
+def archive_announcement(ann_id):
+    ann = Announcement.query.get(ann_id)
+    if not ann:
+        return jsonify(message="Announcement not found."), 404
+    if ann.status == 'Archived':
+        return jsonify(message="Already archived."), 400
+
+    ann.status = 'Archived'
+
+    admin_id = int(get_jwt_identity())
+    log_activity(admin_id, 'announcement_archived', f'Archived announcement "{ann.title}".')
+    db.session.commit()
+
+    author = User.query.get(ann.author_id)
+    return jsonify(success=True, announcement=_serialize_announcement(ann, author.name if author else 'Unknown')), 200
+
+
+@admin_bp.route('/announcements/<int:ann_id>/pin', methods=['PATCH'])
+@role_required('Admin')
+def toggle_pin_announcement(ann_id):
+    ann = Announcement.query.get(ann_id)
+    if not ann:
+        return jsonify(message="Announcement not found."), 404
+
+    ann.is_pinned = not ann.is_pinned
+    db.session.commit()
+
+    author = User.query.get(ann.author_id)
+    return jsonify(success=True, announcement=_serialize_announcement(ann, author.name if author else 'Unknown')), 200

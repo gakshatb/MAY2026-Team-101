@@ -273,6 +273,32 @@ class ContactMessage(db.Model):
         return f'<ContactMessage id={self.name} email={self.email} subject={self.subject!r} message={self.message!r}>'
 
 
+# ─────────────────────────────────────────────────────────────────────────────
+# Announcement
+# ─────────────────────────────────────────────────────────────────────────────
+class Announcement(db.Model):
+    __tablename__ = 'announcements'
+
+    id         = db.Column(db.Integer,     primary_key=True, autoincrement=True)
+    title      = db.Column(db.String(255), nullable=False)
+    summary    = db.Column(db.String(500), nullable=True)
+    content    = db.Column(db.Text,        nullable=False)
+    category   = db.Column(db.String(50),  nullable=False, default='General')     # Maintenance | Policy | Alert | Holiday | General
+    priority   = db.Column(db.String(20),  nullable=False, default='Normal')      # Emergency | Critical | Important | Normal
+    audience   = db.Column(db.String(50),  nullable=False, default='All Users')   # All Users | Citizens | Officers | Workers
+    status     = db.Column(db.String(20),  nullable=False, default='Draft')       # Draft | Scheduled | Published | Archived
+    is_pinned  = db.Column(db.Boolean,     nullable=False, default=False)
+    views      = db.Column(db.Integer,     nullable=False, default=0)
+    publish_at = db.Column(db.DateTime,    nullable=True)
+    expiry_at  = db.Column(db.DateTime,    nullable=True)
+    author_id  = db.Column(db.Integer,     db.ForeignKey('users.id'), nullable=False)
+    created_at = db.Column(db.DateTime,    nullable=False, default=now_ist)
+    updated_at = db.Column(db.DateTime,    nullable=True,  onupdate=now_ist)
+
+    def __repr__(self):
+        return f'<Announcement id={self.id} title={self.title!r} status={self.status}>'
+
+
 def init_db(app, admin_config):
     db.init_app(app)
     with app.app_context():
