@@ -590,7 +590,7 @@ import {
   UserCog, Users, UserPlus, UserCheck, UserMinus, Building2, 
   ClipboardList, BarChart3, TrendingUp, Award, ShieldCheck, 
   Search, Eye, Pencil, RefreshCw, Trash2, Clock, Calendar, 
-  Mail, Phone, BadgeCheck, Activity, AlertTriangle, Key, X, Lightbulb, CheckCircle
+  Mail, Phone, BadgeCheck, Activity, AlertTriangle, Key, X, Lightbulb, CheckCircle, Zap
 } from 'lucide-vue-next';
 
 const API_BASE = 'http://127.0.0.1:5000/api/admin';

@@ -128,8 +128,8 @@
         </section>
 
         <!-- Activity Logs Table (Desktop) -->
-        <section class="hidden lg:block bg-white rounded-[14px] shadow-sm border border-gray-50 overflow-hidden mb-6">
-          <div class="overflow-x-auto">
+        <section id="table" class="hidden lg:block bg-white rounded-[14px] shadow-sm border border-gray-50 overflow-hidden mb-6">
+          <div class="overflow-x-auto no-scrollbar">
             <table class="w-full text-left border-collapse min-w-[1000px]">
               <thead>
                 <tr class="bg-gray-50 text-gray-500 text-[10px] uppercase tracking-wider font-bold">
@@ -143,7 +143,7 @@
                 </tr>
               </thead>
               <tbody class="divide-y divide-gray-100 text-sm">
-                <tr v-for="log in filteredLogs" :key="log.id" class="hover:bg-gray-50 transition-colors group cursor-pointer" @click="openDrawer(log)">
+                <tr v-for="log in pagedLogs" :key="log.id" class="hover:bg-gray-50 transition-colors group cursor-pointer" @click="openDrawer(log)">
                   <td class="p-4">
                     <p class="font-bold text-[#2563EB] text-xs font-mono">{{ log.id }}</p>
                     <p class="text-xs text-gray-500 mt-0.5">{{ log.date }} {{ log.time }}</p>
@@ -179,15 +179,29 @@
               </tbody>
             </table>
           </div>
-          <!-- Result count -->
-          <div class="p-4 border-t border-gray-100 flex items-center justify-between text-sm text-gray-500 bg-gray-50/50">
-            <span>Showing {{ filteredLogs.length }} of {{ logs.length }} most recent logs</span>
+          <!-- Pagination -->
+          <div class="p-4 border-t border-gray-100 flex flex-col sm:flex-row items-center justify-between gap-3 text-sm text-gray-500 bg-gray-50/50">
+            <span>
+              Showing {{ filteredLogs.length === 0 ? 0 : (currentPage - 1) * PAGE_SIZE + 1 }}–{{ Math.min(currentPage * PAGE_SIZE, filteredLogs.length) }}
+              of {{ filteredLogs.length }} logs
+            </span>
+            <div class="flex items-center gap-2">
+              <button @click="goToPage(-1)" :disabled="currentPage === 1"
+                      class="px-3 py-1.5 border border-gray-200 bg-white rounded-lg hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed transition-colors font-medium">
+                Previous 50
+              </button>
+              <span class="text-xs text-gray-400 px-1">Page {{ currentPage }} of {{ totalPages }}</span>
+              <button @click="goToPage(1)" :disabled="currentPage === totalPages"
+                      class="px-3 py-1.5 border border-gray-200 bg-white rounded-lg hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed transition-colors font-medium">
+                Next 50
+              </button>
+            </div>
           </div>
         </section>
 
         <!-- Mobile Activity Cards -->
         <section class="lg:hidden space-y-4 mb-6">
-          <div v-for="log in filteredLogs" :key="log.id" class="bg-white p-4 rounded-[14px] shadow-sm border border-gray-50" @click="openDrawer(log)">
+          <div v-for="log in pagedLogs" :key="log.id" class="bg-white p-4 rounded-[14px] shadow-sm border border-gray-50" @click="openDrawer(log)">
             <div class="flex justify-between items-start mb-2">
               <div>
                 <h3 class="font-bold text-gray-900 text-sm">{{ log.user }}</h3>
@@ -203,6 +217,14 @@
               <span :class="['px-2 py-0.5 rounded text-[10px] font-bold uppercase', getStatusBadge(log.status)]">{{ log.status }}</span>
               <button class="text-[#2563EB] text-xs font-semibold hover:underline">Details</button>
             </div>
+          </div>
+
+          <div v-if="filteredLogs.length === 0" class="text-center py-10 bg-white rounded-[14px] border border-gray-50 text-gray-500">No activity logs found matching the current filters.</div>
+
+          <div v-else class="bg-white p-4 rounded-[14px] shadow-sm border border-gray-50 flex items-center justify-between gap-3 text-sm text-gray-500">
+            <button @click="goToPage(-1)" :disabled="currentPage === 1" class="px-3 py-1.5 border border-gray-200 bg-white rounded-lg disabled:opacity-40 disabled:cursor-not-allowed font-medium">Prev</button>
+            <span class="text-xs">Page {{ currentPage }} of {{ totalPages }}</span>
+            <button @click="goToPage(1)" :disabled="currentPage === totalPages" class="px-3 py-1.5 border border-gray-200 bg-white rounded-lg disabled:opacity-40 disabled:cursor-not-allowed font-medium">Next</button>
           </div>
         </section>
 
@@ -420,7 +442,7 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted, reactive } from 'vue';
+import { ref, computed, onMounted, reactive, watch } from 'vue';
 import { useRouter } from 'vue-router';
 import axios from 'axios';
 import Chart from 'chart.js/auto';
@@ -529,6 +551,20 @@ const filteredLogs = computed(() => {
 
 const resetFilters = () => { filters.search = ''; filters.role = 'All'; filters.module = 'All'; filters.status = 'All'; filters.date = 'All Time'; };
 
+// --- Pagination — 100 per page, resets to page 1 whenever the filtered set changes ---
+const PAGE_SIZE = 50;
+const currentPage = ref(1);
+const totalPages = computed(() => Math.max(1, Math.ceil(filteredLogs.value.length / PAGE_SIZE)));
+const pagedLogs = computed(() => {
+  const start = (currentPage.value - 1) * PAGE_SIZE;
+  return filteredLogs.value.slice(start, start + PAGE_SIZE);
+});
+watch(filteredLogs, () => { currentPage.value = 1; });
+const goToPage = (delta) => {
+  currentPage.value = Math.min(Math.max(1, currentPage.value + delta), totalPages.value);
+  document.getElementById('table')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+};
+
 // --- UI Helpers ---
 const getRoleBadge = (role) => {
   switch(role) {
@@ -564,6 +600,14 @@ const closeDrawer = () => { isDrawerOpen.value = false; setTimeout(() => { selec
 const openExportModal = () => { exportModalOpen.value = true; };
 const closeExportModal = () => { exportModalOpen.value = false; };
 
+// --- Real client-side export (CSV/JSON) of whatever's currently filtered.
+// PDF/Excel aren't implemented — no library for that is wired up — so those
+// two format buttons stay visually present but disabled rather than faking
+// a download that doesn't work. ---
+// navigator isn't in Vue's template-expression global whitelist (unlike
+// Math/Date/JSON etc.) — calling navigator.clipboard directly inline in a
+// template @click resolves to `_ctx.navigator` and crashes. Route it
+// through a real method instead.
 const copyText = (text) => navigator.clipboard.writeText(text);
 
 const downloadBlob = (content, filename, type) => {
@@ -641,12 +685,17 @@ onMounted(fetchLogs);
 .custom-scrollbar::-webkit-scrollbar-thumb { background: #CBD5E1; border-radius: 4px; }
 .custom-scrollbar::-webkit-scrollbar-thumb:hover { background: #94A3B8; }
 
+/* Scrolls (e.g. on overflow), just never shows the scrollbar itself */
+.no-scrollbar { scrollbar-width: none; -ms-overflow-style: none; }
+.no-scrollbar::-webkit-scrollbar { display: none; }
+
 /* Entry Animation */
 @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
 .animate-fade-in { animation: fadeIn 0.4s ease-out forwards; }
 
 .line-clamp-2 {
   display: -webkit-box;
+  line-clamp: 2;
   -webkit-line-clamp: 2;
   -webkit-box-orient: vertical;
   overflow: hidden;

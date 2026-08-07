@@ -480,7 +480,7 @@ import Chart from 'chart.js/auto';
 
 // Icons
 import { 
-  Megaphone, Bell, MessageSquare, Newspaper, ClipboardList, 
+  Megaphone, Bell, MessageSquare, Newspaper, ClipboardList, Activity,
   Calendar, Clock, Users, ShieldAlert, AlertTriangle, FileText, 
   Search, Eye, Pencil, Trash2, Archive, Copy, Send, BarChart3, 
   PieChart, LineChart, TrendingUp, X, Download
@@ -821,6 +821,7 @@ onMounted(fetchAnnouncements);
 
 .line-clamp-2 {
   display: -webkit-box;
+  line-clamp: 2;
   -webkit-line-clamp: 2;
   -webkit-box-orient: vertical;
   overflow: hidden;
