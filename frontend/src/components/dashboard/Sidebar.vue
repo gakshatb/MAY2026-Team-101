@@ -162,12 +162,13 @@ const menuItems = computed(() => {
 
 const handleLogout = async () => {
   const token = localStorage.getItem('token')
+  const refreshToken = localStorage.getItem('refresh_token')
 
   if (token) {
     try {
       await axios.post(
         'http://127.0.0.1:5000/api/logout',
-        {},
+        { refresh_token: refreshToken },
         { headers: { Authorization: `Bearer ${token}` } }
       )
     } catch (err) {

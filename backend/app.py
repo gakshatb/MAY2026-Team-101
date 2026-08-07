@@ -17,7 +17,14 @@ app = Flask(__name__,
             static_url_path='',
             template_folder=os.path.join(BASE_DIR, '..', 'frontend'))
 
-CORS(app)
+_default_origins = "http://localhost:5173,http://127.0.0.1:5173"
+allowed_origins = [
+    origin.strip()
+    for origin in os.environ.get("ALLOWED_ORIGINS", _default_origins).split(",")
+    if origin.strip()
+]
+
+CORS(app, resources={r"/api/*": {"origins": allowed_origins}})
 
 DEBUG = os.environ.get("FLASK_DEBUG", "false").strip().lower() in ("1", "true", "yes", "on")
 
