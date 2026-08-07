@@ -347,7 +347,7 @@ def change_password():
         return jsonify(message="Current password and new password are required."), 400
 
     if not check_password_hash(user.password, current_password):
-        return jsonify(message="Current password is incorrect."), 401
+        return jsonify(message="Current password is incorrect."), 400
 
     if len(new_password) < 8:
         return jsonify(message="New password must be at least 8 characters."), 400
