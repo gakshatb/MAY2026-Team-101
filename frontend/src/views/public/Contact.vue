@@ -164,7 +164,7 @@ const contactInfo = [
 
 const team = [
   { name: 'Guhan M R', role: 'Project Manager', image: '/Team/guhan.jpg' },
-  { name: 'Gupta Shivam Rakesh', role: 'Frontend Dev', image: '/Team/gupta.jpg' },
+  { name: 'Gupta Shivam Rakesh', role: 'Frontend Dev', image: '/Team/shivam.jpg' },
   { name: 'Akshat B Gupta', role: 'Backend Dev', image: '/Team/akshat.jpg' },
   { name: 'Akash Maurya', role: 'QA & Testing', image: '/Team/akash.jpg' },
   { name: 'Girish M', role: 'Code Reviewer', image: '/Team/girish.jpg' }
