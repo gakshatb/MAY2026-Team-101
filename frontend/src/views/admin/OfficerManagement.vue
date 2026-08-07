@@ -4,7 +4,7 @@
       
       
       <!-- Scrollable Dashboard Content -->
-      <main class="flex-1 overflow-y-auto p-4 md:p-6 lg:p-8 animate-fade-in custom-scrollbar">
+      <main class="flex-1 overflow-x-hidden overflow-y-auto p-4 md:p-6 lg:p-8 animate-fade-in custom-scrollbar">
         
         <!-- Header & Breadcrumbs -->
         <header class="mb-8 flex flex-col md:flex-row md:items-end justify-between gap-4">
