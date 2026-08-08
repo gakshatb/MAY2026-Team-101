@@ -57,6 +57,7 @@ import OfficersProfile from '../views/admin/Profile.vue'
 import SystemAnalytics from '../views/admin/SystemAnalytics.vue'
 import ActivityLogs from '../views/admin/ActivityLogs.vue'
 import Announcements from '../views/admin/Announcements.vue'
+import ContactMessages from '../views/admin/ContactMessages.vue'
 
 const router = createRouter({
   history: createWebHistory(import.meta.env.BASE_URL),
@@ -141,6 +142,7 @@ const router = createRouter({
         { path: 'systemanalytics', name: 'SystemAnalytics', component: SystemAnalytics, meta: { title: 'System Analytics | CivicDesk', pageTitle: 'System Analytics' } },
         { path: 'activitylogs', name: 'ActivityLogs', component: ActivityLogs, meta: { title: 'Activity Logs | CivicDesk', pageTitle: 'Activity Logs' } },
         { path: 'announcements', name: 'Announcements', component: Announcements, meta: { title: 'Announcements | CivicDesk', pageTitle: 'Announcements' } },
+        { path: 'contactmessages', name: 'ContactMessages', component: ContactMessages, meta: { title: 'Contact Messages | CivicDesk', pageTitle: 'Contact Messages' } },
       ]
     },
 

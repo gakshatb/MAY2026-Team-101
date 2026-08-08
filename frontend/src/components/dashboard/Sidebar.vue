@@ -69,7 +69,7 @@ import {
   Users, BarChart3, Megaphone, 
   Activity, ClipboardList, FileText, UserPlus, 
   HardHat, Briefcase, ListTodo, Wrench, 
-  CheckSquare, PieChart
+  CheckSquare, PieChart, Mail
 } from 'lucide-vue-next'
 
 defineProps({
@@ -119,6 +119,7 @@ const menuItems = computed(() => {
         { name: 'Officer Details', icon: UserSearch, route: '/admin/officerdetails' },
         { name: 'System Analytics', icon: BarChart3, route: '/admin/systemanalytics' },
         { name: 'Announcements', icon: Megaphone, route: '/admin/announcements' },
+        { name: 'Contact Messages', icon: Mail, route: '/admin/contactmessages' },
         { name: 'Activity Logs', icon: Activity, route: '/admin/activitylogs' },
         { name: 'Notifications', icon: Bell, route: '/admin/notifications' },
       ]

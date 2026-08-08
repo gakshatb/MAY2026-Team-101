@@ -9,7 +9,8 @@ from werkzeug.utils import secure_filename # type: ignore
 
 from models import (
     db, User, Complaint, Department, ActivityLog, Feedback, Assignment,
-    Announcement, LoginSession, NotificationPreference, TokenBlocklist, now_ist
+    Announcement, LoginSession, NotificationPreference, TokenBlocklist,
+    ContactMessage, now_ist
 )
 from api_auth_utils import log_activity, role_required, revoke_token
 
@@ -1834,6 +1835,84 @@ def toggle_pin_announcement(ann_id):
 
     author = User.query.get(ann.author_id)
     return jsonify(success=True, announcement=_serialize_announcement(ann, author.name if author else 'Unknown')), 200
+
+
+# ─────────────────────────────────────────────────────────────────────────
+# Contact Messages — powers ContactMessages.vue
+# Reads submissions from the public /api/contact form (see api.py).
+# ─────────────────────────────────────────────────────────────────────────
+def _serialize_contact_message(m):
+    return {
+        "id":         m.id,
+        "name":       m.name,
+        "email":      m.email,
+        "subject":    m.subject,
+        "message":    m.message,
+        "is_read":    m.is_read,
+        "created_at": m.created_at.isoformat() if m.created_at else None,
+    }
+
+
+@admin_bp.route('/contact-messages', methods=['GET'])
+@role_required('Admin')
+def list_contact_messages():
+    status = request.args.get('status', 'All')   # All | Read | Unread
+    search = request.args.get('search', '').strip().lower()
+
+    query = ContactMessage.query
+    if status == 'Read':
+        query = query.filter_by(is_read=True)
+    elif status == 'Unread':
+        query = query.filter_by(is_read=False)
+
+    rows = query.order_by(ContactMessage.created_at.desc()).all()
+
+    if search:
+        rows = [
+            m for m in rows
+            if search in m.name.lower()
+            or search in m.email.lower()
+            or search in m.subject.lower()
+            or search in m.message.lower()
+        ]
+
+    total = ContactMessage.query.count()
+    unread = ContactMessage.query.filter_by(is_read=False).count()
+    today_start = now_ist().replace(hour=0, minute=0, second=0, microsecond=0)
+    today_count = ContactMessage.query.filter(ContactMessage.created_at >= today_start).count()
+
+    return jsonify(
+        success=True,
+        summary={"total": total, "unread": unread, "read": total - unread, "today": today_count},
+        messages=[_serialize_contact_message(m) for m in rows]
+    ), 200
+
+
+@admin_bp.route('/contact-messages/<int:message_id>/read', methods=['PATCH'])
+@role_required('Admin')
+def mark_contact_message_read(message_id):
+    message = ContactMessage.query.get(message_id)
+    if not message:
+        return jsonify(message="Message not found."), 404
+
+    data = request.get_json(silent=True) or {}
+    message.is_read = bool(data.get('read', True))
+    db.session.commit()
+
+    return jsonify(success=True, message_data=_serialize_contact_message(message)), 200
+
+
+@admin_bp.route('/contact-messages/<int:message_id>', methods=['DELETE'])
+@role_required('Admin')
+def delete_contact_message(message_id):
+    message = ContactMessage.query.get(message_id)
+    if not message:
+        return jsonify(message="Message not found."), 404
+
+    db.session.delete(message)
+    db.session.commit()
+
+    return jsonify(success=True, message="Message deleted."), 200
 
 
 # ─────────────────────────────────────────────────────────────────────────
