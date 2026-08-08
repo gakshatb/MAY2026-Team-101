@@ -575,7 +575,7 @@ const editForm = reactive({});
 const startEdit = () => {
   Object.assign(editForm, {
     name: profile.value.name, phone: profile.value.phone, designation: profile.value.designation,
-    dob: personal.value.dob ? new Date(personal.value.dob).toISOString().slice(0, 10) : '',
+    dob: personal.value.dob_iso || '',
     gender: personal.value.gender || '', nationality: personal.value.nationality || '',
     address: personal.value.address || '', city: personal.value.city || '',
     state: personal.value.state || '', zip: personal.value.zip || '',
@@ -695,11 +695,8 @@ const submitPasswordChange = async () => {
 
 .font-sans { font-family: 'Inter', sans-serif; }
 
-/* Custom Scrollbars */
-.custom-scrollbar::-webkit-scrollbar { width: 6px; height: 6px; }
-.custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
-.custom-scrollbar::-webkit-scrollbar-thumb { background: #CBD5E1; border-radius: 4px; }
-.custom-scrollbar::-webkit-scrollbar-thumb:hover { background: #94A3B8; }
+.custom-scrollbar::-webkit-scrollbar { display: none; }
+.custom-scrollbar { scrollbar-width: none; -ms-overflow-style: none; }
 
 /* Entry Animation */
 @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }

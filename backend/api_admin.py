@@ -236,6 +236,242 @@ def dashboard():
 
 
 # ─────────────────────────────────────────────────────────────────────────
+# System Analytics — real replacement for SystemAnalytics.vue's mock data.
+# No fabricated infra metrics — see the note on dashboard()'s alerts.
+# ─────────────────────────────────────────────────────────────────────────
+@admin_bp.route('/analytics', methods=['GET'])
+@role_required('Admin')
+def system_analytics():
+    now = now_ist()
+    this_month_start = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+    last_month_start = (this_month_start - timedelta(days=1)).replace(day=1)
+
+    # ── KPIs (with month-over-month trend, same pattern as dashboard()) ──
+    def month_count(query_fn):
+        this_m = query_fn(this_month_start, now)
+        last_m = query_fn(last_month_start, this_month_start)
+        return this_m, _pct_change(this_m, last_m)
+
+    total_complaints = Complaint.query.count()
+    open_complaints = Complaint.query.filter(~Complaint.status.in_(['Resolved', 'Closed'])).count()
+    resolved_complaints = Complaint.query.filter_by(status='Resolved').count()
+    total_citizens = User.query.filter_by(role='Citizen').count()
+    total_officers = User.query.filter_by(role='Officer', status='active').count()
+    total_workers = User.query.filter_by(role='Worker', status='active').count()
+    departments_count = Department.query.count()
+
+    resolved_rows = Complaint.query.filter(
+        Complaint.status == 'Resolved', Complaint.updated_at.isnot(None)
+    ).all()
+    avg_resolution_hours = round(
+        sum((c.updated_at - c.created_at).total_seconds() for c in resolved_rows) / len(resolved_rows) / 3600, 1
+    ) if resolved_rows else 0
+
+    _, complaints_trend = month_count(lambda a, b: Complaint.query.filter(
+        Complaint.created_at >= a, Complaint.created_at < b).count())
+    _, resolved_trend = month_count(lambda a, b: Complaint.query.filter(
+        Complaint.status == 'Resolved', Complaint.updated_at >= a, Complaint.updated_at < b).count())
+    _, citizens_trend = month_count(lambda a, b: User.query.filter(
+        User.role == 'Citizen', User.created_at >= a, User.created_at < b).count())
+
+    kpis = {
+        "total_complaints":     {"value": total_complaints, "trend_pct": complaints_trend},
+        "open_complaints":      {"value": open_complaints, "trend_pct": None},
+        "resolved_complaints":  {"value": resolved_complaints, "trend_pct": resolved_trend},
+        "total_citizens":       {"value": total_citizens, "trend_pct": citizens_trend},
+        "total_officers":       {"value": total_officers, "trend_pct": None},
+        "total_workers":        {"value": total_workers, "trend_pct": None},
+        "departments":          {"value": departments_count, "trend_pct": None},
+        "avg_resolution_hours": {"value": avg_resolution_hours, "trend_pct": None},
+    }
+
+    # ── Department analytics table (+ feeds dept bar chart & radar) ──────
+    dept_rows = db.session.query(Complaint.department, db.func.count(Complaint.id)).group_by(Complaint.department).all()
+    department_analytics = []
+    for dept_name, total in dept_rows:
+        dept_complaints = Complaint.query.filter_by(department=dept_name)
+        resolved = dept_complaints.filter_by(status='Resolved').count()
+        pending = dept_complaints.filter(~Complaint.status.in_(['Resolved', 'Closed'])).count()
+
+        timed = dept_complaints.filter(Complaint.status == 'Resolved', Complaint.updated_at.isnot(None)).all()
+        avg_hours = (sum((c.updated_at - c.created_at).total_seconds() for c in timed) / len(timed) / 3600) if timed else 0
+
+        ratings = (
+            db.session.query(Feedback.rating)
+            .join(Complaint, Feedback.complaint_id == Complaint.id)
+            .filter(Complaint.department == dept_name)
+            .all()
+        )
+        avg_rating = round(sum(r[0] for r in ratings) / len(ratings), 1) if ratings else None
+
+        department_analytics.append({
+            "name": dept_name, "total": total, "resolved": resolved, "pending": pending,
+            "avg_time_hours": round(avg_hours, 1),
+            "rating": avg_rating,
+            "score": round((resolved / total) * 100) if total else 0,
+        })
+    department_analytics.sort(key=lambda d: d['total'], reverse=True)
+
+    # ── Category / status breakdowns (pie / doughnut) ────────────────────
+    category_breakdown = dict(db.session.query(Complaint.category, db.func.count(Complaint.id)).group_by(Complaint.category).all())
+    status_breakdown = dict(db.session.query(Complaint.status, db.func.count(Complaint.id)).group_by(Complaint.status).all())
+
+    # ── Resolution time by category (horizontal bar) ─────────────────────
+    resolution_by_category = {}
+    for cat, in db.session.query(Complaint.category).distinct():
+        rows = Complaint.query.filter(Complaint.category == cat, Complaint.status == 'Resolved', Complaint.updated_at.isnot(None)).all()
+        resolution_by_category[cat] = round(
+            sum((c.updated_at - c.created_at).total_seconds() for c in rows) / len(rows) / 3600, 1
+        ) if rows else 0
+
+    # ── Satisfaction gauge (from Feedback.rating, 1-5) ────────────────────
+    all_ratings = [r[0] for r in db.session.query(Feedback.rating).all()]
+    satisfied = sum(1 for r in all_ratings if r >= 4)
+    neutral = sum(1 for r in all_ratings if r == 3)
+    dissatisfied = sum(1 for r in all_ratings if r <= 2)
+    total_ratings = len(all_ratings) or 1
+    satisfaction = {
+        "satisfied_pct": round(satisfied / total_ratings * 100),
+        "neutral_pct": round(neutral / total_ratings * 100),
+        "dissatisfied_pct": round(dissatisfied / total_ratings * 100),
+    }
+
+    # ── Emergency handling ────────────────────────────────────────────────
+    emergency_q = Complaint.query.filter_by(priority='Emergency')
+    emergency_total = emergency_q.count()
+    emergency_resolved = emergency_q.filter_by(status='Resolved').count()
+    emergency_timed = emergency_q.filter(Complaint.status == 'Resolved', Complaint.updated_at.isnot(None)).all()
+    emergency_avg_minutes = round(
+        sum((c.updated_at - c.created_at).total_seconds() for c in emergency_timed) / len(emergency_timed) / 60
+    ) if emergency_timed else 0
+    ward_row = (
+        db.session.query(Complaint.ward, db.func.count(Complaint.id))
+        .filter(Complaint.priority == 'Emergency', Complaint.ward.isnot(None))
+        .group_by(Complaint.ward).order_by(db.func.count(Complaint.id).desc()).first()
+    )
+    emergency = {
+        "total": emergency_total, "resolved": emergency_resolved,
+        "pending": emergency_total - emergency_resolved,
+        "avg_response_minutes": emergency_avg_minutes,
+        "most_impacted_ward": ward_row[0] if ward_row else None,
+    }
+
+    # ── Top 5 officers (by resolution score among assigned complaints) ───
+    officers = User.query.filter_by(role='Officer', status='active').all()
+    officer_stats = []
+    for o in officers:
+        managed = Complaint.query.filter_by(assigned_officer=o.id)
+        managed_count = managed.count()
+        if not managed_count:
+            continue
+        resolved_count = managed.filter_by(status='Resolved').count()
+        ratings = db.session.query(Feedback.rating).join(Complaint, Feedback.complaint_id == Complaint.id).filter(Complaint.assigned_officer == o.id).all()
+        officer_stats.append({
+            "name": o.name, "dept": o.member_department.department_name if o.member_department else None,
+            "managed": managed_count, "score": round(resolved_count / managed_count * 100),
+            "rating": round(sum(r[0] for r in ratings) / len(ratings), 1) if ratings else None,
+        })
+    officer_stats.sort(key=lambda x: x['score'], reverse=True)
+    top_officers = officer_stats[:5]
+
+    # ── Top 5 workers (by completion rate among assignments) ─────────────
+    workers = User.query.filter_by(role='Worker', status='active').all()
+    worker_stats = []
+    for w in workers:
+        assignments = db.session.query(Assignment, Complaint).join(Complaint, Assignment.complaint_id == Complaint.id).filter(Assignment.worker_id == w.id).all()
+        if not assignments:
+            continue
+        completed = [a for a, c in assignments if c.status in ('Resolved', 'Closed')]
+        timed = [(a, c) for a, c in assignments if c.status == 'Resolved' and c.updated_at]
+        avg_hours = (sum((c.updated_at - a.assigned_at).total_seconds() for a, c in timed) / len(timed) / 3600) if timed else 0
+        worker_stats.append({
+            "name": w.name, "dept": w.member_department.department_name if w.member_department else None,
+            "tasks": len(assignments), "completion_rate": round(len(completed) / len(assignments) * 100),
+            "avg_time_hours": round(avg_hours, 1),
+        })
+    worker_stats.sort(key=lambda x: x['completion_rate'], reverse=True)
+    top_workers = worker_stats[:5]
+
+    # ── Growth trend, 6 months (complaints + new citizens) ────────────────
+    month_keys = []
+    y, m = now.year, now.month
+    for _ in range(6):
+        month_keys.append((y, m))
+        m -= 1
+        if m == 0:
+            m, y = 12, y - 1
+    month_keys.reverse()
+
+    def bucket(rows_query):
+        counts = {k: 0 for k in month_keys}
+        for (created_at,) in rows_query:
+            if created_at and (created_at.year, created_at.month) in counts:
+                counts[(created_at.year, created_at.month)] += 1
+        return [counts[k] for k in month_keys]
+
+    growth_trend = {
+        "labels": [datetime(y, m, 1).strftime('%b') for (y, m) in month_keys],
+        "complaints": bucket(Complaint.query.with_entities(Complaint.created_at).all()),
+        "citizens": bucket(User.query.filter_by(role='Citizen').with_entities(User.created_at).all()),
+    }
+
+    # ── Announcements reach (only real fields — no ack/sync tracking) ────
+    published = Announcement.query.filter_by(status='Published')
+    announcements_reach = {
+        "published_count": published.count(),
+        "total_views": db.session.query(db.func.sum(Announcement.views)).filter(Announcement.status == 'Published').scalar() or 0,
+    }
+
+    # ── Platform activity timeline (same source as dashboard(), more rows) ─
+    recent_logs = (
+        db.session.query(ActivityLog, User)
+        .join(User, ActivityLog.user_id == User.id)
+        .order_by(ActivityLog.created_at.desc())
+        .limit(15)
+        .all()
+    )
+    activity_timeline = [
+        {
+            "id": log.id,
+            "title": log.activity_type.replace('_', ' ').title(),
+            "description": log.description,
+            "user": user.name,
+            "created_at": log.created_at.isoformat() if log.created_at else None,
+        }
+        for log, user in recent_logs
+    ]
+
+    # ── Insights (derived, not separately stored) ─────────────────────────
+    insights = {
+        "most_active_dept": department_analytics[0]['name'] if department_analytics else None,
+        "highest_satisfaction_dept": max(
+            (d for d in department_analytics if d['rating'] is not None), key=lambda d: d['rating'], default=None
+        ),
+        "fastest_resolution_dept": min(
+            (d for d in department_analytics if d['total'] > 0), key=lambda d: d['avg_time_hours'], default=None
+        ),
+        "top_concern_ward": emergency['most_impacted_ward'],
+    }
+
+    return jsonify(
+        success=True,
+        kpis=kpis,
+        insights=insights,
+        emergency=emergency,
+        department_analytics=department_analytics,
+        category_breakdown=category_breakdown,
+        status_breakdown=status_breakdown,
+        resolution_by_category=resolution_by_category,
+        satisfaction=satisfaction,
+        top_officers=top_officers,
+        top_workers=top_workers,
+        growth_trend=growth_trend,
+        announcements_reach=announcements_reach,
+        activity_timeline=activity_timeline,
+    ), 200
+
+
+# ─────────────────────────────────────────────────────────────────────────
 # Approve / reject a pending Officer or Worker registration.
 # ─────────────────────────────────────────────────────────────────────────
 @admin_bp.route('/users/<int:user_id>/approve', methods=['PATCH'])
@@ -1761,6 +1997,7 @@ def admin_profile():
         personal={
             "name":        user.name,
             "dob":         user.dob.strftime('%d %b %Y') if user.dob else None,
+            "dob_iso":     user.dob.isoformat() if user.dob else None,
             "gender":      user.gender,
             "nationality": user.nationality,
             "address":     user.address,

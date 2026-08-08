@@ -8,7 +8,7 @@ from flask_jwt_extended import ( # type: ignore
     get_jwt, get_jwt_identity, jwt_required
 )
 
-from models import db, User, PasswordResetOTP, LoginSession, now_ist
+from models import db, User, PasswordResetOTP, LoginSession, now_ist, IST
 
 from api_auth_utils import (
     VALID_ROLES, is_token_revoked, is_valid_email, is_valid_phone, limiter,
@@ -16,6 +16,10 @@ from api_auth_utils import (
 )
 
 auth_bp = Blueprint('auth', __name__, url_prefix='/api')
+
+
+def _exp_to_ist(exp):
+    return datetime.fromtimestamp(exp, tz=IST).replace(tzinfo=None)
 
 
 # ─────────────────────────────────────────────────────────────────────────
@@ -141,7 +145,7 @@ def login():
         ip_address=request.remote_addr,
         status='Success',
         last_active_at=now_ist(),
-        expires_at=datetime.fromtimestamp(refresh_claims['exp'])
+        expires_at=_exp_to_ist(refresh_claims['exp'])
     ))
     log_activity(user.id, 'login', 'Logged in.')
     db.session.commit()
@@ -168,7 +172,7 @@ def login():
 def logout():
     user_id = int(get_jwt_identity())
     claims = get_jwt()
-    revoke_token(claims["jti"], datetime.fromtimestamp(claims["exp"]), user_id=user_id)
+    revoke_token(claims["jti"], _exp_to_ist(claims["exp"]), user_id=user_id)
 
     data = request.get_json(silent=True) or {}
     refresh_token = data.get("refresh_token")
@@ -177,7 +181,7 @@ def logout():
             refresh_claims = decode_token(refresh_token)
             revoke_token(
                 refresh_claims["jti"],
-                datetime.fromtimestamp(refresh_claims["exp"]),
+                _exp_to_ist(refresh_claims["exp"]),
                 user_id=user_id
             )
             session = LoginSession.query.filter_by(jti=refresh_claims["jti"]).first()
