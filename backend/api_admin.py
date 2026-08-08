@@ -10,7 +10,7 @@ from werkzeug.utils import secure_filename # type: ignore
 from models import (
     db, User, Complaint, Department, ActivityLog, Feedback, Assignment,
     Announcement, LoginSession, NotificationPreference, TokenBlocklist,
-    ContactMessage, now_ist
+    ContactMessage, Notification, StatusLog, now_ist
 )
 from api_auth_utils import log_activity, role_required, revoke_token
 
@@ -1329,6 +1329,177 @@ def officer_details(officer_id):
 
 
 # ─────────────────────────────────────────────────────────────────────────
+# Complaint Management — powers ComplaintManagement.vue
+# Lets an admin see every complaint platform-wide and assign/reassign the
+# Civic Officer responsible for it (independent of the officer's own
+# worker-assignment flow, which happens after this).
+# ─────────────────────────────────────────────────────────────────────────
+def _serialize_admin_complaint(c):
+    citizen = User.query.get(c.created_by)
+    officer = User.query.get(c.assigned_officer) if c.assigned_officer else None
+    return {
+        "id":              f"CMP-{c.id:05d}",
+        "raw_id":          c.id,
+        "title":           c.title,
+        "category":        c.category,
+        "priority":        c.priority,
+        "department":      c.department,
+        "status":          c.status,
+        "location":        c.location,
+        "is_escalated":    c.is_escalated,
+        "citizen":         {"id": citizen.id, "name": citizen.name, "email": citizen.email} if citizen else None,
+        "officer":         {"id": officer.id, "name": officer.name, "empId": f"OFC-{officer.id:04d}"} if officer else None,
+        "created_at":      c.created_at.isoformat() if c.created_at else None,
+        "updated_at":      c.updated_at.isoformat() if c.updated_at else None,
+    }
+
+
+@admin_bp.route('/complaints', methods=['GET'])
+@role_required('Admin')
+def list_admin_complaints():
+    query = Complaint.query
+
+    status = request.args.get('status', 'All')
+    if status == 'Unassigned':
+        query = query.filter(Complaint.assigned_officer.is_(None))
+    elif status != 'All':
+        query = query.filter_by(status=status)
+
+    department = request.args.get('department', 'All')
+    if department != 'All':
+        query = query.filter_by(department=department)
+
+    priority = request.args.get('priority', 'All')
+    if priority != 'All':
+        query = query.filter_by(priority=priority)
+
+    rows = query.order_by(Complaint.created_at.desc()).all()
+
+    search = request.args.get('search', '').strip().lower()
+    if search:
+        rows = [
+            c for c in rows
+            if search in c.title.lower()
+            or search in c.category.lower()
+            or search in f"cmp-{c.id:05d}"
+            or (c.citizen and search in c.citizen.name.lower())
+        ]
+
+    total = Complaint.query.count()
+    unassigned = Complaint.query.filter(Complaint.assigned_officer.is_(None)).count()
+    in_progress = Complaint.query.filter(Complaint.status == 'In Progress').count()
+    resolved = Complaint.query.filter(Complaint.status.in_(['Resolved', 'Closed'])).count()
+
+    return jsonify(
+        success=True,
+        summary={"total": total, "unassigned": unassigned, "in_progress": in_progress, "resolved": resolved},
+        complaints=[_serialize_admin_complaint(c) for c in rows],
+        departments=[
+            d.department_name for d in Department.query.order_by(Department.department_name.asc()).all()
+        ],
+    ), 200
+
+
+@admin_bp.route('/complaints/<int:complaint_id>', methods=['GET'])
+@role_required('Admin')
+def get_admin_complaint(complaint_id):
+    c = Complaint.query.get(complaint_id)
+    if not c:
+        return jsonify(message="Complaint not found."), 404
+
+    data = _serialize_admin_complaint(c)
+    data.update({
+        "description":  c.description,
+        "city":         c.city,
+        "ward":         c.ward,
+        "area":         c.area,
+        "street":       c.street,
+        "landmark":     c.landmark,
+        "images":       [img.image_url for img in c.images],
+        "status_logs": [
+            {
+                "old_status": s.old_status,
+                "new_status": s.new_status,
+                "remark":     s.remark,
+                "changed_at": s.changed_at.isoformat() if s.changed_at else None,
+            }
+            for s in sorted(c.status_logs, key=lambda s: s.changed_at)
+        ],
+    })
+
+    # Officers in the same department, so the admin can pick a sensible
+    # assignee — active only, same department name as the complaint.
+    eligible_officers = (
+        User.query
+        .join(Department, User.department_id == Department.id)
+        .filter(User.role == 'Officer', User.status == 'active', Department.department_name == c.department)
+        .order_by(User.name.asc())
+        .all()
+    )
+    data["eligible_officers"] = [
+        {"id": o.id, "name": o.name, "empId": f"OFC-{o.id:04d}"} for o in eligible_officers
+    ]
+
+    return jsonify(success=True, complaint=data), 200
+
+
+@admin_bp.route('/complaints/<int:complaint_id>/assign', methods=['PATCH'])
+@role_required('Admin')
+def assign_complaint_officer(complaint_id):
+    admin_id = int(get_jwt_identity())
+    c = Complaint.query.get(complaint_id)
+    if not c:
+        return jsonify(message="Complaint not found."), 404
+
+    data = request.get_json()
+    if not data or not data.get('officer_id'):
+        return jsonify(message="officer_id is required."), 400
+
+    officer = User.query.get(data['officer_id'])
+    if not officer or officer.role != 'Officer':
+        return jsonify(message="Officer not found."), 404
+    if officer.status != 'active':
+        return jsonify(message="Cannot assign a complaint to an inactive officer."), 400
+
+    old_status = c.status
+    c.assigned_officer = officer.id
+    if c.status in ('Pending', 'Under Review'):
+        c.status = 'Assigned'
+
+    if c.status != old_status:
+        db.session.add(StatusLog(
+            complaint_id=c.id,
+            old_status=old_status,
+            new_status=c.status,
+            remark=f'Assigned to {officer.name} by admin.'
+        ))
+
+    db.session.add(Notification(
+        user_id=officer.id,
+        complaint_id=c.id,
+        title='New Complaint Assigned',
+        message=f'You have been assigned complaint CMP-{c.id:05d}: "{c.title}".',
+        type='assigned'
+    ))
+    db.session.add(Notification(
+        user_id=c.created_by,
+        complaint_id=c.id,
+        title='Officer Assigned',
+        message=f'Your complaint "{c.title}" has been assigned to {officer.name}.',
+        type='assigned'
+    ))
+
+    log_activity(
+        admin_id, 'complaint_assigned',
+        f'Assigned complaint CMP-{c.id:05d} to {officer.name}.',
+        complaint_id=c.id
+    )
+
+    db.session.commit()
+    return jsonify(success=True, message=f'Complaint assigned to {officer.name}.', complaint=_serialize_admin_complaint(c)), 200
+
+
+# ─────────────────────────────────────────────────────────────────────────
 # System-wide notification feed for admins — powers Notifications.vue
 # ─────────────────────────────────────────────────────────────────────────
 NOTIFICATION_CATEGORIES = {
@@ -1407,7 +1578,7 @@ ACTIVITY_MODULE = {
     'password_changed': 'Authentication', 'password_reset_requested': 'Authentication',
     'password_reset_completed': 'Authentication',
     'profile_updated': 'Profile', 'profile_photo_updated': 'Profile', 'profile_photo_removed': 'Profile',
-    'complaint_submitted': 'Complaint', 'feedback_submitted': 'Complaint',
+    'complaint_submitted': 'Complaint', 'feedback_submitted': 'Complaint', 'complaint_assigned': 'Complaint',
     'officer_approved': 'Officer', 'officer_rejected': 'Officer', 'officer_suspended': 'Officer',
     'officer_reactivated': 'Officer', 'officer_updated': 'Officer', 'officer_transferred': 'Officer',
     'department_created': 'Department', 'department_updated': 'Department', 'department_deleted': 'Department',
