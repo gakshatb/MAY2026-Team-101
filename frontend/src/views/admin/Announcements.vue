@@ -39,7 +39,7 @@
         <section class="mb-6 grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-4">
           <div v-for="(stat, index) in topStats" :key="index" class="bg-white p-5 rounded-[14px] shadow-sm border border-gray-50 flex flex-col group hover:border-[#2563EB] hover:shadow-md transition-all">
             <div class="flex items-center justify-between mb-3">
-              <div :class="`p-2.5 rounded-xl bg-opacity-10 ${stat.colorClass} bg-current group-hover:scale-110 transition-transform duration-300`">
+              <div :class="`p-2.5 rounded-xl ${stat.colorClass} group-hover:scale-110 transition-transform duration-300`">
                 <component :is="stat.icon" class="w-5 h-5" :class="stat.textClass" />
               </div>
             </div>
@@ -473,7 +473,7 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted, reactive } from 'vue';
+import { ref, computed, onMounted, reactive, nextTick } from 'vue';
 import { useRouter } from 'vue-router';
 import axios from 'axios';
 import Chart from 'chart.js/auto';
@@ -547,13 +547,16 @@ const fetchAnnouncements = async () => {
     audienceDist.value = data.audience_distribution;
     priorityDist.value = data.priority_distribution;
     monthlyCreated.value = data.monthly_created;
-
-    renderCharts();
   } catch (err) {
     if (err.response?.status === 401) router.push('/login');
     else errorMessage.value = err.response?.data?.message || 'Failed to load announcements.';
   } finally {
     isLoading.value = false;
+  }
+
+  if (announcements.value.length) {
+    await nextTick();
+    renderCharts();
   }
 };
 

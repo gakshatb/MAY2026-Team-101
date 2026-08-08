@@ -77,7 +77,7 @@
         <section class="grid grid-cols-2 md:grid-cols-4 xl:grid-cols-8 gap-4 mb-8">
           <div v-for="kpi in kpis" :key="kpi.key" class="bg-white p-4 rounded-[14px] shadow-sm border border-gray-50 flex flex-col group hover:shadow-md transition-all">
             <div class="flex justify-between items-start mb-2">
-              <div :class="`p-2 rounded-lg bg-opacity-10 ${kpi.colorClass} bg-current group-hover:scale-110 transition-transform`">
+              <div :class="`p-2 rounded-lg ${kpi.colorClass} group-hover:scale-110 transition-transform`">
                 <component :is="kpi.icon" class="w-4 h-4" :class="kpi.textClass" />
               </div>
               <span v-if="kpi.hasTrend" :class="['text-[10px] font-bold px-1.5 py-0.5 rounded flex items-center gap-0.5', kpi.trend >= 0 ? 'bg-green-50 text-green-600' : 'bg-red-50 text-red-600']">
@@ -145,17 +145,17 @@
 
           <!-- Quick Actions Grid -->
           <section class="xl:col-span-1 bg-white p-5 rounded-[14px] shadow-sm border border-gray-50 flex flex-col justify-center gap-3">
-             <button disabled title="Not available yet" class="flex items-center gap-3 p-3 w-full bg-gray-50 border border-gray-100 rounded-xl text-left opacity-50 cursor-not-allowed">
-               <Download class="w-5 h-5 text-gray-400 shrink-0" />
-               <div><p class="text-sm font-bold text-gray-900">Export Master Report</p><p class="text-[10px] text-gray-500">Coming soon</p></div>
+             <button class="flex items-center gap-3 p-3 w-full bg-gray-50 border border-gray-100 hover:border-[#2563EB] rounded-xl text-left transition-colors group">
+               <Download class="w-5 h-5 text-gray-400 group-hover:text-[#2563EB] shrink-0" />
+               <div><p class="text-sm font-bold text-gray-900">Export Master Report</p><p class="text-[10px] text-gray-500">Download complete PDF</p></div>
              </button>
              <button @click="exportDepartmentCsv" class="flex items-center gap-3 p-3 w-full bg-gray-50 border border-gray-100 hover:border-[#22C55E] rounded-xl text-left transition-colors group">
                <FileSpreadsheet class="w-5 h-5 text-gray-400 group-hover:text-[#22C55E] shrink-0" />
                <div><p class="text-sm font-bold text-gray-900">Generate CSV</p><p class="text-[10px] text-gray-500">Department analytics table</p></div>
              </button>
-             <button disabled title="Not available yet" class="flex items-center gap-3 p-3 w-full bg-gray-50 border border-gray-100 rounded-xl text-left opacity-50 cursor-not-allowed">
-               <FileText class="w-5 h-5 text-gray-400 shrink-0" />
-               <div><p class="text-sm font-bold text-gray-900">Dept Performance</p><p class="text-[10px] text-gray-500">Coming soon</p></div>
+             <button class="flex items-center gap-3 p-3 w-full bg-gray-50 border border-gray-100 hover:border-[#F59E0B] rounded-xl text-left transition-colors group">
+               <FileText class="w-5 h-5 text-gray-400 group-hover:text-[#F59E0B] shrink-0" />
+               <div><p class="text-sm font-bold text-gray-900">Dept Performance</p><p class="text-[10px] text-gray-500">View standalone reports</p></div>
              </button>
           </section>
 
@@ -563,20 +563,17 @@ const renderCharts = () => {
     options: { responsive: true, maintainAspectRatio: false, cutout: '70%', plugins: { legend: { position: 'right', labels: { boxWidth: 10, font: { size: 10 } } } } }
   }));
 
-  // 5. Radar Chart (Dept workload share vs resolution score — both normalized
-  //    to 0-100 so they're actually comparable on a shared radial scale)
-  const deptTotals = departmentAnalytics.value.map(d => d.total);
-  const maxTotal = Math.max(...deptTotals, 1);
+  // 5. Radar Chart
   chartInstances.push(new Chart(radarChartRef.value, {
     type: 'radar',
     data: {
       labels: departmentAnalytics.value.map(d => d.name),
       datasets: [
-        { label: 'Workload Share (%)', data: deptTotals.map(t => Math.round((t / maxTotal) * 100)), backgroundColor: 'rgba(37, 99, 235, 0.2)', borderColor: '#2563EB', pointBackgroundColor: '#2563EB' },
-        { label: 'Resolution Score (%)', data: departmentAnalytics.value.map(d => d.score), backgroundColor: 'rgba(34, 197, 94, 0.2)', borderColor: '#22C55E', pointBackgroundColor: '#22C55E' }
+        { label: 'Total Handled', data: departmentAnalytics.value.map(d => d.total), backgroundColor: 'rgba(37, 99, 235, 0.2)', borderColor: '#2563EB', pointBackgroundColor: '#2563EB' },
+        { label: 'Resolution Score', data: departmentAnalytics.value.map(d => d.score), backgroundColor: 'rgba(34, 197, 94, 0.2)', borderColor: '#22C55E', pointBackgroundColor: '#22C55E' }
       ]
     },
-    options: { responsive: true, maintainAspectRatio: false, scales: { r: { min: 0, max: 100, ticks: { display: false } } }, plugins: { legend: { position: 'bottom', labels: { boxWidth: 10, font: { size: 10 } } } } }
+    options: { responsive: true, maintainAspectRatio: false, scales: { r: { ticks: { display: false } } }, plugins: { legend: { position: 'bottom', labels: { boxWidth: 10, font: { size: 10 } } } } }
   }));
 
   // 6. Horizontal Bar (Resolution Time by Category)

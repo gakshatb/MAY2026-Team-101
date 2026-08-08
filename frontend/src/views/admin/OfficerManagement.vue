@@ -39,7 +39,7 @@
         <section class="mb-8 grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-4">
           <div v-for="(stat, index) in topStats" :key="index" class="bg-white p-5 rounded-[14px] shadow-sm border border-gray-50 flex flex-col group hover:border-gray-200 hover:shadow-md transition-all">
             <div class="flex items-center gap-3 mb-3">
-              <div :class="`p-2.5 rounded-lg bg-opacity-10 ${stat.colorClass} bg-current group-hover:scale-110 transition-transform duration-300`">
+              <div :class="`p-2.5 rounded-lg ${stat.colorClass} group-hover:scale-110 transition-transform duration-300`">
                 <component :is="stat.icon" class="w-5 h-5" :class="stat.textClass" />
               </div>
             </div>
@@ -580,7 +580,7 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted, reactive } from 'vue';
+import { ref, computed, onMounted, reactive, nextTick } from 'vue';
 import { useRouter } from 'vue-router';
 import axios from 'axios';
 import Chart from 'chart.js/auto';
@@ -673,12 +673,19 @@ const fetchOfficers = async () => {
       color: 'border-blue-500',
     }));
     departmentList.value = data.departments;
-    renderCharts();
   } catch (err) {
     if (err.response?.status === 401) router.push('/login');
     errorMessage.value = err.response?.data?.message || 'Failed to load officers.';
   } finally {
     isLoading.value = false;
+  }
+
+  // Charts live behind v-else="isLoading" — wait for that flip to reach
+  // the DOM before the <canvas> elements exist, otherwise renderCharts()'s
+  // own ref guard silently no-ops and the charts never draw.
+  if (officers.value.length) {
+    await nextTick();
+    renderCharts();
   }
 };
 

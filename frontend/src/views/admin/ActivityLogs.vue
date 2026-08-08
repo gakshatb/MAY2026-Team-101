@@ -37,7 +37,7 @@
         <section class="mb-6 grid grid-cols-2 md:grid-cols-4 xl:grid-cols-8 gap-3">
           <div v-for="(stat, index) in topStats" :key="index" class="bg-white p-4 rounded-[14px] shadow-sm border border-gray-50 flex flex-col group hover:shadow-md transition-all">
             <div class="flex justify-between items-start mb-2">
-              <div :class="`p-2 rounded-lg bg-opacity-10 ${stat.colorClass} bg-current group-hover:scale-110 transition-transform`">
+              <div :class="`p-2 rounded-lg ${stat.colorClass} group-hover:scale-110 transition-transform`">
                 <component :is="stat.icon" class="w-4 h-4" :class="stat.textClass" />
               </div>
             </div>
@@ -439,7 +439,7 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted, reactive, watch } from 'vue';
+import { ref, computed, onMounted, reactive, watch, nextTick } from 'vue';
 import { useRouter } from 'vue-router';
 import axios from 'axios';
 import Chart from 'chart.js/auto';
@@ -504,13 +504,20 @@ const fetchLogs = async () => {
     heatmap.value = data.heatmap;
     mostFrequentActivities.value = data.most_frequent_activities;
     roleDistribution.value = data.role_distribution;
-
-    renderCharts();
   } catch (err) {
     if (err.response?.status === 401) router.push('/login');
     else errorMessage.value = err.response?.data?.message || 'Failed to load activity logs.';
   } finally {
     isLoading.value = false;
+  }
+
+  // Charts live behind v-else="isLoading" — must wait for that flip to
+  // actually reach the DOM (nextTick) before the <canvas> elements exist,
+  // otherwise renderCharts()'s own ref guard silently no-ops and the
+  // charts never draw, even on retry.
+  if (logs.value.length || Object.keys(roleDistribution.value).length) {
+    await nextTick();
+    renderCharts();
   }
 };
 
