@@ -623,7 +623,7 @@ const updatePassword = async () => {
     passwordSuccess.value = 'Password updated successfully.'
     resetPasswordForm()
   } catch (err) {
-    if (err.response?.status === 401 && err.response?.data?.message?.includes('incorrect')) {
+    if (err.response?.status === 400 && err.response?.data?.message?.includes('incorrect')) {
       passwordErrors.current = 'Current password is incorrect.'
     } else {
       passwordErrors.submit = err.response?.data?.message || 'Password update failed.'

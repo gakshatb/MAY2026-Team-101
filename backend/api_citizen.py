@@ -259,11 +259,13 @@ def complaints_summary():
     return jsonify(
         success=True,
         summary={
-            "total":       base.count(),
-            "pending":     base.filter_by(status='Pending').count(),
-            "in_progress": base.filter_by(status='In Progress').count(),
-            "resolved":    base.filter_by(status='Resolved').count(),
-            "closed":      base.filter_by(status='Closed').count(),
+            "total":         base.count(),
+            "pending":       base.filter_by(status='Pending').count(),
+            "under_review":  base.filter_by(status='Under Review').count(),
+            "assigned":      base.filter_by(status='Assigned').count(),
+            "in_progress":   base.filter_by(status='In Progress').count(),
+            "resolved":      base.filter_by(status='Resolved').count(),
+            "closed":        base.filter_by(status='Closed').count(),
         }
     ), 200
 
@@ -800,6 +802,8 @@ def dashboard():
         summary={
             "total":       base.count(),
             "pending":     base.filter_by(status='Pending').count(),
+            "under_review": base.filter_by(status='Under Review').count(),
+            "assigned":    base.filter_by(status='Assigned').count(),
             "in_progress": base.filter_by(status='In Progress').count(),
             "resolved":    base.filter_by(status='Resolved').count(),
             "closed":      base.filter_by(status='Closed').count(),

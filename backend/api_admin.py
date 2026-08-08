@@ -1,11 +1,18 @@
+import os
+import uuid
 from datetime import datetime, timedelta
 from urllib.parse import quote
 
-from flask import Blueprint, jsonify, request # type: ignore
-from flask_jwt_extended import get_jwt_identity # type: ignore
+from flask import Blueprint, current_app, jsonify, request # type: ignore
+from flask_jwt_extended import get_jwt, get_jwt_identity # type: ignore
+from werkzeug.utils import secure_filename # type: ignore
 
-from models import db, User, Complaint, Department, ActivityLog, Feedback, Assignment, Announcement, now_ist
-from api_auth_utils import log_activity, role_required
+from models import (
+    db, User, Complaint, Department, ActivityLog, Feedback, Assignment,
+    Announcement, LoginSession, NotificationPreference, TokenBlocklist,
+    ContactMessage, Notification, StatusLog, now_ist
+)
+from api_auth_utils import log_activity, role_required, revoke_token
 
 admin_bp = Blueprint('admin', __name__, url_prefix='/api/admin')
 
@@ -226,6 +233,242 @@ def dashboard():
         platform_activity=platform_activity,
         growth_chart=growth_chart,
         category_breakdown={cat: count for cat, count in category_rows},
+    ), 200
+
+
+# ─────────────────────────────────────────────────────────────────────────
+# System Analytics — real replacement for SystemAnalytics.vue's mock data.
+# No fabricated infra metrics — see the note on dashboard()'s alerts.
+# ─────────────────────────────────────────────────────────────────────────
+@admin_bp.route('/analytics', methods=['GET'])
+@role_required('Admin')
+def system_analytics():
+    now = now_ist()
+    this_month_start = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+    last_month_start = (this_month_start - timedelta(days=1)).replace(day=1)
+
+    # ── KPIs (with month-over-month trend, same pattern as dashboard()) ──
+    def month_count(query_fn):
+        this_m = query_fn(this_month_start, now)
+        last_m = query_fn(last_month_start, this_month_start)
+        return this_m, _pct_change(this_m, last_m)
+
+    total_complaints = Complaint.query.count()
+    open_complaints = Complaint.query.filter(~Complaint.status.in_(['Resolved', 'Closed'])).count()
+    resolved_complaints = Complaint.query.filter_by(status='Resolved').count()
+    total_citizens = User.query.filter_by(role='Citizen').count()
+    total_officers = User.query.filter_by(role='Officer', status='active').count()
+    total_workers = User.query.filter_by(role='Worker', status='active').count()
+    departments_count = Department.query.count()
+
+    resolved_rows = Complaint.query.filter(
+        Complaint.status == 'Resolved', Complaint.updated_at.isnot(None)
+    ).all()
+    avg_resolution_hours = round(
+        sum((c.updated_at - c.created_at).total_seconds() for c in resolved_rows) / len(resolved_rows) / 3600, 1
+    ) if resolved_rows else 0
+
+    _, complaints_trend = month_count(lambda a, b: Complaint.query.filter(
+        Complaint.created_at >= a, Complaint.created_at < b).count())
+    _, resolved_trend = month_count(lambda a, b: Complaint.query.filter(
+        Complaint.status == 'Resolved', Complaint.updated_at >= a, Complaint.updated_at < b).count())
+    _, citizens_trend = month_count(lambda a, b: User.query.filter(
+        User.role == 'Citizen', User.created_at >= a, User.created_at < b).count())
+
+    kpis = {
+        "total_complaints":     {"value": total_complaints, "trend_pct": complaints_trend},
+        "open_complaints":      {"value": open_complaints, "trend_pct": None},
+        "resolved_complaints":  {"value": resolved_complaints, "trend_pct": resolved_trend},
+        "total_citizens":       {"value": total_citizens, "trend_pct": citizens_trend},
+        "total_officers":       {"value": total_officers, "trend_pct": None},
+        "total_workers":        {"value": total_workers, "trend_pct": None},
+        "departments":          {"value": departments_count, "trend_pct": None},
+        "avg_resolution_hours": {"value": avg_resolution_hours, "trend_pct": None},
+    }
+
+    # ── Department analytics table (+ feeds dept bar chart & radar) ──────
+    dept_rows = db.session.query(Complaint.department, db.func.count(Complaint.id)).group_by(Complaint.department).all()
+    department_analytics = []
+    for dept_name, total in dept_rows:
+        dept_complaints = Complaint.query.filter_by(department=dept_name)
+        resolved = dept_complaints.filter_by(status='Resolved').count()
+        pending = dept_complaints.filter(~Complaint.status.in_(['Resolved', 'Closed'])).count()
+
+        timed = dept_complaints.filter(Complaint.status == 'Resolved', Complaint.updated_at.isnot(None)).all()
+        avg_hours = (sum((c.updated_at - c.created_at).total_seconds() for c in timed) / len(timed) / 3600) if timed else 0
+
+        ratings = (
+            db.session.query(Feedback.rating)
+            .join(Complaint, Feedback.complaint_id == Complaint.id)
+            .filter(Complaint.department == dept_name)
+            .all()
+        )
+        avg_rating = round(sum(r[0] for r in ratings) / len(ratings), 1) if ratings else None
+
+        department_analytics.append({
+            "name": dept_name, "total": total, "resolved": resolved, "pending": pending,
+            "avg_time_hours": round(avg_hours, 1),
+            "rating": avg_rating,
+            "score": round((resolved / total) * 100) if total else 0,
+        })
+    department_analytics.sort(key=lambda d: d['total'], reverse=True)
+
+    # ── Category / status breakdowns (pie / doughnut) ────────────────────
+    category_breakdown = dict(db.session.query(Complaint.category, db.func.count(Complaint.id)).group_by(Complaint.category).all())
+    status_breakdown = dict(db.session.query(Complaint.status, db.func.count(Complaint.id)).group_by(Complaint.status).all())
+
+    # ── Resolution time by category (horizontal bar) ─────────────────────
+    resolution_by_category = {}
+    for cat, in db.session.query(Complaint.category).distinct():
+        rows = Complaint.query.filter(Complaint.category == cat, Complaint.status == 'Resolved', Complaint.updated_at.isnot(None)).all()
+        resolution_by_category[cat] = round(
+            sum((c.updated_at - c.created_at).total_seconds() for c in rows) / len(rows) / 3600, 1
+        ) if rows else 0
+
+    # ── Satisfaction gauge (from Feedback.rating, 1-5) ────────────────────
+    all_ratings = [r[0] for r in db.session.query(Feedback.rating).all()]
+    satisfied = sum(1 for r in all_ratings if r >= 4)
+    neutral = sum(1 for r in all_ratings if r == 3)
+    dissatisfied = sum(1 for r in all_ratings if r <= 2)
+    total_ratings = len(all_ratings) or 1
+    satisfaction = {
+        "satisfied_pct": round(satisfied / total_ratings * 100),
+        "neutral_pct": round(neutral / total_ratings * 100),
+        "dissatisfied_pct": round(dissatisfied / total_ratings * 100),
+    }
+
+    # ── Emergency handling ────────────────────────────────────────────────
+    emergency_q = Complaint.query.filter_by(priority='Emergency')
+    emergency_total = emergency_q.count()
+    emergency_resolved = emergency_q.filter_by(status='Resolved').count()
+    emergency_timed = emergency_q.filter(Complaint.status == 'Resolved', Complaint.updated_at.isnot(None)).all()
+    emergency_avg_minutes = round(
+        sum((c.updated_at - c.created_at).total_seconds() for c in emergency_timed) / len(emergency_timed) / 60
+    ) if emergency_timed else 0
+    ward_row = (
+        db.session.query(Complaint.ward, db.func.count(Complaint.id))
+        .filter(Complaint.priority == 'Emergency', Complaint.ward.isnot(None))
+        .group_by(Complaint.ward).order_by(db.func.count(Complaint.id).desc()).first()
+    )
+    emergency = {
+        "total": emergency_total, "resolved": emergency_resolved,
+        "pending": emergency_total - emergency_resolved,
+        "avg_response_minutes": emergency_avg_minutes,
+        "most_impacted_ward": ward_row[0] if ward_row else None,
+    }
+
+    # ── Top 5 officers (by resolution score among assigned complaints) ───
+    officers = User.query.filter_by(role='Officer', status='active').all()
+    officer_stats = []
+    for o in officers:
+        managed = Complaint.query.filter_by(assigned_officer=o.id)
+        managed_count = managed.count()
+        if not managed_count:
+            continue
+        resolved_count = managed.filter_by(status='Resolved').count()
+        ratings = db.session.query(Feedback.rating).join(Complaint, Feedback.complaint_id == Complaint.id).filter(Complaint.assigned_officer == o.id).all()
+        officer_stats.append({
+            "name": o.name, "dept": o.member_department.department_name if o.member_department else None,
+            "managed": managed_count, "score": round(resolved_count / managed_count * 100),
+            "rating": round(sum(r[0] for r in ratings) / len(ratings), 1) if ratings else None,
+        })
+    officer_stats.sort(key=lambda x: x['score'], reverse=True)
+    top_officers = officer_stats[:5]
+
+    # ── Top 5 workers (by completion rate among assignments) ─────────────
+    workers = User.query.filter_by(role='Worker', status='active').all()
+    worker_stats = []
+    for w in workers:
+        assignments = db.session.query(Assignment, Complaint).join(Complaint, Assignment.complaint_id == Complaint.id).filter(Assignment.worker_id == w.id).all()
+        if not assignments:
+            continue
+        completed = [a for a, c in assignments if c.status in ('Resolved', 'Closed')]
+        timed = [(a, c) for a, c in assignments if c.status == 'Resolved' and c.updated_at]
+        avg_hours = (sum((c.updated_at - a.assigned_at).total_seconds() for a, c in timed) / len(timed) / 3600) if timed else 0
+        worker_stats.append({
+            "name": w.name, "dept": w.member_department.department_name if w.member_department else None,
+            "tasks": len(assignments), "completion_rate": round(len(completed) / len(assignments) * 100),
+            "avg_time_hours": round(avg_hours, 1),
+        })
+    worker_stats.sort(key=lambda x: x['completion_rate'], reverse=True)
+    top_workers = worker_stats[:5]
+
+    # ── Growth trend, 6 months (complaints + new citizens) ────────────────
+    month_keys = []
+    y, m = now.year, now.month
+    for _ in range(6):
+        month_keys.append((y, m))
+        m -= 1
+        if m == 0:
+            m, y = 12, y - 1
+    month_keys.reverse()
+
+    def bucket(rows_query):
+        counts = {k: 0 for k in month_keys}
+        for (created_at,) in rows_query:
+            if created_at and (created_at.year, created_at.month) in counts:
+                counts[(created_at.year, created_at.month)] += 1
+        return [counts[k] for k in month_keys]
+
+    growth_trend = {
+        "labels": [datetime(y, m, 1).strftime('%b') for (y, m) in month_keys],
+        "complaints": bucket(Complaint.query.with_entities(Complaint.created_at).all()),
+        "citizens": bucket(User.query.filter_by(role='Citizen').with_entities(User.created_at).all()),
+    }
+
+    # ── Announcements reach (only real fields — no ack/sync tracking) ────
+    published = Announcement.query.filter_by(status='Published')
+    announcements_reach = {
+        "published_count": published.count(),
+        "total_views": db.session.query(db.func.sum(Announcement.views)).filter(Announcement.status == 'Published').scalar() or 0,
+    }
+
+    # ── Platform activity timeline (same source as dashboard(), more rows) ─
+    recent_logs = (
+        db.session.query(ActivityLog, User)
+        .join(User, ActivityLog.user_id == User.id)
+        .order_by(ActivityLog.created_at.desc())
+        .limit(15)
+        .all()
+    )
+    activity_timeline = [
+        {
+            "id": log.id,
+            "title": log.activity_type.replace('_', ' ').title(),
+            "description": log.description,
+            "user": user.name,
+            "created_at": log.created_at.isoformat() if log.created_at else None,
+        }
+        for log, user in recent_logs
+    ]
+
+    # ── Insights (derived, not separately stored) ─────────────────────────
+    insights = {
+        "most_active_dept": department_analytics[0]['name'] if department_analytics else None,
+        "highest_satisfaction_dept": max(
+            (d for d in department_analytics if d['rating'] is not None), key=lambda d: d['rating'], default=None
+        ),
+        "fastest_resolution_dept": min(
+            (d for d in department_analytics if d['total'] > 0), key=lambda d: d['avg_time_hours'], default=None
+        ),
+        "top_concern_ward": emergency['most_impacted_ward'],
+    }
+
+    return jsonify(
+        success=True,
+        kpis=kpis,
+        insights=insights,
+        emergency=emergency,
+        department_analytics=department_analytics,
+        category_breakdown=category_breakdown,
+        status_breakdown=status_breakdown,
+        resolution_by_category=resolution_by_category,
+        satisfaction=satisfaction,
+        top_officers=top_officers,
+        top_workers=top_workers,
+        growth_trend=growth_trend,
+        announcements_reach=announcements_reach,
+        activity_timeline=activity_timeline,
     ), 200
 
 
@@ -1086,6 +1329,177 @@ def officer_details(officer_id):
 
 
 # ─────────────────────────────────────────────────────────────────────────
+# Complaint Management — powers ComplaintManagement.vue
+# Lets an admin see every complaint platform-wide and assign/reassign the
+# Civic Officer responsible for it (independent of the officer's own
+# worker-assignment flow, which happens after this).
+# ─────────────────────────────────────────────────────────────────────────
+def _serialize_admin_complaint(c):
+    citizen = User.query.get(c.created_by)
+    officer = User.query.get(c.assigned_officer) if c.assigned_officer else None
+    return {
+        "id":              f"CMP-{c.id:05d}",
+        "raw_id":          c.id,
+        "title":           c.title,
+        "category":        c.category,
+        "priority":        c.priority,
+        "department":      c.department,
+        "status":          c.status,
+        "location":        c.location,
+        "is_escalated":    c.is_escalated,
+        "citizen":         {"id": citizen.id, "name": citizen.name, "email": citizen.email} if citizen else None,
+        "officer":         {"id": officer.id, "name": officer.name, "empId": f"OFC-{officer.id:04d}"} if officer else None,
+        "created_at":      c.created_at.isoformat() if c.created_at else None,
+        "updated_at":      c.updated_at.isoformat() if c.updated_at else None,
+    }
+
+
+@admin_bp.route('/complaints', methods=['GET'])
+@role_required('Admin')
+def list_admin_complaints():
+    query = Complaint.query
+
+    status = request.args.get('status', 'All')
+    if status == 'Unassigned':
+        query = query.filter(Complaint.assigned_officer.is_(None))
+    elif status != 'All':
+        query = query.filter_by(status=status)
+
+    department = request.args.get('department', 'All')
+    if department != 'All':
+        query = query.filter_by(department=department)
+
+    priority = request.args.get('priority', 'All')
+    if priority != 'All':
+        query = query.filter_by(priority=priority)
+
+    rows = query.order_by(Complaint.created_at.desc()).all()
+
+    search = request.args.get('search', '').strip().lower()
+    if search:
+        rows = [
+            c for c in rows
+            if search in c.title.lower()
+            or search in c.category.lower()
+            or search in f"cmp-{c.id:05d}"
+            or (c.citizen and search in c.citizen.name.lower())
+        ]
+
+    total = Complaint.query.count()
+    unassigned = Complaint.query.filter(Complaint.assigned_officer.is_(None)).count()
+    in_progress = Complaint.query.filter(Complaint.status == 'In Progress').count()
+    resolved = Complaint.query.filter(Complaint.status.in_(['Resolved', 'Closed'])).count()
+
+    return jsonify(
+        success=True,
+        summary={"total": total, "unassigned": unassigned, "in_progress": in_progress, "resolved": resolved},
+        complaints=[_serialize_admin_complaint(c) for c in rows],
+        departments=[
+            d.department_name for d in Department.query.order_by(Department.department_name.asc()).all()
+        ],
+    ), 200
+
+
+@admin_bp.route('/complaints/<int:complaint_id>', methods=['GET'])
+@role_required('Admin')
+def get_admin_complaint(complaint_id):
+    c = Complaint.query.get(complaint_id)
+    if not c:
+        return jsonify(message="Complaint not found."), 404
+
+    data = _serialize_admin_complaint(c)
+    data.update({
+        "description":  c.description,
+        "city":         c.city,
+        "ward":         c.ward,
+        "area":         c.area,
+        "street":       c.street,
+        "landmark":     c.landmark,
+        "images":       [img.image_url for img in c.images],
+        "status_logs": [
+            {
+                "old_status": s.old_status,
+                "new_status": s.new_status,
+                "remark":     s.remark,
+                "changed_at": s.changed_at.isoformat() if s.changed_at else None,
+            }
+            for s in sorted(c.status_logs, key=lambda s: s.changed_at)
+        ],
+    })
+
+    # Officers in the same department, so the admin can pick a sensible
+    # assignee — active only, same department name as the complaint.
+    eligible_officers = (
+        User.query
+        .join(Department, User.department_id == Department.id)
+        .filter(User.role == 'Officer', User.status == 'active', Department.department_name == c.department)
+        .order_by(User.name.asc())
+        .all()
+    )
+    data["eligible_officers"] = [
+        {"id": o.id, "name": o.name, "empId": f"OFC-{o.id:04d}"} for o in eligible_officers
+    ]
+
+    return jsonify(success=True, complaint=data), 200
+
+
+@admin_bp.route('/complaints/<int:complaint_id>/assign', methods=['PATCH'])
+@role_required('Admin')
+def assign_complaint_officer(complaint_id):
+    admin_id = int(get_jwt_identity())
+    c = Complaint.query.get(complaint_id)
+    if not c:
+        return jsonify(message="Complaint not found."), 404
+
+    data = request.get_json()
+    if not data or not data.get('officer_id'):
+        return jsonify(message="officer_id is required."), 400
+
+    officer = User.query.get(data['officer_id'])
+    if not officer or officer.role != 'Officer':
+        return jsonify(message="Officer not found."), 404
+    if officer.status != 'active':
+        return jsonify(message="Cannot assign a complaint to an inactive officer."), 400
+
+    old_status = c.status
+    c.assigned_officer = officer.id
+    if c.status in ('Pending', 'Under Review'):
+        c.status = 'Assigned'
+
+    if c.status != old_status:
+        db.session.add(StatusLog(
+            complaint_id=c.id,
+            old_status=old_status,
+            new_status=c.status,
+            remark=f'Assigned to {officer.name} by admin.'
+        ))
+
+    db.session.add(Notification(
+        user_id=officer.id,
+        complaint_id=c.id,
+        title='New Complaint Assigned',
+        message=f'You have been assigned complaint CMP-{c.id:05d}: "{c.title}".',
+        type='assigned'
+    ))
+    db.session.add(Notification(
+        user_id=c.created_by,
+        complaint_id=c.id,
+        title='Officer Assigned',
+        message=f'Your complaint "{c.title}" has been assigned to {officer.name}.',
+        type='assigned'
+    ))
+
+    log_activity(
+        admin_id, 'complaint_assigned',
+        f'Assigned complaint CMP-{c.id:05d} to {officer.name}.',
+        complaint_id=c.id
+    )
+
+    db.session.commit()
+    return jsonify(success=True, message=f'Complaint assigned to {officer.name}.', complaint=_serialize_admin_complaint(c)), 200
+
+
+# ─────────────────────────────────────────────────────────────────────────
 # System-wide notification feed for admins — powers Notifications.vue
 # ─────────────────────────────────────────────────────────────────────────
 NOTIFICATION_CATEGORIES = {
@@ -1164,7 +1578,7 @@ ACTIVITY_MODULE = {
     'password_changed': 'Authentication', 'password_reset_requested': 'Authentication',
     'password_reset_completed': 'Authentication',
     'profile_updated': 'Profile', 'profile_photo_updated': 'Profile', 'profile_photo_removed': 'Profile',
-    'complaint_submitted': 'Complaint', 'feedback_submitted': 'Complaint',
+    'complaint_submitted': 'Complaint', 'feedback_submitted': 'Complaint', 'complaint_assigned': 'Complaint',
     'officer_approved': 'Officer', 'officer_rejected': 'Officer', 'officer_suspended': 'Officer',
     'officer_reactivated': 'Officer', 'officer_updated': 'Officer', 'officer_transferred': 'Officer',
     'department_created': 'Department', 'department_updated': 'Department', 'department_deleted': 'Department',
@@ -1592,3 +2006,454 @@ def toggle_pin_announcement(ann_id):
 
     author = User.query.get(ann.author_id)
     return jsonify(success=True, announcement=_serialize_announcement(ann, author.name if author else 'Unknown')), 200
+
+
+# ─────────────────────────────────────────────────────────────────────────
+# Contact Messages — powers ContactMessages.vue
+# Reads submissions from the public /api/contact form (see api.py).
+# ─────────────────────────────────────────────────────────────────────────
+def _serialize_contact_message(m):
+    return {
+        "id":         m.id,
+        "name":       m.name,
+        "email":      m.email,
+        "subject":    m.subject,
+        "message":    m.message,
+        "is_read":    m.is_read,
+        "created_at": m.created_at.isoformat() if m.created_at else None,
+    }
+
+
+@admin_bp.route('/contact-messages', methods=['GET'])
+@role_required('Admin')
+def list_contact_messages():
+    status = request.args.get('status', 'All')   # All | Read | Unread
+    search = request.args.get('search', '').strip().lower()
+
+    query = ContactMessage.query
+    if status == 'Read':
+        query = query.filter_by(is_read=True)
+    elif status == 'Unread':
+        query = query.filter_by(is_read=False)
+
+    rows = query.order_by(ContactMessage.created_at.desc()).all()
+
+    if search:
+        rows = [
+            m for m in rows
+            if search in m.name.lower()
+            or search in m.email.lower()
+            or search in m.subject.lower()
+            or search in m.message.lower()
+        ]
+
+    total = ContactMessage.query.count()
+    unread = ContactMessage.query.filter_by(is_read=False).count()
+    today_start = now_ist().replace(hour=0, minute=0, second=0, microsecond=0)
+    today_count = ContactMessage.query.filter(ContactMessage.created_at >= today_start).count()
+
+    return jsonify(
+        success=True,
+        summary={"total": total, "unread": unread, "read": total - unread, "today": today_count},
+        messages=[_serialize_contact_message(m) for m in rows]
+    ), 200
+
+
+@admin_bp.route('/contact-messages/<int:message_id>/read', methods=['PATCH'])
+@role_required('Admin')
+def mark_contact_message_read(message_id):
+    message = ContactMessage.query.get(message_id)
+    if not message:
+        return jsonify(message="Message not found."), 404
+
+    data = request.get_json(silent=True) or {}
+    message.is_read = bool(data.get('read', True))
+    db.session.commit()
+
+    return jsonify(success=True, message_data=_serialize_contact_message(message)), 200
+
+
+@admin_bp.route('/contact-messages/<int:message_id>', methods=['DELETE'])
+@role_required('Admin')
+def delete_contact_message(message_id):
+    message = ContactMessage.query.get(message_id)
+    if not message:
+        return jsonify(message="Message not found."), 404
+
+    db.session.delete(message)
+    db.session.commit()
+
+    return jsonify(success=True, message="Message deleted."), 200
+
+
+# ─────────────────────────────────────────────────────────────────────────
+# Admin Profile — powers Profile.vue
+# ─────────────────────────────────────────────────────────────────────────
+ALLOWED_AVATAR_TYPES = {'.png', '.jpg', '.jpeg'}
+MAX_AVATAR_BYTES = 5 * 1024 * 1024
+
+ADMIN_PERMISSIONS = [
+    {"name": "Manage Departments",    "desc": "Create, edit, and delete civic departments.",       "level": "Full Access"},
+    {"name": "Manage Officers",       "desc": "Approve, suspend, and transfer civic officers.",     "level": "Full Access"},
+    {"name": "Manage Announcements",  "desc": "Publish global and targeted notices.",                "level": "Full Access"},
+    {"name": "System Settings",       "desc": "Configure platform-wide variables.",                  "level": "Full Access"},
+    {"name": "View Analytics",        "desc": "Access platform business intelligence.",              "level": "Read Only"},
+    {"name": "Audit Logs",            "desc": "Monitor security and activity trails.",                "level": "Read Only"},
+]
+
+
+def _save_avatar_image(file_storage):
+    """Saves an uploaded avatar to disk and returns its public URL path.
+    Mirrors _save_uploaded_image() in api_citizen.py — kept local here so
+    this blueprint stays self-contained."""
+    if not file_storage or not file_storage.filename:
+        return None
+
+    ext = os.path.splitext(file_storage.filename)[1].lower()
+    if ext not in ALLOWED_AVATAR_TYPES:
+        raise ValueError('Only PNG, JPG, and JPEG images are allowed.')
+
+    file_storage.seek(0, os.SEEK_END)
+    size = file_storage.tell()
+    file_storage.seek(0)
+    if size > MAX_AVATAR_BYTES:
+        raise ValueError('Image exceeds the 5MB size limit.')
+
+    upload_dir = current_app.config['UPLOAD_FOLDER']
+    os.makedirs(upload_dir, exist_ok=True)
+
+    filename = secure_filename(f"{uuid.uuid4().hex}{ext}")
+    file_storage.save(os.path.join(upload_dir, filename))
+
+    return f"/api/uploads/{filename}"
+
+
+def _relative_day_label(dt):
+    """'Today' / 'Yesterday' / 'Jul 12, 2026' — used for last-login display."""
+    if not dt:
+        return 'Never'
+    today = now_ist().date()
+    d = dt.date()
+    if d == today:
+        return 'Today'
+    if d == today - timedelta(days=1):
+        return 'Yesterday'
+    return dt.strftime('%b %d, %Y')
+
+
+def _get_or_create_prefs(user_id):
+    prefs = NotificationPreference.query.filter_by(user_id=user_id).first()
+    if not prefs:
+        prefs = NotificationPreference(user_id=user_id)
+        db.session.add(prefs)
+        db.session.commit()
+    return prefs
+
+
+def _serialize_prefs(prefs):
+    return {
+        "email":         prefs.email,
+        "push":          prefs.push,
+        "alerts":        prefs.alerts,
+        "security":      prefs.security,
+        "dept":          prefs.dept_updates,
+        "weekly":        prefs.weekly_reports,
+    }
+
+
+def _serialize_session(s, current_jti=None):
+    return {
+        "id":            s.id,
+        "device":        s.device or 'Unknown',
+        "os":            s.os or 'Unknown',
+        "browser":       s.browser or 'Unknown',
+        "ip":            s.ip_address or 'N/A',
+        "created_at":    s.created_at.isoformat() if s.created_at else None,
+        "last_active":   (s.last_active_at or s.created_at).strftime('%b %d, %Y %I:%M %p') if (s.last_active_at or s.created_at) else None,
+        "is_current":    bool(current_jti) and s.jti == current_jti,
+    }
+
+
+@admin_bp.route('/profile', methods=['GET'])
+@role_required('Admin')
+def admin_profile():
+    user_id = int(get_jwt_identity())
+    user = User.query.get(user_id)
+    if not user:
+        return jsonify(message="User not found."), 404
+
+    now = now_ist()
+    active_sessions = (
+        LoginSession.query
+        .filter_by(user_id=user_id, status='Success')
+        .filter(LoginSession.revoked_at.is_(None))
+        .filter(db.or_(LoginSession.expires_at.is_(None), LoginSession.expires_at > now))
+        .order_by(LoginSession.last_active_at.desc().nullslast(), LoginSession.created_at.desc())
+        .all()
+    )
+    trusted_device_count = len({(s.device, s.os) for s in active_sessions})
+
+    last_login = (
+        LoginSession.query
+        .filter_by(user_id=user_id, status='Success')
+        .order_by(LoginSession.created_at.desc())
+        .first()
+    )
+    last_pw_change = (
+        ActivityLog.query
+        .filter_by(user_id=user_id, activity_type='password_changed')
+        .order_by(ActivityLog.created_at.desc())
+        .first()
+    )
+
+    login_history_rows = (
+        LoginSession.query
+        .filter_by(user_id=user_id)
+        .order_by(LoginSession.created_at.desc())
+        .limit(10)
+        .all()
+    )
+    activity_rows = (
+        ActivityLog.query
+        .filter_by(user_id=user_id)
+        .order_by(ActivityLog.created_at.desc())
+        .limit(10)
+        .all()
+    )
+
+    years_of_service = round((now - user.created_at).days / 365.25, 1) if user.created_at else 0
+    prefs = _get_or_create_prefs(user_id)
+
+    return jsonify(
+        success=True,
+        profile={
+            "name":         user.name,
+            "id":           f"ADM-{user.id:03d}",
+            "designation":  user.designation or 'Administrator',
+            "department":   "CivicDesk HQ",
+            "email":        user.email,
+            "phone":        user.phone,
+            "joinDate":     user.created_at.strftime('%b %d, %Y') if user.created_at else None,
+            "avatar":       user.profile_photo,
+        },
+        stats=[
+            {"label": "Years of Service",  "value": str(years_of_service)},
+            {"label": "Announcements",     "value": str(Announcement.query.filter_by(author_id=user_id).count())},
+            {"label": "Depts Managed",     "value": str(Department.query.count())},
+            {"label": "Officers Managed",  "value": str(User.query.filter_by(role='Officer').count())},
+            {"label": "System Actions",    "value": str(ActivityLog.query.filter_by(user_id=user_id).count())},
+            {"label": "Last Login",        "value": _relative_day_label(last_login.created_at if last_login else None)},
+        ],
+        personal={
+            "name":        user.name,
+            "dob":         user.dob.strftime('%d %b %Y') if user.dob else None,
+            "dob_iso":     user.dob.isoformat() if user.dob else None,
+            "gender":      user.gender,
+            "nationality": user.nationality,
+            "address":     user.address,
+            "city":        user.city,
+            "state":       user.state,
+            "country":     'India',
+            "zip":         user.pincode,
+            "emergency":   user.emergency_contact,
+        },
+        permissions=ADMIN_PERMISSIONS,
+        security={
+            "lastPasswordChange": _relative_day_label(last_pw_change.created_at if last_pw_change else user.created_at),
+            "recoveryEmail":      user.recovery_email,
+            "activeSessions":     len(active_sessions),
+            "trustedDevices":     trusted_device_count,
+        },
+        notificationPrefs=_serialize_prefs(prefs),
+        loginHistory=[
+            {
+                "id":      r.id,
+                "date":    r.created_at.strftime('%b %d, %Y'),
+                "time":    r.created_at.strftime('%I:%M %p'),
+                "device":  r.device or 'Unknown',
+                "os":      r.os or 'Unknown',
+                "browser": r.browser or 'Unknown',
+                "ip":      r.ip_address or 'N/A',
+                "status":  r.status,
+            }
+            for r in login_history_rows
+        ],
+        accountActivities=[
+            {
+                "id":   a.id,
+                "action": a.activity_type.replace('_', ' ').title(),
+                "desc":   a.description,
+                "date":   a.created_at.strftime('%b %d, %Y'),
+                "time":   a.created_at.strftime('%I:%M %p'),
+            }
+            for a in activity_rows
+        ],
+    ), 200
+
+
+@admin_bp.route('/profile', methods=['PUT'])
+@role_required('Admin')
+def update_admin_profile():
+    user_id = int(get_jwt_identity())
+    user = User.query.get(user_id)
+    if not user:
+        return jsonify(message="User not found."), 404
+
+    data = request.get_json()
+    if not data:
+        return jsonify(message="Request body must be JSON."), 400
+
+    name    = data.get('name', '').strip()
+    phone   = data.get('phone', '').strip()
+    address = data.get('address', '').strip()
+    city    = data.get('city', '').strip()
+    state   = data.get('state', '').strip()
+    pincode = data.get('zip', '').strip()
+    gender  = data.get('gender', '').strip()
+    designation = data.get('designation', '').strip()
+    nationality = data.get('nationality', '').strip()
+    emergency   = data.get('emergency', '').strip()
+    recovery_email = data.get('recoveryEmail', '').strip().lower()
+    dob_str = data.get('dob', '').strip()
+
+    if not name:
+        return jsonify(message="Name is required."), 400
+    if phone and (not phone.isdigit() or len(phone) != 10):
+        return jsonify(message="Enter a valid 10-digit phone number."), 400
+    if recovery_email and '@' not in recovery_email:
+        return jsonify(message="Enter a valid recovery email."), 400
+
+    if dob_str:
+        try:
+            user.dob = datetime.strptime(dob_str, '%Y-%m-%d').date()
+        except ValueError:
+            return jsonify(message="Date of birth must be in YYYY-MM-DD format."), 400
+
+    user.name = name
+    if phone:
+        user.phone = phone
+    if address:
+        user.address = address
+    if city:
+        user.city = city
+    if state:
+        user.state = state
+    if pincode:
+        user.pincode = pincode
+    if gender:
+        user.gender = gender
+    if designation:
+        user.designation = designation
+    if nationality:
+        user.nationality = nationality
+    if emergency:
+        user.emergency_contact = emergency
+    if recovery_email:
+        user.recovery_email = recovery_email
+
+    log_activity(user_id, 'profile_updated', 'Updated profile details.')
+    db.session.commit()
+
+    return jsonify(success=True, message="Profile updated successfully."), 200
+
+
+@admin_bp.route('/profile/photo', methods=['POST'])
+@role_required('Admin')
+def upload_admin_photo():
+    user_id = int(get_jwt_identity())
+    user = User.query.get(user_id)
+
+    if 'photo' not in request.files:
+        return jsonify(message="No photo file was provided."), 400
+
+    try:
+        photo_url = _save_avatar_image(request.files['photo'])
+    except ValueError as e:
+        return jsonify(message=str(e)), 400
+
+    if not photo_url:
+        return jsonify(message="No photo file was provided."), 400
+
+    user.profile_photo = photo_url
+    log_activity(user_id, 'profile_photo_updated', 'Updated profile photo.')
+    db.session.commit()
+
+    return jsonify(success=True, profilePhoto=photo_url), 200
+
+
+@admin_bp.route('/profile/photo', methods=['DELETE'])
+@role_required('Admin')
+def delete_admin_photo():
+    user_id = int(get_jwt_identity())
+    user = User.query.get(user_id)
+
+    user.profile_photo = None
+    log_activity(user_id, 'profile_photo_removed', 'Removed profile photo.')
+    db.session.commit()
+
+    return jsonify(success=True), 200
+
+
+@admin_bp.route('/profile/notification-preferences', methods=['PUT'])
+@role_required('Admin')
+def update_notification_prefs():
+    user_id = int(get_jwt_identity())
+    data = request.get_json()
+    if not data:
+        return jsonify(message="Request body must be JSON."), 400
+
+    prefs = _get_or_create_prefs(user_id)
+    field_map = {
+        "email":    "email",
+        "push":     "push",
+        "alerts":   "alerts",
+        "security": "security",
+        "dept":     "dept_updates",
+        "weekly":   "weekly_reports",
+    }
+    for key, attr in field_map.items():
+        if key in data:
+            setattr(prefs, attr, bool(data[key]))
+
+    db.session.commit()
+    return jsonify(success=True, notificationPrefs=_serialize_prefs(prefs)), 200
+
+
+@admin_bp.route('/profile/sessions', methods=['GET'])
+@role_required('Admin')
+def list_admin_sessions():
+    user_id = int(get_jwt_identity())
+    current_jti = get_jwt().get('jti')
+
+    now = now_ist()
+    sessions = (
+        LoginSession.query
+        .filter_by(user_id=user_id, status='Success')
+        .filter(LoginSession.revoked_at.is_(None))
+        .filter(db.or_(LoginSession.expires_at.is_(None), LoginSession.expires_at > now))
+        .order_by(LoginSession.last_active_at.desc().nullslast(), LoginSession.created_at.desc())
+        .all()
+    )
+    return jsonify(
+        success=True,
+        sessions=[_serialize_session(s, current_jti) for s in sessions]
+    ), 200
+
+
+@admin_bp.route('/profile/sessions/<int:session_id>', methods=['DELETE'])
+@role_required('Admin')
+def revoke_admin_session(session_id):
+    user_id = int(get_jwt_identity())
+    session = LoginSession.query.get(session_id)
+
+    if not session or session.user_id != user_id:
+        return jsonify(message="Session not found."), 404
+    if session.revoked_at:
+        return jsonify(message="Session already ended."), 400
+
+    session.revoked_at = now_ist()
+    if session.jti:
+        revoke_token(session.jti, session.expires_at or now_ist(), user_id=user_id)
+
+    db.session.commit()
+    return jsonify(success=True, message="Session ended."), 200

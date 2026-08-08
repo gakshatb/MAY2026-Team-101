@@ -8,14 +8,18 @@ from flask_jwt_extended import ( # type: ignore
     get_jwt, get_jwt_identity, jwt_required
 )
 
-from models import db, User, PasswordResetOTP, now_ist
+from models import db, User, PasswordResetOTP, LoginSession, now_ist, IST
 
 from api_auth_utils import (
     VALID_ROLES, is_token_revoked, is_valid_email, is_valid_phone, limiter,
-    log_activity, revoke_token, token_not_revoked
+    log_activity, parse_user_agent, revoke_token, token_not_revoked
 )
 
 auth_bp = Blueprint('auth', __name__, url_prefix='/api')
+
+
+def _exp_to_ist(exp):
+    return datetime.fromtimestamp(exp, tz=IST).replace(tzinfo=None)
 
 
 # ─────────────────────────────────────────────────────────────────────────
@@ -114,8 +118,15 @@ def login():
         return jsonify(message="Email and password are required."), 400
 
     user = User.query.filter_by(email=email).first()
+    device, os_name, browser = parse_user_agent(request.headers.get('User-Agent'))
 
     if not user or not check_password_hash(user.password, password):
+        if user:
+            db.session.add(LoginSession(
+                user_id=user.id, device=device, os=os_name, browser=browser,
+                ip_address=request.remote_addr, status='Failed'
+            ))
+            db.session.commit()
         return jsonify(message="Invalid email or password."), 401
 
     if user.status == 'pending':
@@ -125,7 +136,17 @@ def login():
 
     access_token  = create_access_token(identity=str(user.id))
     refresh_token = create_refresh_token(identity=str(user.id))
+    refresh_claims = decode_token(refresh_token)
 
+    db.session.add(LoginSession(
+        user_id=user.id,
+        jti=refresh_claims['jti'],
+        device=device, os=os_name, browser=browser,
+        ip_address=request.remote_addr,
+        status='Success',
+        last_active_at=now_ist(),
+        expires_at=_exp_to_ist(refresh_claims['exp'])
+    ))
     log_activity(user.id, 'login', 'Logged in.')
     db.session.commit()
 
@@ -151,7 +172,7 @@ def login():
 def logout():
     user_id = int(get_jwt_identity())
     claims = get_jwt()
-    revoke_token(claims["jti"], datetime.fromtimestamp(claims["exp"]), user_id=user_id)
+    revoke_token(claims["jti"], _exp_to_ist(claims["exp"]), user_id=user_id)
 
     data = request.get_json(silent=True) or {}
     refresh_token = data.get("refresh_token")
@@ -160,9 +181,12 @@ def logout():
             refresh_claims = decode_token(refresh_token)
             revoke_token(
                 refresh_claims["jti"],
-                datetime.fromtimestamp(refresh_claims["exp"]),
+                _exp_to_ist(refresh_claims["exp"]),
                 user_id=user_id
             )
+            session = LoginSession.query.filter_by(jti=refresh_claims["jti"]).first()
+            if session:
+                session.revoked_at = now_ist()
         except Exception:
             pass
 
@@ -186,6 +210,11 @@ def refresh():
     user = User.query.get(int(user_id))
     if not user or user.status != 'active':
         return jsonify(message="User not found or disabled."), 403
+
+    session = LoginSession.query.filter_by(jti=jti).first()
+    if session:
+        session.last_active_at = now_ist()
+        db.session.commit()
 
     new_access_token = create_access_token(identity=str(user_id))
     return jsonify(
@@ -347,7 +376,7 @@ def change_password():
         return jsonify(message="Current password and new password are required."), 400
 
     if not check_password_hash(user.password, current_password):
-        return jsonify(message="Current password is incorrect."), 401
+        return jsonify(message="Current password is incorrect."), 400
 
     if len(new_password) < 8:
         return jsonify(message="New password must be at least 8 characters."), 400

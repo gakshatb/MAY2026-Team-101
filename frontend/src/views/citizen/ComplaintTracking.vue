@@ -64,18 +64,20 @@
               <div :class="[
                 'absolute left-0 w-8 h-8 rounded-full flex items-center justify-center border-2 z-10 transition-colors',
                 step.status === 'completed' ? 'bg-green-100 border-[#22C55E]' :
-                  step.status === 'active' ? 'bg-blue-100 border-[#2563EB]' : 'bg-white border-slate-200'
+                  step.status === 'active' ? 'bg-blue-100 border-[#2563EB]' :
+                    step.status === 'skipped' ? 'bg-slate-100 border-slate-300' : 'bg-white border-slate-200'
               ]">
                 <Check v-if="step.status === 'completed'" class="w-4 h-4 text-[#22C55E]" />
                 <div v-else-if="step.status === 'active'" class="w-2.5 h-2.5 bg-[#2563EB] rounded-full animate-pulse">
                 </div>
+                <SkipForward v-else-if="step.status === 'skipped'" class="w-3.5 h-3.5 text-slate-400" />
                 <div v-else class="w-2.5 h-2.5 bg-slate-200 rounded-full"></div>
               </div>
 
               <div class="pt-0.5">
-                <p :class="['font-bold', step.status === 'active' ? 'text-[#2563EB]' : 'text-slate-900']">{{ step.title
+                <p :class="['font-bold', step.status === 'active' ? 'text-[#2563EB]' : step.status === 'skipped' ? 'text-slate-400' : 'text-slate-900']">{{ step.title
                   }}</p>
-                <p class="text-xs text-slate-400 mt-1">{{ step.date || 'Pending' }}</p>
+                <p class="text-xs text-slate-400 mt-1">{{ step.date || (step.status === 'skipped' ? 'Skipped' : 'Pending') }}</p>
               </div>
             </div>
           </div>
@@ -159,7 +161,7 @@ import axios from 'axios'
 import jsPDF from 'jspdf'
 import ComplaintPicker from '../../components/dashboard/ComplaintPicker.vue'
 import {
-  Download, MapPin, SearchX, Check
+  Download, MapPin, SearchX, Check, SkipForward
 } from 'lucide-vue-next'
 
 defineProps({ id: { type: String, default: null } })
@@ -172,8 +174,8 @@ const complaint = ref(null)
 const timelineSteps = ref([])
 const activityLog = ref([])
 
-const STAGE_ORDER = ['Pending', 'In Progress', 'Resolved', 'Closed']
-const STAGE_LABELS = { Pending: 'Submitted', 'In Progress': 'In Progress', Resolved: 'Resolved', Closed: 'Closed' }
+const STAGE_ORDER = ['Pending', 'Under Review', 'Assigned', 'In Progress', 'Resolved', 'Closed']
+const STAGE_LABELS = { Pending: 'Submitted', 'Under Review': 'Under Review', Assigned: 'Assigned', 'In Progress': 'In Progress', Resolved: 'Resolved', Closed: 'Closed' }
 
 const fetchTracking = async () => {
   if (!route.params.id) {
@@ -194,9 +196,17 @@ const fetchTracking = async () => {
     const currentIndex = STAGE_ORDER.indexOf(complaint.value.status)
     timelineSteps.value = STAGE_ORDER.map((stage, index) => {
       const logEntry = data.activity_log.find(l => l.new_status === stage)
+      let status
+      if (index === currentIndex) {
+        status = 'active'
+      } else if (index < currentIndex) {
+        status = logEntry ? 'completed' : 'skipped'
+      } else {
+        status = 'upcoming'
+      }
       return {
         title: STAGE_LABELS[stage],
-        status: index < currentIndex ? 'completed' : index === currentIndex ? 'active' : 'upcoming',
+        status,
         date: logEntry?.changed_at
           ? new Date(logEntry.changed_at).toLocaleDateString('en-US', { month: 'short', day: '2-digit', year: 'numeric' })
           : null

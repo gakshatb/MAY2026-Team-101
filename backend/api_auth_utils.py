@@ -35,32 +35,15 @@ def purge_expired_blocklist_entries():
 # Recognised activity_type values for ActivityLog rows.
 # ─────────────────────────────────────────────────────────────────────────
 ACTIVITY_TYPES = {
-    'register',
-    'login',
-    'logout',
-    'password_changed',
-    'password_reset_requested',
-    'password_reset_completed',
-    'profile_updated',
-    'profile_photo_updated',
-    'profile_photo_removed',
-    'complaint_submitted',
-    'feedback_submitted',
-    'officer_approved',
-    'officer_rejected',
-    'officer_suspended',
-    'officer_reactivated',
-    'officer_updated',
-    'officer_transferred',
-    'department_created',
-    'department_updated',
-    'department_deleted',
-    'announcement_created',
-    'announcement_updated',
-    'announcement_published',
-    'announcement_scheduled',
-    'announcement_archived',
-    'announcement_deleted',
+    'register', 'login', 'logout', 'password_changed',
+    'password_reset_requested', 'password_reset_completed',
+    'profile_updated', 'profile_photo_updated', 'profile_photo_removed',
+    'complaint_submitted', 'complaint_assigned', 'feedback_submitted',
+    'officer_approved', 'officer_rejected', 'officer_suspended',
+    'officer_reactivated', 'officer_updated', 'officer_transferred',
+    'department_created', 'department_updated', 'department_deleted',
+    'announcement_created', 'announcement_updated', 'announcement_published',
+    'announcement_scheduled', 'announcement_archived', 'announcement_deleted',
 }
 
 
@@ -78,6 +61,47 @@ def log_activity(user_id, activity_type, description, complaint_id=None):
     )
     db.session.add(entry)
     return entry
+
+
+def parse_user_agent(ua_string):
+    ua = (ua_string or '').lower()
+
+    if 'ipad' in ua or 'tablet' in ua:
+        device = 'Tablet'
+    elif 'mobile' in ua or 'iphone' in ua or 'android' in ua:
+        device = 'Mobile'
+    elif ua:
+        device = 'Desktop'
+    else:
+        device = 'Unknown'
+
+    if 'iphone' in ua or 'ipad' in ua:
+        os_name = 'iOS'
+    elif 'windows' in ua:
+        os_name = 'Windows'
+    elif 'mac os' in ua or 'macintosh' in ua:
+        os_name = 'macOS'
+    elif 'android' in ua:
+        os_name = 'Android'
+    elif 'linux' in ua:
+        os_name = 'Linux'
+    else:
+        os_name = 'Unknown'
+
+    if 'edg/' in ua or 'edge/' in ua:
+        browser = 'Edge'
+    elif 'opr/' in ua or 'opera' in ua:
+        browser = 'Opera'
+    elif 'chrome/' in ua and 'chromium' not in ua:
+        browser = 'Chrome'
+    elif 'firefox/' in ua:
+        browser = 'Firefox'
+    elif 'safari/' in ua and 'chrome/' not in ua:
+        browser = 'Safari'
+    else:
+        browser = 'Unknown'
+
+    return device, os_name, browser
 
 
 def is_valid_email(email):
