@@ -80,6 +80,47 @@ def log_activity(user_id, activity_type, description, complaint_id=None):
     return entry
 
 
+def parse_user_agent(ua_string):
+    ua = (ua_string or '').lower()
+
+    if 'ipad' in ua or 'tablet' in ua:
+        device = 'Tablet'
+    elif 'mobile' in ua or 'iphone' in ua or 'android' in ua:
+        device = 'Mobile'
+    elif ua:
+        device = 'Desktop'
+    else:
+        device = 'Unknown'
+
+    if 'iphone' in ua or 'ipad' in ua:
+        os_name = 'iOS'
+    elif 'windows' in ua:
+        os_name = 'Windows'
+    elif 'mac os' in ua or 'macintosh' in ua:
+        os_name = 'macOS'
+    elif 'android' in ua:
+        os_name = 'Android'
+    elif 'linux' in ua:
+        os_name = 'Linux'
+    else:
+        os_name = 'Unknown'
+
+    if 'edg/' in ua or 'edge/' in ua:
+        browser = 'Edge'
+    elif 'opr/' in ua or 'opera' in ua:
+        browser = 'Opera'
+    elif 'chrome/' in ua and 'chromium' not in ua:
+        browser = 'Chrome'
+    elif 'firefox/' in ua:
+        browser = 'Firefox'
+    elif 'safari/' in ua and 'chrome/' not in ua:
+        browser = 'Safari'
+    else:
+        browser = 'Unknown'
+
+    return device, os_name, browser
+
+
 def is_valid_email(email):
     return re.match(r'^[\w\.-]+@[\w\.-]+\.\w{2,}$', email) is not None
 

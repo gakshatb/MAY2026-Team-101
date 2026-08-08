@@ -24,6 +24,10 @@ class User(db.Model):
     pincode    = db.Column(db.String(20),  nullable=True)
     gender     = db.Column(db.String(20),  nullable=True)
     profile_photo = db.Column(db.String(500), nullable=True)
+    dob               = db.Column(db.Date,        nullable=True)
+    nationality       = db.Column(db.String(50),  nullable=True)
+    emergency_contact = db.Column(db.String(100), nullable=True)
+    recovery_email    = db.Column(db.String(255), nullable=True)
     role       = db.Column(db.String(20),  nullable=False)          # citizen | officer | worker
     status     = db.Column(db.String(20),  nullable=False, default='active')  # active | pending | suspended
     designation = db.Column(db.String(100), nullable=True)
@@ -232,6 +236,52 @@ class TokenBlocklist(db.Model):
 
     def __repr__(self):
         return f'<TokenBlocklist jti={self.jti}>'
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# LoginSession
+# ─────────────────────────────────────────────────────────────────────────────
+class LoginSession(db.Model):
+    __tablename__ = 'login_sessions'
+
+    id             = db.Column(db.Integer,     primary_key=True, autoincrement=True)
+    user_id        = db.Column(db.Integer,     db.ForeignKey('users.id'), nullable=False)
+    jti            = db.Column(db.String(36),  nullable=True, unique=True, index=True)
+    device         = db.Column(db.String(50),  nullable=True)   # Desktop | Mobile | Tablet | Unknown
+    os             = db.Column(db.String(50),  nullable=True)
+    browser        = db.Column(db.String(50),  nullable=True)
+    ip_address     = db.Column(db.String(45),  nullable=True)
+    status         = db.Column(db.String(20),  nullable=False, default='Success')  # Success | Failed
+    created_at     = db.Column(db.DateTime,    nullable=False, default=now_ist)
+    last_active_at = db.Column(db.DateTime,    nullable=True)
+    expires_at     = db.Column(db.DateTime,    nullable=True)   # copied from the refresh token's exp
+    revoked_at     = db.Column(db.DateTime,    nullable=True)
+
+    user = db.relationship('User', backref=db.backref('login_sessions', lazy=True, cascade='all, delete-orphan'))
+
+    def __repr__(self):
+        return f'<LoginSession id={self.id} user_id={self.user_id} status={self.status}>'
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# NotificationPreference
+# One row per user. Created lazily with defaults on first read.
+# ─────────────────────────────────────────────────────────────────────────────
+class NotificationPreference(db.Model):
+    __tablename__ = 'notification_preferences'
+
+    id             = db.Column(db.Integer,  primary_key=True, autoincrement=True)
+    user_id        = db.Column(db.Integer,  db.ForeignKey('users.id'), nullable=False, unique=True)
+    email          = db.Column(db.Boolean,  nullable=False, default=True)
+    push           = db.Column(db.Boolean,  nullable=False, default=True)
+    alerts         = db.Column(db.Boolean,  nullable=False, default=True)
+    security       = db.Column(db.Boolean,  nullable=False, default=True)
+    dept_updates   = db.Column(db.Boolean,  nullable=False, default=False)
+    weekly_reports = db.Column(db.Boolean,  nullable=False, default=True)
+    updated_at     = db.Column(db.DateTime, nullable=True, onupdate=now_ist)
+
+    def __repr__(self):
+        return f'<NotificationPreference user_id={self.user_id}>'
 
 
 # ─────────────────────────────────────────────────────────────────────────────

@@ -1,11 +1,17 @@
+import os
+import uuid
 from datetime import datetime, timedelta
 from urllib.parse import quote
 
-from flask import Blueprint, jsonify, request # type: ignore
-from flask_jwt_extended import get_jwt_identity # type: ignore
+from flask import Blueprint, current_app, jsonify, request # type: ignore
+from flask_jwt_extended import get_jwt, get_jwt_identity # type: ignore
+from werkzeug.utils import secure_filename # type: ignore
 
-from models import db, User, Complaint, Department, ActivityLog, Feedback, Assignment, Announcement, now_ist
-from api_auth_utils import log_activity, role_required
+from models import (
+    db, User, Complaint, Department, ActivityLog, Feedback, Assignment,
+    Announcement, LoginSession, NotificationPreference, TokenBlocklist, now_ist
+)
+from api_auth_utils import log_activity, role_required, revoke_token
 
 admin_bp = Blueprint('admin', __name__, url_prefix='/api/admin')
 
@@ -1592,3 +1598,375 @@ def toggle_pin_announcement(ann_id):
 
     author = User.query.get(ann.author_id)
     return jsonify(success=True, announcement=_serialize_announcement(ann, author.name if author else 'Unknown')), 200
+
+
+# ─────────────────────────────────────────────────────────────────────────
+# Admin Profile — powers Profile.vue
+# ─────────────────────────────────────────────────────────────────────────
+ALLOWED_AVATAR_TYPES = {'.png', '.jpg', '.jpeg'}
+MAX_AVATAR_BYTES = 5 * 1024 * 1024
+
+ADMIN_PERMISSIONS = [
+    {"name": "Manage Departments",    "desc": "Create, edit, and delete civic departments.",       "level": "Full Access"},
+    {"name": "Manage Officers",       "desc": "Approve, suspend, and transfer civic officers.",     "level": "Full Access"},
+    {"name": "Manage Announcements",  "desc": "Publish global and targeted notices.",                "level": "Full Access"},
+    {"name": "System Settings",       "desc": "Configure platform-wide variables.",                  "level": "Full Access"},
+    {"name": "View Analytics",        "desc": "Access platform business intelligence.",              "level": "Read Only"},
+    {"name": "Audit Logs",            "desc": "Monitor security and activity trails.",                "level": "Read Only"},
+]
+
+
+def _save_avatar_image(file_storage):
+    """Saves an uploaded avatar to disk and returns its public URL path.
+    Mirrors _save_uploaded_image() in api_citizen.py — kept local here so
+    this blueprint stays self-contained."""
+    if not file_storage or not file_storage.filename:
+        return None
+
+    ext = os.path.splitext(file_storage.filename)[1].lower()
+    if ext not in ALLOWED_AVATAR_TYPES:
+        raise ValueError('Only PNG, JPG, and JPEG images are allowed.')
+
+    file_storage.seek(0, os.SEEK_END)
+    size = file_storage.tell()
+    file_storage.seek(0)
+    if size > MAX_AVATAR_BYTES:
+        raise ValueError('Image exceeds the 5MB size limit.')
+
+    upload_dir = current_app.config['UPLOAD_FOLDER']
+    os.makedirs(upload_dir, exist_ok=True)
+
+    filename = secure_filename(f"{uuid.uuid4().hex}{ext}")
+    file_storage.save(os.path.join(upload_dir, filename))
+
+    return f"/api/uploads/{filename}"
+
+
+def _relative_day_label(dt):
+    """'Today' / 'Yesterday' / 'Jul 12, 2026' — used for last-login display."""
+    if not dt:
+        return 'Never'
+    today = now_ist().date()
+    d = dt.date()
+    if d == today:
+        return 'Today'
+    if d == today - timedelta(days=1):
+        return 'Yesterday'
+    return dt.strftime('%b %d, %Y')
+
+
+def _get_or_create_prefs(user_id):
+    prefs = NotificationPreference.query.filter_by(user_id=user_id).first()
+    if not prefs:
+        prefs = NotificationPreference(user_id=user_id)
+        db.session.add(prefs)
+        db.session.commit()
+    return prefs
+
+
+def _serialize_prefs(prefs):
+    return {
+        "email":         prefs.email,
+        "push":          prefs.push,
+        "alerts":        prefs.alerts,
+        "security":      prefs.security,
+        "dept":          prefs.dept_updates,
+        "weekly":        prefs.weekly_reports,
+    }
+
+
+def _serialize_session(s, current_jti=None):
+    return {
+        "id":            s.id,
+        "device":        s.device or 'Unknown',
+        "os":            s.os or 'Unknown',
+        "browser":       s.browser or 'Unknown',
+        "ip":            s.ip_address or 'N/A',
+        "created_at":    s.created_at.isoformat() if s.created_at else None,
+        "last_active":   (s.last_active_at or s.created_at).strftime('%b %d, %Y %I:%M %p') if (s.last_active_at or s.created_at) else None,
+        "is_current":    bool(current_jti) and s.jti == current_jti,
+    }
+
+
+@admin_bp.route('/profile', methods=['GET'])
+@role_required('Admin')
+def admin_profile():
+    user_id = int(get_jwt_identity())
+    user = User.query.get(user_id)
+    if not user:
+        return jsonify(message="User not found."), 404
+
+    now = now_ist()
+    active_sessions = (
+        LoginSession.query
+        .filter_by(user_id=user_id, status='Success')
+        .filter(LoginSession.revoked_at.is_(None))
+        .filter(db.or_(LoginSession.expires_at.is_(None), LoginSession.expires_at > now))
+        .order_by(LoginSession.last_active_at.desc().nullslast(), LoginSession.created_at.desc())
+        .all()
+    )
+    trusted_device_count = len({(s.device, s.os) for s in active_sessions})
+
+    last_login = (
+        LoginSession.query
+        .filter_by(user_id=user_id, status='Success')
+        .order_by(LoginSession.created_at.desc())
+        .first()
+    )
+    last_pw_change = (
+        ActivityLog.query
+        .filter_by(user_id=user_id, activity_type='password_changed')
+        .order_by(ActivityLog.created_at.desc())
+        .first()
+    )
+
+    login_history_rows = (
+        LoginSession.query
+        .filter_by(user_id=user_id)
+        .order_by(LoginSession.created_at.desc())
+        .limit(10)
+        .all()
+    )
+    activity_rows = (
+        ActivityLog.query
+        .filter_by(user_id=user_id)
+        .order_by(ActivityLog.created_at.desc())
+        .limit(10)
+        .all()
+    )
+
+    years_of_service = round((now - user.created_at).days / 365.25, 1) if user.created_at else 0
+    prefs = _get_or_create_prefs(user_id)
+
+    return jsonify(
+        success=True,
+        profile={
+            "name":         user.name,
+            "id":           f"ADM-{user.id:03d}",
+            "designation":  user.designation or 'Administrator',
+            "department":   "CivicDesk HQ",
+            "email":        user.email,
+            "phone":        user.phone,
+            "joinDate":     user.created_at.strftime('%b %d, %Y') if user.created_at else None,
+            "avatar":       user.profile_photo,
+        },
+        stats=[
+            {"label": "Years of Service",  "value": str(years_of_service)},
+            {"label": "Announcements",     "value": str(Announcement.query.filter_by(author_id=user_id).count())},
+            {"label": "Depts Managed",     "value": str(Department.query.count())},
+            {"label": "Officers Managed",  "value": str(User.query.filter_by(role='Officer').count())},
+            {"label": "System Actions",    "value": str(ActivityLog.query.filter_by(user_id=user_id).count())},
+            {"label": "Last Login",        "value": _relative_day_label(last_login.created_at if last_login else None)},
+        ],
+        personal={
+            "name":        user.name,
+            "dob":         user.dob.strftime('%d %b %Y') if user.dob else None,
+            "gender":      user.gender,
+            "nationality": user.nationality,
+            "address":     user.address,
+            "city":        user.city,
+            "state":       user.state,
+            "country":     'India',
+            "zip":         user.pincode,
+            "emergency":   user.emergency_contact,
+        },
+        permissions=ADMIN_PERMISSIONS,
+        security={
+            "lastPasswordChange": _relative_day_label(last_pw_change.created_at if last_pw_change else user.created_at),
+            "recoveryEmail":      user.recovery_email,
+            "activeSessions":     len(active_sessions),
+            "trustedDevices":     trusted_device_count,
+        },
+        notificationPrefs=_serialize_prefs(prefs),
+        loginHistory=[
+            {
+                "id":      r.id,
+                "date":    r.created_at.strftime('%b %d, %Y'),
+                "time":    r.created_at.strftime('%I:%M %p'),
+                "device":  r.device or 'Unknown',
+                "os":      r.os or 'Unknown',
+                "browser": r.browser or 'Unknown',
+                "ip":      r.ip_address or 'N/A',
+                "status":  r.status,
+            }
+            for r in login_history_rows
+        ],
+        accountActivities=[
+            {
+                "id":   a.id,
+                "action": a.activity_type.replace('_', ' ').title(),
+                "desc":   a.description,
+                "date":   a.created_at.strftime('%b %d, %Y'),
+                "time":   a.created_at.strftime('%I:%M %p'),
+            }
+            for a in activity_rows
+        ],
+    ), 200
+
+
+@admin_bp.route('/profile', methods=['PUT'])
+@role_required('Admin')
+def update_admin_profile():
+    user_id = int(get_jwt_identity())
+    user = User.query.get(user_id)
+    if not user:
+        return jsonify(message="User not found."), 404
+
+    data = request.get_json()
+    if not data:
+        return jsonify(message="Request body must be JSON."), 400
+
+    name    = data.get('name', '').strip()
+    phone   = data.get('phone', '').strip()
+    address = data.get('address', '').strip()
+    city    = data.get('city', '').strip()
+    state   = data.get('state', '').strip()
+    pincode = data.get('zip', '').strip()
+    gender  = data.get('gender', '').strip()
+    designation = data.get('designation', '').strip()
+    nationality = data.get('nationality', '').strip()
+    emergency   = data.get('emergency', '').strip()
+    recovery_email = data.get('recoveryEmail', '').strip().lower()
+    dob_str = data.get('dob', '').strip()
+
+    if not name:
+        return jsonify(message="Name is required."), 400
+    if phone and (not phone.isdigit() or len(phone) != 10):
+        return jsonify(message="Enter a valid 10-digit phone number."), 400
+    if recovery_email and '@' not in recovery_email:
+        return jsonify(message="Enter a valid recovery email."), 400
+
+    if dob_str:
+        try:
+            user.dob = datetime.strptime(dob_str, '%Y-%m-%d').date()
+        except ValueError:
+            return jsonify(message="Date of birth must be in YYYY-MM-DD format."), 400
+
+    user.name = name
+    if phone:
+        user.phone = phone
+    if address:
+        user.address = address
+    if city:
+        user.city = city
+    if state:
+        user.state = state
+    if pincode:
+        user.pincode = pincode
+    if gender:
+        user.gender = gender
+    if designation:
+        user.designation = designation
+    if nationality:
+        user.nationality = nationality
+    if emergency:
+        user.emergency_contact = emergency
+    if recovery_email:
+        user.recovery_email = recovery_email
+
+    log_activity(user_id, 'profile_updated', 'Updated profile details.')
+    db.session.commit()
+
+    return jsonify(success=True, message="Profile updated successfully."), 200
+
+
+@admin_bp.route('/profile/photo', methods=['POST'])
+@role_required('Admin')
+def upload_admin_photo():
+    user_id = int(get_jwt_identity())
+    user = User.query.get(user_id)
+
+    if 'photo' not in request.files:
+        return jsonify(message="No photo file was provided."), 400
+
+    try:
+        photo_url = _save_avatar_image(request.files['photo'])
+    except ValueError as e:
+        return jsonify(message=str(e)), 400
+
+    if not photo_url:
+        return jsonify(message="No photo file was provided."), 400
+
+    user.profile_photo = photo_url
+    log_activity(user_id, 'profile_photo_updated', 'Updated profile photo.')
+    db.session.commit()
+
+    return jsonify(success=True, profilePhoto=photo_url), 200
+
+
+@admin_bp.route('/profile/photo', methods=['DELETE'])
+@role_required('Admin')
+def delete_admin_photo():
+    user_id = int(get_jwt_identity())
+    user = User.query.get(user_id)
+
+    user.profile_photo = None
+    log_activity(user_id, 'profile_photo_removed', 'Removed profile photo.')
+    db.session.commit()
+
+    return jsonify(success=True), 200
+
+
+@admin_bp.route('/profile/notification-preferences', methods=['PUT'])
+@role_required('Admin')
+def update_notification_prefs():
+    user_id = int(get_jwt_identity())
+    data = request.get_json()
+    if not data:
+        return jsonify(message="Request body must be JSON."), 400
+
+    prefs = _get_or_create_prefs(user_id)
+    field_map = {
+        "email":    "email",
+        "push":     "push",
+        "alerts":   "alerts",
+        "security": "security",
+        "dept":     "dept_updates",
+        "weekly":   "weekly_reports",
+    }
+    for key, attr in field_map.items():
+        if key in data:
+            setattr(prefs, attr, bool(data[key]))
+
+    db.session.commit()
+    return jsonify(success=True, notificationPrefs=_serialize_prefs(prefs)), 200
+
+
+@admin_bp.route('/profile/sessions', methods=['GET'])
+@role_required('Admin')
+def list_admin_sessions():
+    user_id = int(get_jwt_identity())
+    current_jti = get_jwt().get('jti')
+
+    now = now_ist()
+    sessions = (
+        LoginSession.query
+        .filter_by(user_id=user_id, status='Success')
+        .filter(LoginSession.revoked_at.is_(None))
+        .filter(db.or_(LoginSession.expires_at.is_(None), LoginSession.expires_at > now))
+        .order_by(LoginSession.last_active_at.desc().nullslast(), LoginSession.created_at.desc())
+        .all()
+    )
+    return jsonify(
+        success=True,
+        sessions=[_serialize_session(s, current_jti) for s in sessions]
+    ), 200
+
+
+@admin_bp.route('/profile/sessions/<int:session_id>', methods=['DELETE'])
+@role_required('Admin')
+def revoke_admin_session(session_id):
+    user_id = int(get_jwt_identity())
+    session = LoginSession.query.get(session_id)
+
+    if not session or session.user_id != user_id:
+        return jsonify(message="Session not found."), 404
+    if session.revoked_at:
+        return jsonify(message="Session already ended."), 400
+
+    session.revoked_at = now_ist()
+    if session.jti:
+        revoke_token(session.jti, session.expires_at or now_ist(), user_id=user_id)
+
+    db.session.commit()
+    return jsonify(success=True, message="Session ended."), 200
