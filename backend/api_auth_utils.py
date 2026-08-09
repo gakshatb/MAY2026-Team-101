@@ -38,7 +38,7 @@ ACTIVITY_TYPES = {
     'register', 'login', 'logout', 'password_changed',
     'password_reset_requested', 'password_reset_completed',
     'profile_updated', 'profile_photo_updated', 'profile_photo_removed',
-    'complaint_submitted', 'complaint_assigned', 'feedback_submitted',
+    'complaint_submitted', 'complaint_assigned', 'complaint_closed', 'feedback_submitted',
     'officer_approved', 'officer_rejected', 'officer_suspended',
     'officer_reactivated', 'officer_updated', 'officer_transferred',
     'department_created', 'department_updated', 'department_deleted',

@@ -570,6 +570,10 @@ def get_profile():
             "state":      user.state,
             "pincode":    user.pincode,
             "gender":     user.gender,
+            "dob":        user.dob.isoformat() if user.dob else None,
+            "nationality": user.nationality,
+            "emergencyContact": user.emergency_contact,
+            "recoveryEmail":    user.recovery_email,
             "profilePhoto": user.profile_photo,
             "accountId":  f"CVC-USR-{user.id:04d}",
             "memberSince": user.created_at.strftime('%B %d, %Y') if user.created_at else None,
@@ -596,6 +600,10 @@ def update_profile():
     state     = data.get('state', '').strip()
     pincode   = data.get('pincode', '').strip()
     gender    = data.get('gender', '').strip()
+    dob_str          = data.get('dob', '').strip()
+    nationality      = data.get('nationality', '').strip()
+    emergency        = data.get('emergencyContact', '').strip()
+    recovery_email   = data.get('recoveryEmail', '').strip().lower()
 
     if not full_name:
         return jsonify(message="Full Name is required."), 400
@@ -609,6 +617,19 @@ def update_profile():
         return jsonify(message="State is required."), 400
     if not pincode or not pincode.isdigit() or len(pincode) != 6:
         return jsonify(message="Enter a valid 6-digit pincode."), 400
+    if emergency and (not emergency.isdigit() or len(emergency) != 10):
+        return jsonify(message="Enter a valid 10-digit emergency contact number."), 400
+    if recovery_email and '@' not in recovery_email:
+        return jsonify(message="Enter a valid recovery email."), 400
+
+    dob = None
+    if dob_str:
+        try:
+            dob = datetime.strptime(dob_str, '%Y-%m-%d').date()
+        except ValueError:
+            return jsonify(message="Date of birth must be in YYYY-MM-DD format."), 400
+        if dob >= now_ist().date():
+            return jsonify(message="Date of birth must be in the past."), 400
 
     if email and email != user.email:
         if User.query.filter(User.email == email, User.id != user_id).first():
@@ -623,6 +644,14 @@ def update_profile():
     user.pincode = pincode
     if gender:
         user.gender = gender
+    if dob_str:
+        user.dob = dob
+    if nationality:
+        user.nationality = nationality
+    if emergency:
+        user.emergency_contact = emergency
+    if recovery_email:
+        user.recovery_email = recovery_email
 
     log_activity(user_id, 'profile_updated', 'Updated profile details.')
     db.session.commit()
