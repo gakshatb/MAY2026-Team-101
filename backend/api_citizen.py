@@ -8,7 +8,7 @@ from flask_jwt_extended import get_jwt_identity # type: ignore
 from werkzeug.utils import secure_filename # type: ignore
 
 from models import db, User, Complaint, StatusLog, ComplaintImages, Feedback, Notification, ActivityLog, now_ist
-from api_auth_utils import log_activity, role_required
+from api_auth_utils import log_activity, role_required, is_valid_email
 
 citizen_bp = Blueprint('citizen', __name__, url_prefix='/api/citizen')
 
@@ -619,8 +619,11 @@ def update_profile():
         return jsonify(message="Enter a valid 6-digit pincode."), 400
     if emergency and (not emergency.isdigit() or len(emergency) != 10):
         return jsonify(message="Enter a valid 10-digit emergency contact number."), 400
-    if recovery_email and '@' not in recovery_email:
-        return jsonify(message="Enter a valid recovery email."), 400
+    if recovery_email:
+        if not is_valid_email(recovery_email):
+            return jsonify(message="Enter a valid recovery email address."), 400
+        if recovery_email == email or recovery_email == user.email:
+            return jsonify(message="Recovery email must be different from your primary email."), 400
 
     dob = None
     if dob_str:
@@ -644,14 +647,10 @@ def update_profile():
     user.pincode = pincode
     if gender:
         user.gender = gender
-    if dob_str:
-        user.dob = dob
-    if nationality:
-        user.nationality = nationality
-    if emergency:
-        user.emergency_contact = emergency
-    if recovery_email:
-        user.recovery_email = recovery_email
+    user.dob               = dob
+    user.nationality        = nationality or None
+    user.emergency_contact = emergency or None
+    user.recovery_email    = recovery_email or None
 
     log_activity(user_id, 'profile_updated', 'Updated profile details.')
     db.session.commit()
