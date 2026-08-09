@@ -28,8 +28,11 @@
           class="px-3 py-2.5 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:outline-none">
           <option value="All">All Statuses</option>
           <option value="Pending">Pending</option>
+          <option value="Under Review">Under Review</option>
+          <option value="Assigned">Assigned</option>
           <option value="In Progress">In Progress</option>
           <option value="Resolved">Resolved</option>
+          <option value="Closed">Closed</option>
         </select>
         <button @click="$router.push('/citizen/submit')"
           class="flex items-center gap-2 px-5 py-2.5 bg-[#2563EB] text-white text-sm font-medium rounded-lg hover:bg-[#1E40AF] transition-colors">
@@ -105,13 +108,9 @@
       </div>
     </div>
 
-    <!-- Pagination -->
+    <!-- Results Count -->
     <div class="flex items-center justify-between text-sm text-slate-500">
-      <p>Showing 1-{{ filteredComplaints.length }} of {{ complaints.length }} results</p>
-      <div class="flex gap-2">
-        <button class="px-4 py-2 border border-slate-200 rounded-lg bg-white disabled:opacity-50">Prev</button>
-        <button class="px-4 py-2 border border-slate-200 rounded-lg bg-white">Next</button>
-      </div>
+      <p>Showing {{ filteredComplaints.length }} of {{ complaints.length }} complaint{{ complaints.length === 1 ? '' : 's' }}</p>
     </div>
 
   </div>
@@ -179,7 +178,10 @@ onMounted(fetchComplaints)
 const statusColors = (status) => {
   switch (status) {
     case 'Resolved': return 'bg-green-50 text-green-700'
+    case 'Closed': return 'bg-slate-100 text-slate-600'
     case 'In Progress': return 'bg-blue-50 text-blue-700'
+    case 'Assigned': return 'bg-indigo-50 text-indigo-700'
+    case 'Under Review': return 'bg-slate-100 text-slate-700'
     case 'Pending': return 'bg-amber-50 text-amber-700'
     default: return 'bg-slate-100 text-slate-700'
   }

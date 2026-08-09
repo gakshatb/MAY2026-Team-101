@@ -74,6 +74,10 @@ def _create_notification(user_id, title, message, complaint_id=None, ntype='info
 
 
 def _serialize_complaint(c, include_full=False):
+    officer = User.query.get(c.assigned_officer) if c.assigned_officer else None
+    latest_assignment = max(c.assignments, key=lambda a: a.assigned_at, default=None)
+    worker = User.query.get(latest_assignment.worker_id) if latest_assignment else None
+
     data = {
         "id":         f"CMP-{c.id:05d}",
         "raw_id":     c.id,
@@ -86,6 +90,8 @@ def _serialize_complaint(c, include_full=False):
         "created_at": c.created_at.isoformat() if c.created_at else None,
         "updated_at": c.updated_at.isoformat() if c.updated_at else None,
         "has_feedback": c.feedback is not None,
+        "officer":    {"name": officer.name} if officer else None,
+        "worker":     {"name": worker.name} if worker else None,
     }
     if include_full:
         data.update({
