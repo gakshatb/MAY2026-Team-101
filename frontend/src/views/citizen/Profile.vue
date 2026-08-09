@@ -27,44 +27,6 @@
       </div>
     </div>
 
-    <div v-if="userRole === 'Civic Officer'" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
-      <div class="bg-white p-5 rounded-[14px] shadow-sm border border-slate-100 flex flex-col">
-        <span class="text-sm font-medium text-slate-500 mb-1">Complaints Managed</span>
-        <span class="text-3xl font-bold text-slate-900">145</span>
-      </div>
-      <div class="bg-white p-5 rounded-[14px] shadow-sm border border-slate-100 flex flex-col">
-        <span class="text-sm font-medium text-slate-500 mb-1">Pending Reviews</span>
-        <span class="text-3xl font-bold text-amber-500">12</span>
-      </div>
-      <div class="bg-white p-5 rounded-[14px] shadow-sm border border-slate-100 flex flex-col">
-        <span class="text-sm font-medium text-slate-500 mb-1">Resolved (This Month)</span>
-        <span class="text-3xl font-bold text-[#22C55E]">89</span>
-      </div>
-      <div class="bg-white p-5 rounded-[14px] shadow-sm border border-slate-100 flex flex-col">
-        <span class="text-sm font-medium text-slate-500 mb-1">Assigned Workers</span>
-        <span class="text-3xl font-bold text-[#2563EB]">24</span>
-      </div>
-    </div>
-
-    <div v-if="userRole === 'Field Worker'" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
-      <div class="bg-white p-5 rounded-[14px] shadow-sm border border-slate-100 flex flex-col">
-        <span class="text-sm font-medium text-slate-500 mb-1">Assigned Tasks</span>
-        <span class="text-3xl font-bold text-slate-900">8</span>
-      </div>
-      <div class="bg-white p-5 rounded-[14px] shadow-sm border border-slate-100 flex flex-col">
-        <span class="text-sm font-medium text-slate-500 mb-1">Completed Tasks</span>
-        <span class="text-3xl font-bold text-[#22C55E]">42</span>
-      </div>
-      <div class="bg-white p-5 rounded-[14px] shadow-sm border border-slate-100 flex flex-col">
-        <span class="text-sm font-medium text-slate-500 mb-1">Pending Tasks</span>
-        <span class="text-3xl font-bold text-amber-500">5</span>
-      </div>
-      <div class="bg-white p-5 rounded-[14px] shadow-sm border border-slate-100 flex flex-col">
-        <span class="text-sm font-medium text-slate-500 mb-1">Avg. Completion Time</span>
-        <span class="text-3xl font-bold text-[#2563EB]">18h</span>
-      </div>
-    </div>
-
     <!-- Main Layout Grid -->
     <div class="grid grid-cols-1 lg:grid-cols-12 gap-8">
 
@@ -233,6 +195,45 @@
               <span v-if="profileErrors.gender" class="text-red-500 text-xs mt-1 block">{{ profileErrors.gender }}</span>
             </div>
 
+            <!-- Date of Birth -->
+            <div>
+              <label class="block text-sm font-medium text-slate-700 mb-1.5">Date of Birth <span class="text-slate-400 font-normal">(Optional)</span></label>
+              <input v-model="profileForm.dob" type="date" :disabled="!isEditingProfile"
+                :class="inputClasses(profileErrors.dob, !isEditingProfile)" />
+              <span v-if="profileErrors.dob" class="text-red-500 text-xs mt-1 block">{{ profileErrors.dob }}</span>
+            </div>
+
+            <!-- Nationality -->
+            <div>
+              <label class="block text-sm font-medium text-slate-700 mb-1.5">Nationality <span class="text-slate-400 font-normal">(Optional)</span></label>
+              <input v-model="profileForm.nationality" type="text" :disabled="!isEditingProfile"
+                :class="inputClasses(false, !isEditingProfile)" placeholder="e.g., Indian" />
+            </div>
+
+            <!-- Emergency Contact -->
+            <div>
+              <label class="block text-sm font-medium text-slate-700 mb-1.5">Emergency Contact <span class="text-slate-400 font-normal">(Optional)</span></label>
+              <div class="relative">
+                <Phone class="w-4 h-4 text-slate-400 absolute left-3 top-3 pointer-events-none" />
+                <input v-model="profileForm.emergencyContact" type="text" maxlength="10" :disabled="!isEditingProfile"
+                  :class="[inputClasses(profileErrors.emergencyContact, !isEditingProfile), 'pl-9']"
+                  placeholder="10-digit contact number" />
+              </div>
+              <span v-if="profileErrors.emergencyContact" class="text-red-500 text-xs mt-1 block">{{ profileErrors.emergencyContact }}</span>
+            </div>
+
+            <!-- Recovery Email -->
+            <div>
+              <label class="block text-sm font-medium text-slate-700 mb-1.5">Recovery Email <span class="text-slate-400 font-normal">(Optional)</span></label>
+              <div class="relative">
+                <Mail class="w-4 h-4 text-slate-400 absolute left-3 top-3 pointer-events-none" />
+                <input v-model="profileForm.recoveryEmail" type="email" :disabled="!isEditingProfile"
+                  :class="[inputClasses(profileErrors.recoveryEmail, !isEditingProfile), 'pl-9']"
+                  placeholder="Alternate email for account recovery" />
+              </div>
+              <span v-if="profileErrors.recoveryEmail" class="text-red-500 text-xs mt-1 block">{{ profileErrors.recoveryEmail }}</span>
+            </div>
+
             <!-- Action Buttons -->
             <div v-if="isEditingProfile"
               class="sm:col-span-2 flex items-center justify-end gap-3 mt-4 pt-4 border-t border-slate-100">
@@ -378,6 +379,7 @@ let originalProfileData = {}
 const profileForm = reactive({
   fullName: '', email: '', mobile: '',
   address: '', city: '', state: '', pincode: '', gender: '',
+  dob: '', nationality: '', emergencyContact: '', recoveryEmail: '',
   accountId: '', memberSince: '', lastLogin: ''
 })
 
@@ -397,6 +399,10 @@ const fetchProfile = async () => {
       state: u.state || '',
       pincode: u.pincode || '',
       gender: u.gender || '',
+      dob: u.dob || '',
+      nationality: u.nationality || '',
+      emergencyContact: u.emergencyContact || '',
+      recoveryEmail: u.recoveryEmail || '',
       accountId: u.accountId || '',
       memberSince: u.memberSince || '',
       lastLogin: u.lastLogin || ''
@@ -550,6 +556,33 @@ const validateProfile = () => {
     isValid = false
   }
 
+  if (profileForm.dob) {
+    const dobDate = new Date(profileForm.dob)
+    const ageYears = (Date.now() - dobDate.getTime()) / (1000 * 60 * 60 * 24 * 365.25)
+    if (dobDate >= new Date()) {
+      profileErrors.dob = 'Date of birth must be in the past'
+      isValid = false
+    } else if (ageYears < 13) {
+      profileErrors.dob = 'You must be at least 13 years old'
+      isValid = false
+    }
+  }
+
+  if (profileForm.emergencyContact && !/^\d{10}$/.test(profileForm.emergencyContact)) {
+    profileErrors.emergencyContact = 'Enter a valid 10-digit contact number'
+    isValid = false
+  }
+
+  if (profileForm.recoveryEmail) {
+    if (!emailRegex.test(profileForm.recoveryEmail)) {
+      profileErrors.recoveryEmail = 'Enter a valid email address'
+      isValid = false
+    } else if (profileForm.recoveryEmail.toLowerCase() === profileForm.email.toLowerCase()) {
+      profileErrors.recoveryEmail = 'Must be different from your primary email'
+      isValid = false
+    }
+  }
+
   return isValid
 }
 
@@ -568,6 +601,10 @@ const saveProfile = async () => {
       state: profileForm.state,
       pincode: profileForm.pincode,
       gender: profileForm.gender,
+      dob: profileForm.dob,
+      nationality: profileForm.nationality,
+      emergencyContact: profileForm.emergencyContact,
+      recoveryEmail: profileForm.recoveryEmail,
     }, { headers: { Authorization: `Bearer ${token}` } })
     isEditingProfile.value = false
     profileSuccess.value = 'Profile updated successfully.'

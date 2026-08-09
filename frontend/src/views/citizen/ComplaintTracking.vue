@@ -126,7 +126,7 @@
             </div>
             <div class="flex justify-between border-b border-slate-50 pb-2">
               <span class="text-sm text-slate-500">Assigned To</span>
-              <span class="text-sm font-semibold">Not yet assigned</span>
+              <span class="text-sm font-semibold">{{ complaint.officer?.name || 'Not yet assigned' }}</span>
             </div>
             <div class="flex justify-between border-b border-slate-50 pb-2">
               <span class="text-sm text-slate-500">Priority</span>
@@ -217,7 +217,7 @@ const fetchTracking = async () => {
       id: index,
       date: log.changed_at ? new Date(log.changed_at).toLocaleString() : '—',
       status: log.new_status,
-      officer: '—', // no officer/worker assignment feature yet on the backend
+      officer: STAGE_ORDER.indexOf(log.new_status) >= STAGE_ORDER.indexOf('Assigned') ? (complaint.value.officer?.name || '—') : '—',
       remarks: log.remark || '—',
     }))
   } catch (err) {

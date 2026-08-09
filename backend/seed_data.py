@@ -14,7 +14,8 @@ from werkzeug.security import generate_password_hash
 from models import (
     db, User, Department, Complaint, StatusLog, ComplaintImages,
     Feedback, Notification, Assignment, ActivityLog,
-    TokenBlocklist, PasswordResetOTP, ContactMessage, now_ist,
+    TokenBlocklist, PasswordResetOTP, ContactMessage, Announcement,
+    LoginSession, now_ist,
 )
 
 try:
@@ -88,6 +89,7 @@ def reset_db():
         ActivityLog, Notification, Feedback, Assignment,
         ComplaintImages, StatusLog, Complaint,
         TokenBlocklist, PasswordResetOTP, ContactMessage,
+        Announcement, LoginSession,
         User, Department,
     ]:
         db.session.query(model).delete()
@@ -527,6 +529,137 @@ def seed():
     db.session.commit()
     print(f"✔ Activity logs added ({activity_count}).")
 
+    # ── 11. Announcements — every status/priority/audience/category combo,
+    #      authored by admin, so Announcements.vue and the analytics
+    #      endpoint (published_count / total_views) have real data ─────
+    announcement_specs = [
+        ('Scheduled Water Supply Maintenance', 'Maintenance', 'Important', 'All Users', 'Published', True,
+         'Water supply will be interrupted for scheduled pipeline maintenance.',
+         'The Water & Drainage Department will carry out scheduled maintenance on the main '
+         'supply line. Residents in the affected wards should store water in advance. '
+         'Normal supply is expected to resume by the end of the maintenance window.'),
+        ('Emergency Weather Alert: Heavy Rainfall Expected', 'Alert', 'Emergency', 'All Users', 'Published', True,
+         'Heavy rainfall predicted over the next 48 hours — please avoid low-lying areas.',
+         'The meteorological department has issued a heavy rainfall warning. Residents near '
+         'drainage-prone areas and low-lying wards are advised to take precautions. Report '
+         'waterlogging or blocked drains immediately through the complaint portal.'),
+        ('New Online Complaint Tracking Feature', 'General', 'Normal', 'Citizens', 'Published', False,
+         'You can now track your complaint status in real time from your dashboard.',
+         'CivicDesk has rolled out real-time complaint tracking. Citizens can now view every '
+         'status change, from submission to resolution, directly from the "My Complaints" page.'),
+        ('Public Holiday: Department Offices Closed', 'Holiday', 'Normal', 'All Users', 'Published', False,
+         'All department offices will remain closed for the public holiday.',
+         'In observance of the public holiday, all CivicDesk department offices will be closed. '
+         'Emergency complaints will still be monitored and escalated as needed.'),
+        ('Revised Complaint Escalation Policy', 'Policy', 'Important', 'Officers', 'Published', False,
+         'Complaints open for more than 7 days without action will now auto-escalate.',
+         'To improve response times, any complaint left in "Pending" or "Under Review" for more '
+         'than 7 days will now be automatically flagged for escalation to department heads.'),
+        ('Worker Safety Guidelines Update', 'Policy', 'Important', 'Workers', 'Published', False,
+         'Updated PPE and on-site safety guidelines are now in effect for all field staff.',
+         'All field workers are required to review the updated safety guidelines before their '
+         'next assignment. Hard copies are also available at each department office.'),
+        ('Upcoming System Maintenance Window', 'Maintenance', 'Normal', 'All Users', 'Scheduled', False,
+         'CivicDesk will be briefly unavailable for a routine system upgrade.',
+         'The platform will undergo a routine upgrade to improve performance and add new '
+         'features. Expect brief downtime; no action is required from users.'),
+        ('Draft: Q3 Department Performance Summary', 'General', 'Normal', 'Officers', 'Draft', False,
+         'Internal summary of department performance for the upcoming quarter review.',
+         'Draft notes for the quarterly performance review meeting — pending final numbers '
+         'from System Analytics before this goes out to department heads.'),
+        ('Draft: Citizen Satisfaction Survey', 'General', 'Normal', 'Citizens', 'Draft', False,
+         'Upcoming survey to gather feedback on the complaint resolution experience.',
+         'Draft announcement for an upcoming citizen satisfaction survey — copy and audience '
+         'targeting still being finalized.'),
+        ('Diwali Festival Advisory', 'Alert', 'Normal', 'All Users', 'Archived', False,
+         'Fire safety advisory issued for the festival season.',
+         'During the festival season, residents were advised to exercise caution with '
+         'firecrackers and report any fire hazards immediately. This advisory has now expired.'),
+        ('Previous System Maintenance Notice', 'Maintenance', 'Normal', 'All Users', 'Archived', False,
+         'Completed maintenance window from last quarter.',
+         'This is an archived notice for a completed maintenance window. No further action was '
+         'required from users.'),
+    ]
+    announcements_created = 0
+    for title, category, priority, audience, status, is_pinned, summary, content in announcement_specs:
+        if Announcement.query.filter_by(title=title).first():
+            continue
+        created_at = backdated(5, 60)
+        publish_at = created_at if status in ('Published', 'Archived') else (
+            now_ist() + timedelta(days=random.randint(1, 5)) if status == 'Scheduled' else None
+        )
+        expiry_at = created_at + timedelta(days=random.randint(10, 30)) if status == 'Archived' else None
+        views = random.randint(50, 900) if status == 'Published' else (5 if status == 'Archived' else 0)
+        db.session.add(Announcement(
+            title=title, summary=summary, content=content, category=category,
+            priority=priority, audience=audience, status=status, is_pinned=is_pinned,
+            views=views, publish_at=publish_at, expiry_at=expiry_at,
+            author_id=admin.id, created_at=created_at,
+        ))
+        announcements_created += 1
+        if status == 'Published':
+            db.session.add(ActivityLog(
+                user_id=admin.id, activity_type='announcement_published',
+                description=f"Published announcement '{title}'.", ip_address='127.0.0.1',
+                created_at=created_at,
+            ))
+    db.session.commit()
+    print(f"✔ Announcements added ({announcements_created}), statuses: "
+          f"{sorted({spec[4] for spec in announcement_specs})}.")
+
+    # ── 12. LoginSession — a handful of sessions per active officer/worker
+    #      (so Profile's "Manage Devices" panel and admin ActivityLogs'
+    #      active-user tracking have real rows to show), plus a few failed
+    #      login attempts for security-event coverage ─────────────────
+    device_combos = [
+        ('Desktop', 'Windows', 'Chrome'), ('Desktop', 'macOS', 'Safari'),
+        ('Mobile', 'Android', 'Chrome'), ('Mobile', 'iOS', 'Safari'),
+        ('Tablet', 'iOS', 'Safari'), ('Desktop', 'Linux', 'Firefox'),
+    ]
+    sample_ips = ['192.168.1.4', '192.168.1.12', '10.0.0.23', '172.16.4.9', '203.0.113.7']
+    session_count = 0
+
+    def add_sessions_for(user, n_range=(1, 3)):
+        nonlocal session_count
+        n = random.randint(*n_range)
+        for i in range(n):
+            device, os_name, browser = device_combos[(user.id + i) % len(device_combos)]
+            created = backdated(0, 14)
+            revoked = created + timedelta(days=random.randint(1, 5)) if (i > 0 and random.random() < 0.3) else None
+            db.session.add(LoginSession(
+                user_id=user.id, device=device, os=os_name, browser=browser,
+                ip_address=sample_ips[(user.id + i) % len(sample_ips)], status='Success',
+                created_at=created, last_active_at=created + timedelta(minutes=random.randint(1, 600)),
+                expires_at=created + timedelta(days=30), revoked_at=revoked,
+            ))
+            session_count += 1
+
+    add_sessions_for(admin, n_range=(1, 2))
+    for dept_officers in officers['active'].values():
+        for off in dept_officers:
+            add_sessions_for(off)
+    for dept_workers in workers['active'].values():
+        for w in dept_workers:
+            add_sessions_for(w)
+    # A sample of citizens too, so citizen-side session management isn't empty either.
+    for citizen in citizens[:min(10, len(citizens))]:
+        add_sessions_for(citizen, n_range=(1, 2))
+
+    # A few failed login attempts (wrong password) — no valid session lifecycle,
+    # just a record for security-event visibility.
+    for _ in range(6):
+        target = random.choice(citizens + [o for pool in officers['active'].values() for o in pool])
+        device, os_name, browser = random.choice(device_combos)
+        db.session.add(LoginSession(
+            user_id=target.id, device=device, os=os_name, browser=browser,
+            ip_address=random.choice(sample_ips), status='Failed',
+            created_at=backdated(0, 10), last_active_at=None, expires_at=None, revoked_at=None,
+        ))
+        session_count += 1
+    db.session.commit()
+    print(f"✔ Login sessions added ({session_count}: active officers/workers/admin/sample citizens, "
+          f"a few revoked, a few failed attempts).")
+
     print(f"\nAll done. Every dummy account's password is: {DEFAULT_PASSWORD}")
     print(f"Admin login: {admin.email} / {DEFAULT_PASSWORD}")
     print("Coverage check:")
@@ -538,7 +671,9 @@ def seed():
     print("  Complaint.is_escalated: [True, False]")
     print("  Notification.type: [submitted, verified, assigned, resolved]")
     print("  ActivityLog.activity_type: [complaint_submitted, feedback_submitted, "
-          "department_created, officer_approved, officer_suspended]")
+          "department_created, officer_approved, officer_suspended, announcement_published, login]")
+    print("  Announcement.status: [Draft, Scheduled, Published, Archived]")
+    print("  LoginSession.status: [Success, Failed] (some revoked)")
 
 
 if __name__ == '__main__':

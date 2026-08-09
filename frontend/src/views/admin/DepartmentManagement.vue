@@ -32,7 +32,7 @@
         <section class="mb-8 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4">
           <div v-for="(stat, index) in topStats" :key="index" class="bg-white p-5 rounded-[14px] shadow-sm hover:shadow-md transition-shadow border border-gray-50 flex flex-col group">
             <div class="flex items-center gap-3 mb-3">
-              <div :class="`p-2.5 rounded-lg bg-opacity-10 ${stat.colorClass} bg-current group-hover:scale-110 transition-transform`">
+              <div :class="`p-2.5 rounded-lg ${stat.colorClass} group-hover:scale-110 transition-transform`">
                 <component :is="stat.icon" class="w-5 h-5" :class="stat.textClass" />
               </div>
               <span class="text-sm text-gray-500 font-medium">{{ stat.label }}</span>

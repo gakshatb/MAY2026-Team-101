@@ -260,32 +260,18 @@
             <Clock class="w-5 h-5 text-slate-400" />
             Recent Complaints
           </h3>
-          <div class="space-y-4">
-            <div class="p-3 rounded-lg bg-slate-50 border border-slate-100 flex items-center justify-between">
-              <div>
-                <p class="text-sm font-bold text-slate-900">Streetlight Failure</p>
-                <p class="text-xs text-slate-500 mt-0.5">Ward 4, MG Road</p>
+          <div v-if="recentComplaints.length" class="space-y-4">
+            <div v-for="c in recentComplaints" :key="c.id"
+              class="p-3 rounded-lg bg-slate-50 border border-slate-100 flex items-center justify-between gap-3 cursor-pointer hover:bg-slate-100 transition-colors"
+              @click="router.push(`/citizen/complaintdetails/${c.rawId}`)">
+              <div class="min-w-0">
+                <p class="text-sm font-bold text-slate-900 truncate">{{ c.title }}</p>
+                <p class="text-xs text-slate-500 mt-0.5 truncate">{{ c.category }}</p>
               </div>
-              <span
-                class="px-2.5 py-1 rounded-md bg-[#22C55E]/10 text-[#22C55E] text-xs font-semibold uppercase">Resolved</span>
-            </div>
-            <div class="p-3 rounded-lg bg-slate-50 border border-slate-100 flex items-center justify-between">
-              <div>
-                <p class="text-sm font-bold text-slate-900">Garbage Accumulation</p>
-                <p class="text-xs text-slate-500 mt-0.5">Area 51, West End</p>
-              </div>
-              <span
-                class="px-2.5 py-1 rounded-md bg-amber-100 text-amber-700 text-xs font-semibold uppercase">Pending</span>
-            </div>
-            <div class="p-3 rounded-lg bg-slate-50 border border-slate-100 flex items-center justify-between">
-              <div>
-                <p class="text-sm font-bold text-slate-900">Blocked Drainage</p>
-                <p class="text-xs text-slate-500 mt-0.5">Sector 9, Market</p>
-              </div>
-              <span class="px-2.5 py-1 rounded-md bg-[#2563EB]/10 text-[#2563EB] text-xs font-semibold uppercase">In
-                Progress</span>
+              <span :class="['px-2.5 py-1 rounded-md text-xs font-semibold uppercase whitespace-nowrap shrink-0', recentStatusClass(c.status)]">{{ c.status }}</span>
             </div>
           </div>
+          <p v-else class="text-sm text-slate-400">No complaints submitted yet.</p>
         </div>
       </div>
 
@@ -326,7 +312,7 @@
 </template>
 
 <script setup>
-import { ref, reactive, computed } from 'vue'
+import { ref, reactive, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import axios from 'axios'
 import {
@@ -370,6 +356,36 @@ const tips = [
   'Write a detailed description.',
   'Avoid duplicate complaints.'
 ]
+
+const router = useRouter()
+
+// Recent Complaints sidebar — real data instead of the old hardcoded sample cards.
+const recentComplaints = ref([])
+const fetchRecentComplaints = async () => {
+  try {
+    const token = localStorage.getItem('token')
+    const { data } = await axios.get('http://127.0.0.1:5000/api/citizen/complaints', {
+      headers: { Authorization: `Bearer ${token}` }
+    })
+    recentComplaints.value = data.complaints.slice(0, 3).map(c => ({
+      id: c.id, rawId: c.raw_id, title: c.title, category: c.category, status: c.status,
+    }))
+  } catch (err) {
+    console.error('Recent complaints fetch error:', err)
+  }
+}
+onMounted(fetchRecentComplaints)
+
+const recentStatusClass = (status) => {
+  switch (status) {
+    case 'Resolved': return 'bg-[#22C55E]/10 text-[#22C55E]'
+    case 'Closed': return 'bg-slate-200 text-slate-600'
+    case 'In Progress': return 'bg-[#2563EB]/10 text-[#2563EB]'
+    case 'Assigned': return 'bg-indigo-100 text-indigo-700'
+    case 'Under Review': return 'bg-yellow-100 text-yellow-700'
+    default: return 'bg-amber-100 text-amber-700'
+  }
+}
 
 const form = reactive({
   title: '',
@@ -469,8 +485,6 @@ const validateForm = () => {
 
   return isValid
 }
-
-const router = useRouter()
 
 const handleSubmit = async () => {
   if (!validateForm()) return

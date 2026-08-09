@@ -178,7 +178,7 @@
               </div>
               <div class="flex items-center gap-2 text-slate-600">
                 <User class="w-4 h-4 text-slate-400 shrink-0" />
-                <span>Worker: Not tracked yet</span>
+                <span>Worker: {{ complaint.worker?.name || 'Not yet assigned' }}</span>
               </div>
             </div>
           </div>

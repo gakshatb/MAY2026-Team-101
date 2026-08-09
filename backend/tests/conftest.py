@@ -1,0 +1,147 @@
+import os
+import sys
+import pytest
+from flask import Flask
+from api_auth_utils import limiter
+from werkzeug.security import generate_password_hash
+from models import db ,User
+# Add parent directory to path for imports
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
+from app import app as flask_app
+from models import db
+
+@pytest.fixture
+def client():
+    """Test client for the app."""
+    flask_app.config.update({
+        'TESTING': True,
+        'SQLALCHEMY_DATABASE_URI': 'sqlite:///:memory:',
+        'SQLALCHEMY_TRACK_MODIFICATIONS': False,
+        'JWT_SECRET_KEY': 'test-secret-key',
+        'RATELIMIT_STORAGE_URI': 'memory://',
+        'RATELIMIT_ENABLED': False,  # Disable rate limiting for tests
+    })
+
+    with flask_app.app_context():
+        limiter.enabled = False
+    
+    with flask_app.app_context():
+        db.create_all()
+        yield flask_app.test_client()
+        db.session.remove()
+        db.drop_all()
+
+
+
+
+@pytest.fixture
+def sample_admin_data():
+    """Sample valid user data."""
+    return {
+        "fullName": "Administrator",
+        "email": "admin@gmail.com",
+        "mobile": "9999999999",
+        "role": "Admin",
+        "address": "123 Main Street",
+        "city": "Mumbai",
+        "state": "Maharashtra",
+        "pincode": "400001",
+        "gender": "Male",
+        "password": "Admin@123"
+    }
+
+@pytest.fixture
+def sample_officer_data():
+    """Sample valid user data."""
+    return {
+        "fullName": "Officer",
+        "email": "officer@gmail.com",
+        "mobile": "9999999999",
+        "role": "Officer",
+        "address": "123 Main Street",
+        "city": "Mumbai",
+        "state": "Maharashtra",
+        "pincode": "400001",
+        "gender": "Male",
+        "password": "Officer@123"
+    }
+
+
+@pytest.fixture
+def sample_user_data():
+    """Sample valid user data for registration and login tests."""
+    return {
+        "fullName": "John Doe",
+        "email": "john.doe@example.com",
+        "mobile": "9876543210",
+        "role": "Citizen",
+        "address": "123 Main Street",
+        "city": "Mumbai",
+        "state": "Maharashtra",
+        "pincode": "400001",
+        "gender": "Male",
+        "password": "TestPassword123"
+    }
+
+
+@pytest.fixture
+def registered_user(sample_user_data):
+    """Fixture that pre-registers an active user directly into the database."""
+    # Create the user object exactly how your backend expects it
+    user = User(
+        name=sample_user_data["fullName"],
+        email=sample_user_data["email"].lower(),
+        phone=sample_user_data["mobile"],
+        password=generate_password_hash(sample_user_data["password"]),
+        address=sample_user_data["address"],
+        city=sample_user_data["city"],
+        state=sample_user_data.get("state"),
+        pincode=sample_user_data["pincode"],
+        gender=sample_user_data.get("gender"),
+        role=sample_user_data["role"],
+        status='active'  # Explicitly make them active so login doesn't return 403
+    )
+    
+    db.session.add(user)
+    db.session.commit()
+    
+    # Return both the database user object and the raw password for testing login
+    return {
+        "user_record": user,
+        "raw_credentials": {
+            "email": sample_user_data["email"],
+            "password": sample_user_data["password"]
+        }
+    }
+
+
+@pytest.fixture
+def registered_officer(sample_officer_data):
+    """Fixture that pre-registers an active user directly into the database."""
+    # Create the user object exactly how your backend expects it
+    user = User(
+        name=sample_officer_data["fullName"],
+        email=sample_officer_data["email"].lower(),
+        phone=sample_officer_data["mobile"],
+        password=generate_password_hash(sample_officer_data["password"]),
+        address=sample_officer_data["address"],
+        city=sample_officer_data["city"],
+        state=sample_officer_data.get("state"),
+        pincode=sample_officer_data["pincode"],
+        gender=sample_officer_data.get("gender"),
+        role=sample_officer_data["role"],
+        status= 'pending'
+    )
+    
+    db.session.add(user)
+    db.session.commit()
+    
+    # Return both the database user object and the raw password for testing login
+    return {
+        "user_record": user,
+        "raw_credentials": {
+            "email": sample_officer_data["email"],
+            "password": sample_officer_data["password"]
+        }
+    }

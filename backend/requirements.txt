@@ -24,3 +24,6 @@ SQLAlchemy==2.0.51
 typing_extensions==4.16.0
 Werkzeug==3.1.8
 wrapt==2.3.0
+pytest==8.4.1
+pytest-html==4.2.0
+pytest-metadata==3.1.1

@@ -158,7 +158,7 @@
         <section class="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-4 mb-6">
           <div v-for="(stat, index) in decoratedStats" :key="index" class="bg-white p-5 rounded-[14px] shadow-sm border border-gray-50 flex flex-col group hover:border-[#2563EB] transition-colors">
             <div class="flex items-center justify-between mb-3">
-              <div :class="`p-2.5 rounded-xl bg-opacity-10 ${stat.colorClass} bg-current group-hover:scale-110 transition-transform duration-300`">
+              <div :class="`p-2.5 rounded-xl ${stat.colorClass} group-hover:scale-110 transition-transform duration-300`">
                 <component :is="stat.icon" class="w-5 h-5" :class="stat.textClass" />
               </div>
             </div>
@@ -614,6 +614,14 @@ const onAvatarChosen = async (e) => {
       headers: { ...authHeaders().headers, 'Content-Type': 'multipart/form-data' }
     });
     profile.value.avatar = data.profilePhoto;
+
+    const storedUser = JSON.parse(localStorage.getItem('user') || 'null');
+    if (storedUser) {
+      storedUser.profilePhoto = data.profilePhoto;
+      localStorage.setItem('user', JSON.stringify(storedUser));
+      window.dispatchEvent(new Event('user-updated'));
+    }
+
     showToast('Photo updated.');
   } catch (err) {
     showToast(err.response?.data?.message || 'Failed to upload photo.', 'error');

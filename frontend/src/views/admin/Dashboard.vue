@@ -25,7 +25,7 @@
             class="bg-white p-5 rounded-[14px] shadow-sm hover:shadow-md transition-all duration-300 border border-gray-50 group flex flex-col"
           >
             <div class="flex justify-between items-start mb-4">
-              <div :class="`p-3 rounded-xl bg-opacity-10 ${stat.colorClass} bg-current group-hover:scale-110 transition-transform duration-300`">
+              <div :class="`p-3 rounded-xl ${stat.colorClass} group-hover:scale-110 transition-transform duration-300`">
                 <component :is="stat.icon" class="w-6 h-6" :class="stat.textClass" />
               </div>
               <span :class="['text-xs font-semibold px-2 py-1 rounded-full', stat.trendUp ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700']">
@@ -255,11 +255,11 @@ const updateClock = () => {
 
 // --- Top Stats: labels/icons are static, values come from the API ---
 const STAT_META = [
-  { key: 'total_citizens',   label: 'Total Citizens',   icon: Users,         colorClass: 'text-[#2563EB]', textClass: 'text-[#2563EB]' },
-  { key: 'total_officers',   label: 'Total Officers',   icon: UserCog,       colorClass: 'text-[#1E40AF]', textClass: 'text-[#1E40AF]' },
-  { key: 'total_workers',    label: 'Total Workers',    icon: HardHat,       colorClass: 'text-[#F59E0B]', textClass: 'text-[#F59E0B]' },
-  { key: 'total_complaints', label: 'Total Complaints', icon: ClipboardList, colorClass: 'text-[#EF4444]', textClass: 'text-[#EF4444]' },
-  { key: 'resolved_today',   label: 'Resolved Today',   icon: CheckCircle,   colorClass: 'text-[#22C55E]', textClass: 'text-[#22C55E]' },
+  { key: 'total_citizens',   label: 'Total Citizens',   icon: Users,         colorClass: 'text-[#2563EB] bg-blue-100',   textClass: 'text-[#2563EB]' },
+  { key: 'total_officers',   label: 'Total Officers',   icon: UserCog,       colorClass: 'text-[#1E40AF] bg-indigo-100', textClass: 'text-[#1E40AF]' },
+  { key: 'total_workers',    label: 'Total Workers',    icon: HardHat,       colorClass: 'text-[#F59E0B] bg-yellow-100', textClass: 'text-[#F59E0B]' },
+  { key: 'total_complaints', label: 'Total Complaints', icon: ClipboardList, colorClass: 'text-[#EF4444] bg-red-100',    textClass: 'text-[#EF4444]' },
+  { key: 'resolved_today',   label: 'Resolved Today',   icon: CheckCircle,   colorClass: 'text-[#22C55E] bg-green-100', textClass: 'text-[#22C55E]' },
 ];
 const topStats = ref(STAT_META.map(m => ({ ...m, value: '0', trend: '—', trendUp: true })));
 

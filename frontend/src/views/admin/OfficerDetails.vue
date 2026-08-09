@@ -119,7 +119,7 @@
         <!-- Top Statistics Grid -->
         <section class="mb-6 grid grid-cols-2 sm:grid-cols-4 xl:grid-cols-8 gap-4">
           <div v-for="(stat, index) in topStats" :key="index" class="bg-white p-4 rounded-[14px] shadow-sm border border-gray-50 flex flex-col items-center text-center group hover:border-[#2563EB] transition-colors">
-            <div :class="`p-2 rounded-lg bg-opacity-10 ${stat.colorClass} bg-current mb-2 group-hover:scale-110 transition-transform`">
+            <div :class="`p-2 rounded-lg ${stat.colorClass} mb-2 group-hover:scale-110 transition-transform`">
               <component :is="stat.icon" class="w-5 h-5" :class="stat.textClass" />
             </div>
             <h3 class="text-xl font-bold text-gray-900 leading-tight mb-0.5">{{ stat.value }}</h3>
@@ -357,7 +357,7 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted, watch } from 'vue';
+import { ref, computed, onMounted, watch, nextTick } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import axios from 'axios';
 import Chart from 'chart.js/auto';
@@ -500,14 +500,17 @@ const fetchOfficer = async () => {
 
     statusBreakdown.value = data.complaint_status_breakdown;
     monthlyTrend.value = data.monthly_trend;
-
-    renderCharts();
   } catch (err) {
     if (err.response?.status === 401) router.push('/login');
     else if (err.response?.status === 404) errorMessage.value = 'Officer not found.';
     else errorMessage.value = err.response?.data?.message || 'Failed to load officer details.';
   } finally {
     isLoading.value = false;
+  }
+
+  if (officer.value.id) {
+    await nextTick();
+    renderCharts();
   }
 };
 
