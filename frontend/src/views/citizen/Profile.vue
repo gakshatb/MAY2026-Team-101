@@ -7,8 +7,8 @@
       <p class="text-slate-500">Manage your personal information and account settings.</p>
     </div>
 
-    <!-- Role-based Complaint Summary -->
-    <div v-if="userRole === 'Citizen'" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
+    <!-- Complaint Summary -->
+    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
       <div class="bg-white p-5 rounded-[14px] shadow-sm border border-slate-100 flex flex-col">
         <span class="text-sm font-medium text-slate-500 mb-1">Total Complaints</span>
         <span class="text-3xl font-bold text-slate-900">{{ complaintStats.total }}</span>
@@ -24,44 +24,6 @@
       <div class="bg-white p-5 rounded-[14px] shadow-sm border border-slate-100 flex flex-col">
         <span class="text-sm font-medium text-slate-500 mb-1">Closed</span>
         <span class="text-3xl font-bold text-slate-400">{{ complaintStats.closed }}</span>
-      </div>
-    </div>
-
-    <div v-if="userRole === 'Civic Officer'" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
-      <div class="bg-white p-5 rounded-[14px] shadow-sm border border-slate-100 flex flex-col">
-        <span class="text-sm font-medium text-slate-500 mb-1">Complaints Managed</span>
-        <span class="text-3xl font-bold text-slate-900">145</span>
-      </div>
-      <div class="bg-white p-5 rounded-[14px] shadow-sm border border-slate-100 flex flex-col">
-        <span class="text-sm font-medium text-slate-500 mb-1">Pending Reviews</span>
-        <span class="text-3xl font-bold text-amber-500">12</span>
-      </div>
-      <div class="bg-white p-5 rounded-[14px] shadow-sm border border-slate-100 flex flex-col">
-        <span class="text-sm font-medium text-slate-500 mb-1">Resolved (This Month)</span>
-        <span class="text-3xl font-bold text-[#22C55E]">89</span>
-      </div>
-      <div class="bg-white p-5 rounded-[14px] shadow-sm border border-slate-100 flex flex-col">
-        <span class="text-sm font-medium text-slate-500 mb-1">Assigned Workers</span>
-        <span class="text-3xl font-bold text-[#2563EB]">24</span>
-      </div>
-    </div>
-
-    <div v-if="userRole === 'Field Worker'" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
-      <div class="bg-white p-5 rounded-[14px] shadow-sm border border-slate-100 flex flex-col">
-        <span class="text-sm font-medium text-slate-500 mb-1">Assigned Tasks</span>
-        <span class="text-3xl font-bold text-slate-900">8</span>
-      </div>
-      <div class="bg-white p-5 rounded-[14px] shadow-sm border border-slate-100 flex flex-col">
-        <span class="text-sm font-medium text-slate-500 mb-1">Completed Tasks</span>
-        <span class="text-3xl font-bold text-[#22C55E]">42</span>
-      </div>
-      <div class="bg-white p-5 rounded-[14px] shadow-sm border border-slate-100 flex flex-col">
-        <span class="text-sm font-medium text-slate-500 mb-1">Pending Tasks</span>
-        <span class="text-3xl font-bold text-amber-500">5</span>
-      </div>
-      <div class="bg-white p-5 rounded-[14px] shadow-sm border border-slate-100 flex flex-col">
-        <span class="text-sm font-medium text-slate-500 mb-1">Avg. Completion Time</span>
-        <span class="text-3xl font-bold text-[#2563EB]">18h</span>
       </div>
     </div>
 
@@ -343,7 +305,9 @@ import {
 } from 'lucide-vue-next'
 
 // --- State ---
-const userRole = ref('Citizen') // Options: 'Citizen', 'Civic Officer', 'Field Worker'
+// This page is only ever reached via /citizen/profile — the role label
+// is a fixed, display-only constant, not a live role check.
+const userRole = 'Citizen'
 const router = useRouter()
 const isEditingProfile = ref(false)
 const isSavingProfile = ref(false)
@@ -411,7 +375,7 @@ const fetchProfile = async () => {
 }
 onMounted(() => {
   fetchProfile()
-  if (userRole.value === 'Citizen') fetchComplaintStats()
+  fetchComplaintStats()
 })
 
 const photoInput = ref(null)

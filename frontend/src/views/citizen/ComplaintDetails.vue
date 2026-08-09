@@ -113,7 +113,7 @@
                 <User class="w-5 h-5 text-slate-500" />
               </div>
               <div>
-                <p class="text-sm font-bold text-slate-900">Not yet assigned</p>
+                <p class="text-sm font-bold text-slate-900">{{ complaint.officer?.name || 'Not yet assigned' }}</p>
                 <p class="text-xs text-slate-500">Civic Officer</p>
               </div>
             </div>
@@ -122,7 +122,7 @@
                 <HardHat class="w-5 h-5 text-slate-500" />
               </div>
               <div>
-                <p class="text-sm font-bold text-slate-900">Not yet assigned</p>
+                <p class="text-sm font-bold text-slate-900">{{ complaint.worker?.name || 'Not yet assigned' }}</p>
                 <p class="text-xs text-slate-500">Field Worker</p>
               </div>
             </div>
@@ -174,8 +174,8 @@ const images = ref([])
 const timeline = ref([])
 const rawId = ref(null)
 
-const STAGE_ORDER = ['Pending', 'In Progress', 'Resolved', 'Closed']
-const STAGE_LABELS = { Pending: 'Submitted', 'In Progress': 'In Progress', Resolved: 'Resolved', Closed: 'Closed' }
+const STAGE_ORDER = ['Pending', 'Under Review', 'Assigned', 'In Progress', 'Resolved', 'Closed']
+const STAGE_LABELS = { Pending: 'Submitted', 'Under Review': 'Under Review', Assigned: 'Assigned', 'In Progress': 'In Progress', Resolved: 'Resolved', Closed: 'Closed' }
 
 const fetchComplaintDetails = async () => {
   if (!route.params.id) {
@@ -210,6 +210,8 @@ const fetchComplaintDetails = async () => {
       submittedAt: c.created_at ? new Date(c.created_at).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: '2-digit' }) : '',
       description: c.description,
       has_feedback: c.has_feedback,
+      officer: c.officer,
+      worker: c.worker,
     }
     images.value = c.images || []
 
