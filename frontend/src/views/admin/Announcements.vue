@@ -642,7 +642,7 @@ const openModal = (type, ann = null) => {
     Object.assign(form, {
       title: ann.title, summary: ann.summary || '', content: ann.content,
       category: ann.category, priority: ann.priority, audience: ann.audience,
-      publishAt: '', expiryAt: ann.expiryAt ? toDatetimeLocal(ann.expiryAt) : '',
+      publishAt: '', expiryAt: ann.expiryAtIso ? toDatetimeLocal(ann.expiryAtIso) : '',
     });
   } else if (type === 'create') {
     resetForm();
@@ -652,8 +652,6 @@ const closeModal = () => { activeModal.value = null; targetAnn.value = null; for
 const handleActionClose = () => { closeModal(); closeDrawer(); };
 
 const toDatetimeLocal = (dateStr) => {
-  // dateStr here is the display-formatted date (e.g. 'Aug 06, 2026') — good enough
-  // for a starting point in the expiry field; admin can adjust freely.
   const d = new Date(dateStr);
   if (isNaN(d)) return '';
   return d.toISOString().slice(0, 16);

@@ -100,7 +100,7 @@ import axios from 'axios'
 import {
   Bell, CheckCircle, AlertCircle, Clock,
   MessageSquare, User, Shield, SearchX, X,
-  Check, Mail, Zap
+  Check, Mail, Zap, ClipboardList, Star, UserPlus
 } from 'lucide-vue-next'
 
 const router = useRouter()
@@ -117,10 +117,17 @@ const summaryCards = ref([
 
 const filters = ['All', 'Unread', 'Complaint Updates', 'System Messages']
 
+const NOTIF_META = {
+  submitted: { icon: ClipboardList, bg: 'bg-blue-100',  color: 'text-blue-600' },
+  verified:  { icon: CheckCircle,   bg: 'bg-teal-100',  color: 'text-teal-600' },
+  assigned:  { icon: UserPlus,      bg: 'bg-purple-100',color: 'text-purple-600' },
+  resolved:  { icon: Star,          bg: 'bg-green-100', color: 'text-green-600' },
+  system:    { icon: Shield,        bg: 'bg-red-100',   color: 'text-red-600' },
+  default:   { icon: Bell,          bg: 'bg-slate-100', color: 'text-slate-500' },
+}
+
 const allNotifications = ref([])
 
-// The backend doesn't support server-side filtering on this endpoint —
-// it always returns the full list — so filtering happens client-side.
 const filteredNotifications = computed(() => {
   if (activeFilter.value === 'All') return allNotifications.value
   if (activeFilter.value === 'Unread') return allNotifications.value.filter(n => !n.isRead)
@@ -136,17 +143,21 @@ const fetchNotifications = async () => {
     const { data } = await axios.get('http://127.0.0.1:5000/api/citizen/notifications', {
       headers: { Authorization: `Bearer ${token}` }
     })
-    allNotifications.value = data.notifications.map(n => ({
-      id: n.id,
-      title: n.title,
-      message: n.message,
-      complaintId: n.complaint_id || 'SYS',
-      time: new Date(n.created_at).toLocaleString(),
-      isRead: n.is_read,
-      icon: CheckCircle,
-      iconBg: n.type === 'system' ? 'bg-red-50' : 'bg-green-50',
-      iconColor: n.type === 'system' ? 'text-red-500' : 'text-green-500',
-    }))
+    allNotifications.value = data.notifications.map(n => {
+      const isSystem = !n.complaint_id
+      const meta = NOTIF_META[n.type] || (isSystem ? NOTIF_META.system : NOTIF_META.default)
+      return {
+        id: n.id,
+        title: n.title,
+        message: n.message,
+        complaintId: n.complaint_id || 'SYS',
+        time: new Date(n.created_at).toLocaleString(),
+        isRead: n.is_read,
+        icon: meta.icon,
+        iconBg: meta.bg,
+        iconColor: meta.color,
+      }
+    })
 
     summaryCards.value[0].count = data.summary.all
     summaryCards.value[1].count = data.summary.unread
@@ -168,6 +179,8 @@ const openDrawer = async (note) => {
         { headers: { Authorization: `Bearer ${token}` } }
       )
       note.isRead = true
+      summaryCards.value[1].count = Math.max(0, summaryCards.value[1].count - 1)
+      summaryCards.value[2].count += 1
     } catch (err) { console.error(err) }
   }
 }
@@ -181,6 +194,8 @@ const markAllRead = async () => {
       { headers: { Authorization: `Bearer ${token}` } }
     )
     allNotifications.value.forEach(n => n.isRead = true)
+    summaryCards.value[1].count = 0
+    summaryCards.value[2].count = summaryCards.value[0].count
   } catch (err) { console.error(err) }
 }
 

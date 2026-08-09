@@ -227,6 +227,19 @@
               <p v-if="assignError" class="text-red-600 text-xs mt-2">{{ assignError }}</p>
             </div>
 
+            <!-- Close Complaint -->
+            <div v-if="!['Resolved', 'Closed'].includes(selectedComplaint.status)" class="border-t border-gray-100 pt-5 mt-5">
+              <p class="text-sm font-bold text-gray-900 mb-3">Close Complaint</p>
+              <p class="text-xs text-gray-500 mb-3">Use this to close the complaint directly — e.g. duplicates or out-of-scope submissions — without routing it through an officer.</p>
+              <textarea v-model="closeRemark" rows="2" placeholder="Reason (optional)"
+                        class="w-full bg-gray-50 border border-gray-200 text-gray-700 text-sm rounded-xl px-3 py-2.5 focus:ring-2 focus:ring-[#2563EB]/20 focus:outline-none mb-3"></textarea>
+              <button @click="closeComplaint" :disabled="isClosing"
+                      class="w-full bg-gray-800 hover:bg-gray-900 text-white font-semibold px-5 py-2.5 rounded-xl transition-colors text-sm disabled:opacity-50 disabled:cursor-not-allowed">
+                {{ isClosing ? 'Closing…' : 'Close Complaint' }}
+              </button>
+              <p v-if="closeError" class="text-red-600 text-xs mt-2">{{ closeError }}</p>
+            </div>
+
             <!-- Status History -->
             <div v-if="selectedComplaint.status_logs?.length" class="border-t border-gray-100 mt-6 pt-5">
               <p class="text-sm font-bold text-gray-900 mb-3">Status History</p>
@@ -375,6 +388,30 @@ const assignOfficer = async () => {
     assignError.value = err.response?.data?.message || 'Failed to assign officer.';
   } finally {
     isAssigning.value = false;
+  }
+};
+
+const closeRemark = ref('');
+const isClosing = ref(false);
+const closeError = ref('');
+
+const closeComplaint = async () => {
+  if (!selectedComplaint.value) return;
+  isClosing.value = true;
+  closeError.value = '';
+  try {
+    await axios.patch(
+      `${API_BASE}/complaints/${selectedComplaint.value.raw_id}/close`,
+      { remark: closeRemark.value },
+      authHeaders()
+    );
+    closeRemark.value = '';
+    closeDrawer();
+    await fetchComplaints();
+  } catch (err) {
+    closeError.value = err.response?.data?.message || 'Failed to close complaint.';
+  } finally {
+    isClosing.value = false;
   }
 };
 

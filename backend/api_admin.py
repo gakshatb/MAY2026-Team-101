@@ -1499,6 +1499,51 @@ def assign_complaint_officer(complaint_id):
     return jsonify(success=True, message=f'Complaint assigned to {officer.name}.', complaint=_serialize_admin_complaint(c)), 200
 
 
+@admin_bp.route('/complaints/<int:complaint_id>/close', methods=['PATCH'])
+@role_required('Admin')
+def close_complaint(complaint_id):
+    """Lets an admin close a complaint directly, without routing it through
+    an officer/worker first — e.g. duplicates, out-of-scope submissions, or
+    complaints the admin resolves themselves."""
+    admin_id = int(get_jwt_identity())
+    c = Complaint.query.get(complaint_id)
+    if not c:
+        return jsonify(message="Complaint not found."), 404
+
+    if c.status in ('Resolved', 'Closed'):
+        return jsonify(message="Complaint is already closed."), 400
+
+    data = request.get_json() or {}
+    remark = (data.get('remark') or '').strip() or 'Closed directly by admin.'
+
+    old_status = c.status
+    c.status = 'Closed'
+
+    db.session.add(StatusLog(
+        complaint_id=c.id,
+        old_status=old_status,
+        new_status=c.status,
+        remark=remark
+    ))
+
+    db.session.add(Notification(
+        user_id=c.created_by,
+        complaint_id=c.id,
+        title='Complaint Closed',
+        message=f'Your complaint "{c.title}" has been closed by the admin. {remark}',
+        type='resolved'
+    ))
+
+    log_activity(
+        admin_id, 'complaint_closed',
+        f'Closed complaint CMP-{c.id:05d} directly.',
+        complaint_id=c.id
+    )
+
+    db.session.commit()
+    return jsonify(success=True, message='Complaint closed.', complaint=_serialize_admin_complaint(c)), 200
+
+
 # ─────────────────────────────────────────────────────────────────────────
 # System-wide notification feed for admins — powers Notifications.vue
 # ─────────────────────────────────────────────────────────────────────────
@@ -1735,6 +1780,7 @@ def _serialize_announcement(a, author_name):
         "views":      a.views,
         "publishDate": a.publish_at.strftime('%b %d, %Y') if a.publish_at else '-',
         "expiryDate":  a.expiry_at.strftime('%b %d, %Y') if a.expiry_at else '-',
+        "expiryAtIso": a.expiry_at.isoformat() if a.expiry_at else None,
         "author":     author_name,
         "createdAt":  a.created_at.isoformat(),
     }
@@ -1927,10 +1973,11 @@ def update_announcement(ann_id):
     ann.category = category
     ann.priority = priority
     ann.audience = audience
-    try:
-        ann.expiry_at = datetime.fromisoformat(data['expiryAt']) if data.get('expiryAt') else None
-    except ValueError:
-        return jsonify(message="Invalid expiry date format."), 400
+    if 'expiryAt' in data:
+        try:
+            ann.expiry_at = datetime.fromisoformat(data['expiryAt']) if data['expiryAt'] else None
+        except ValueError:
+            return jsonify(message="Invalid expiry date format."), 400
 
     admin_id = int(get_jwt_identity())
     log_activity(admin_id, 'announcement_updated', f'Updated announcement "{title}".')

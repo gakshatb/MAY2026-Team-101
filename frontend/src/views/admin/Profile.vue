@@ -575,7 +575,7 @@ const editForm = reactive({});
 const startEdit = () => {
   Object.assign(editForm, {
     name: profile.value.name, phone: profile.value.phone, designation: profile.value.designation,
-    dob: personal.value.dob ? new Date(personal.value.dob).toISOString().slice(0, 10) : '',
+    dob: personal.value.dob_iso || '',
     gender: personal.value.gender || '', nationality: personal.value.nationality || '',
     address: personal.value.address || '', city: personal.value.city || '',
     state: personal.value.state || '', zip: personal.value.zip || '',
