@@ -82,7 +82,7 @@ def test_submit_complaint_short_description(client, citizen_auth_headers, sample
     assert 'at least 30 characters' in data['message']
 
 def test_submit_complaint_missing_area(client, citizen_auth_headers, sample_complaint_data):
-    """Test complaint submission with missing area."""
+    """Test complaint submission with missing address."""
     data = sample_complaint_data.copy()
     data['area'] = ''
     
@@ -94,3 +94,21 @@ def test_submit_complaint_missing_area(client, citizen_auth_headers, sample_comp
     
     assert response.status_code == 400
     assert 'Area/Locality is required' in data['message']
+
+def test_list_complaints_success(client, citizen_auth_headers, sample_complaint_data):
+    """Test listing all complaints for a citizen."""
+    # Create a complaint first
+    client.post('/api/citizen/complaints',
+               data=sample_complaint_data,
+               headers=citizen_auth_headers,
+               content_type='multipart/form-data')
+    
+    response = client.get('/api/citizen/complaints',
+                         headers=citizen_auth_headers)
+    data = response.get_json()
+    
+    assert response.status_code == 200
+    assert data['success'] is True
+    assert 'complaints' in data
+    assert len(data['complaints']) >= 1
+    assert data['complaints'][0]['title'] == sample_complaint_data['title']
