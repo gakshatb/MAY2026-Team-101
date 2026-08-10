@@ -130,3 +130,22 @@ def test_list_complaints_filter_by_status(client, citizen_auth_headers, sample_c
     assert data['success'] is True
     for complaint in data['complaints']:
         assert complaint['status'] == 'Pending'
+
+def test_list_complaints_search(client, citizen_auth_headers, sample_complaint_data):
+    """Test searching complaints by title."""
+    # Create a complaint
+    client.post('/api/citizen/complaints',
+               data=sample_complaint_data,
+               headers=citizen_auth_headers,
+               content_type='multipart/form-data')
+    
+    # Search for the complaint
+    response = client.get('/api/citizen/complaints?search=Pothole',
+                         headers=citizen_auth_headers)
+    data = response.get_json()
+    
+    assert response.status_code == 200
+    assert data['success'] is True
+    assert len(data['complaints']) >= 1
+    assert 'Pothole' in data['complaints'][0]['title']
+
