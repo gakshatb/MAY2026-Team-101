@@ -149,3 +149,20 @@ def test_list_complaints_search(client, citizen_auth_headers, sample_complaint_d
     assert len(data['complaints']) >= 1
     assert 'Pothole' in data['complaints'][0]['title']
 
+def test_complaints_summary_success(client, citizen_auth_headers, sample_complaint_data):
+    """Test getting complaint summary statistics."""
+    # Create a complaint
+    client.post('/api/citizen/complaints',
+               data=sample_complaint_data,
+               headers=citizen_auth_headers,
+               content_type='multipart/form-data')
+    
+    response = client.get('/api/citizen/complaints/summary',
+                         headers=citizen_auth_headers)
+    data = response.get_json()
+    
+    assert response.status_code == 200
+    assert data['success'] is True
+    assert 'summary' in data
+    assert data['summary']['total'] >= 1
+    assert data['summary']['pending'] >= 1
