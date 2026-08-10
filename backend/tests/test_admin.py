@@ -171,3 +171,23 @@ def test_delete_department_success(client, admin_auth_headers, test_department):
     # Verify deleted
     dept = Department.query.get(test_department.id)
     assert dept is None
+
+def test_assign_department_head(client, admin_auth_headers, test_department, registered_officer):
+    """Test assigning a department head."""
+    # First approve the officer
+    client.patch(f'/api/admin/users/{registered_officer['user_record'].id}/approve',
+                headers=admin_auth_headers)
+    
+    # Assign as head
+    response = client.patch(f'/api/admin/departments/{test_department.id}/assign-head',
+                           json={"officerId": registered_officer['user_record'].id},
+                           headers=admin_auth_headers)
+    data = response.get_json()
+    
+    assert response.status_code == 200
+    assert data['success'] is True
+    assert 'Department head assigned' in data['message']
+    
+    # Verify
+    dept = Department.query.get(test_department.id)
+    assert dept.user_id == registered_officer['user_record'].id
