@@ -188,3 +188,16 @@ def test_get_complaint_not_found(client, citizen_auth_headers):
     
     assert response.status_code == 404
     assert 'Complaint not found' in data['message']
+
+def test_track_complaint_success(client, citizen_auth_headers, created_complaint):
+    """Test getting complaint tracking information."""
+    response = client.get(f'/api/citizen/complaints/{created_complaint}/tracking',
+                         headers=citizen_auth_headers)
+    data = response.get_json()
+    
+    assert response.status_code == 200
+    assert data['success'] is True
+    assert 'complaint' in data
+    assert 'activity_log' in data
+    assert len(data['activity_log']) >= 1
+    assert data['activity_log'][0]['new_status'] == 'Pending'
