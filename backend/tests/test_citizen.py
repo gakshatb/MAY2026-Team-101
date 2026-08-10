@@ -216,3 +216,17 @@ def test_submit_feedback_complaint_not_resolved(client, citizen_auth_headers, cr
     
     assert response.status_code == 400
     assert 'only be submitted for resolved complaints' in data['message']
+
+def test_list_notifications_success(client, citizen_auth_headers):
+    """Test listing notifications."""
+    response = client.get('/api/citizen/notifications',
+                         headers=citizen_auth_headers)
+    data = response.get_json()
+    
+    assert response.status_code == 200
+    assert data['success'] is True
+    assert 'summary' in data
+    assert 'notifications' in data
+    assert 'all' in data['summary']
+    assert 'unread' in data['summary']
+    assert 'read' in data['summary']
