@@ -179,4 +179,12 @@ def test_get_complaint_success(client, citizen_auth_headers, created_complaint):
     assert 'description' in data['complaint']  # Full details returned
     assert 'images' in data['complaint']
 
+
+def test_get_complaint_not_found(client, citizen_auth_headers):
+    """Test getting a complaint that doesn't exist."""
+    response = client.get('/api/citizen/complaints/99999',
+                         headers=citizen_auth_headers)
+    data = response.get_json()
     
+    assert response.status_code == 404
+    assert 'Complaint not found' in data['message']
