@@ -79,3 +79,15 @@ def test_approve_nonexistent_user(client, admin_auth_headers):
     
     assert response.status_code == 404
     assert 'User not found' in data['message']
+
+def test_list_departments_success(client, admin_auth_headers):
+    """Test listing all departments."""
+    response = client.get('/api/admin/departments', headers=admin_auth_headers)
+    data = response.get_json()
+    
+    assert response.status_code == 200
+    assert data['success'] is True
+    assert 'departments' in data
+    assert 'top_stats' in data
+    assert 'quick_insights' in data
+    assert len(data['departments']) >= 1
