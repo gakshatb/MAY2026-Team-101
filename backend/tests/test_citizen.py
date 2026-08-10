@@ -245,3 +245,27 @@ def test_get_profile_success(client, citizen_auth_headers):
     assert data['profile']['mobile'] == '9876543210'
     assert 'accountId' in data['profile']
     assert 'memberSince' in data['profile']
+
+def test_dashboard_success(client, citizen_auth_headers, sample_complaint_data):
+    """Test getting dashboard data."""
+    # Create a complaint
+    client.post('/api/citizen/complaints',
+               data=sample_complaint_data,
+               headers=citizen_auth_headers,
+               content_type='multipart/form-data')
+    
+    response = client.get('/api/citizen/dashboard',
+                         headers=citizen_auth_headers)
+    data = response.get_json()
+    
+    assert response.status_code == 200
+    assert data['success'] is True
+    assert 'summary' in data
+    assert 'category_breakdown' in data
+    assert 'priority_breakdown' in data
+    assert 'monthly_trend' in data
+    assert 'recent_complaints' in data
+    assert 'recent_notifications' in data
+    assert 'recent_activity' in data
+    assert data['summary']['total'] >= 1
+    assert data['summary']['pending'] >= 1
