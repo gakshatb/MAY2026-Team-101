@@ -191,3 +191,17 @@ def test_assign_department_head(client, admin_auth_headers, test_department, reg
     # Verify
     dept = Department.query.get(test_department.id)
     assert dept.user_id == registered_officer['user_record'].id
+
+
+
+def test_list_officers_success(client, admin_auth_headers):
+    """Test listing all officers."""
+    response = client.get('/api/admin/officers', headers=admin_auth_headers)
+    data = response.get_json()
+    
+    assert response.status_code == 200
+    assert data['success'] is True
+    assert 'officers' in data
+    assert 'top_stats' in data
+    assert 'quick_insights' in data
+    assert 'pending_registrations' in data
