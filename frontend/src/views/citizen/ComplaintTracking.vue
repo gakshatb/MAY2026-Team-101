@@ -53,7 +53,22 @@
 
         <!-- Progress Tracker -->
         <div class="bg-white p-8 rounded-[14px] shadow-sm border border-slate-100">
-          <h3 class="text-lg font-bold text-slate-900 mb-8">Progress Status</h3>
+          <div class="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4 mb-8">
+            <div>
+              <h3 class="text-lg font-bold text-slate-900">Progress Status</h3>
+              <p class="text-sm text-slate-500 mt-1">{{ progressSummary }}</p>
+            </div>
+            <span :class="['px-3 py-1.5 rounded-full text-xs font-bold', statusPillClass]">{{ complaint.status }}</span>
+          </div>
+          <div class="h-2 rounded-full bg-slate-100 overflow-hidden mb-5" aria-label="Complaint progress">
+            <div class="h-full rounded-full transition-all duration-500" :class="isTerminal ? 'bg-green-500' : 'bg-[#2563EB]'" :style="{ width: `${progressPercent}%` }"></div>
+          </div>
+          <div class="flex flex-wrap gap-x-4 gap-y-2 mb-8 text-xs text-slate-500">
+            <span class="inline-flex items-center gap-1.5"><span class="w-2 h-2 rounded-full bg-green-500"></span> Completed</span>
+            <span class="inline-flex items-center gap-1.5"><span class="w-2 h-2 rounded-full bg-[#2563EB]"></span> Current</span>
+            <span class="inline-flex items-center gap-1.5"><span class="w-2 h-2 rounded-full bg-slate-200"></span> Upcoming</span>
+            <span class="inline-flex items-center gap-1.5"><SkipForward class="w-3.5 h-3.5 text-slate-400" /> Skipped</span>
+          </div>
           <div class="space-y-0">
             <div v-for="(step, index) in timelineSteps" :key="step.title" class="relative pl-8 pb-8 last:pb-0">
               <!-- Line Connector -->
@@ -75,9 +90,11 @@
               </div>
 
               <div class="pt-0.5">
-                <p :class="['font-bold', step.status === 'active' ? 'text-[#2563EB]' : step.status === 'skipped' ? 'text-slate-400' : 'text-slate-900']">{{ step.title
-                  }}</p>
-                <p class="text-xs text-slate-400 mt-1">{{ step.date || (step.status === 'skipped' ? 'Skipped' : 'Pending') }}</p>
+                <div class="flex flex-wrap items-center gap-2">
+                  <p :class="['font-bold', step.status === 'active' ? 'text-[#2563EB]' : step.status === 'skipped' || step.status === 'unrecorded' ? 'text-slate-400' : 'text-slate-900']">{{ step.title }}</p>
+                  <span v-if="step.isCurrent" :class="['text-[10px] font-bold uppercase tracking-wide px-2 py-0.5 rounded-full', isTerminal ? 'bg-green-50 text-green-700' : 'bg-blue-50 text-[#2563EB]']">{{ isTerminal ? 'Current outcome' : 'Current stage' }}</span>
+                </div>
+                <p class="text-xs text-slate-400 mt-1">{{ step.date || step.description }}</p>
               </div>
             </div>
           </div>
@@ -92,7 +109,7 @@
                 <tr class="text-slate-500 uppercase text-[10px] tracking-wider border-b border-slate-100">
                   <th class="pb-3 font-semibold">Date</th>
                   <th class="pb-3 font-semibold">Status</th>
-                  <th class="pb-3 font-semibold">Officer</th>
+                  <th class="pb-3 font-semibold">Transition</th>
                   <th class="pb-3 font-semibold">Remarks</th>
                 </tr>
               </thead>
@@ -100,7 +117,7 @@
                 <tr v-for="act in activityLog" :key="act.id" class="text-slate-700">
                   <td class="py-4 font-medium">{{ act.date }}</td>
                   <td class="py-4">{{ act.status }}</td>
-                  <td class="py-4">{{ act.officer }}</td>
+                  <td class="py-4">{{ act.transition }}</td>
                   <td class="py-4 text-slate-500">{{ act.remarks }}</td>
                 </tr>
               </tbody>
@@ -116,7 +133,7 @@
         <div class="bg-white p-6 rounded-[14px] shadow-sm border border-slate-100">
           <div class="flex items-center justify-between mb-6">
             <h3 class="font-bold text-slate-900">Current Overview</h3>
-            <span class="px-3 py-1 bg-blue-50 text-[#2563EB] text-xs font-bold rounded-full uppercase">{{
+            <span :class="['px-3 py-1 text-xs font-bold rounded-full uppercase', statusPillClass]">{{
               complaint.status }}</span>
           </div>
           <div class="space-y-4">
@@ -176,6 +193,79 @@ const activityLog = ref([])
 
 const STAGE_ORDER = ['Pending', 'Under Review', 'Assigned', 'In Progress', 'Resolved', 'Closed']
 const STAGE_LABELS = { Pending: 'Submitted', 'Under Review': 'Under Review', Assigned: 'Assigned', 'In Progress': 'In Progress', Resolved: 'Resolved', Closed: 'Closed' }
+const TERMINAL_STATUSES = new Set(['Resolved', 'Closed', 'Rejected'])
+
+const isTerminal = computed(() => TERMINAL_STATUSES.has(complaint.value?.status))
+const currentStageIndex = computed(() => STAGE_ORDER.indexOf(complaint.value?.status))
+const progressPercent = computed(() => {
+  if (isTerminal.value) return 100
+  if (currentStageIndex.value < 0) return 0
+  return Math.round((currentStageIndex.value / (STAGE_ORDER.length - 1)) * 100)
+})
+const progressSummary = computed(() => {
+  if (!complaint.value) return ''
+  if (complaint.value.status === 'Resolved') return 'Work is complete. You can now share your feedback.'
+  if (complaint.value.status === 'Closed') return 'This complaint has been closed. Review the activity log for the closing note.'
+  return `Currently ${String(complaint.value.status || '').toLowerCase()}. Activity updates appear here as they are recorded.`
+})
+const statusPillClass = computed(() => isTerminal.value ? 'bg-green-50 text-green-700' : 'bg-blue-50 text-[#2563EB]')
+const formatDate = (value) => value ? new Date(value).toLocaleDateString('en-US', {
+  month: 'short', day: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit'
+}) : null
+
+const buildTimeline = (logs, currentStatus) => {
+  const normalizedLogs = [...logs]
+    .filter(log => STAGE_ORDER.includes(log.new_status))
+    .sort((a, b) => new Date(a.changed_at || 0) - new Date(b.changed_at || 0))
+  const reached = new Map()
+  const skipped = new Set()
+
+  // A stage is skipped only when a recorded transition jumps over it. Missing
+  // log rows remain "not recorded" rather than being guessed as skipped.
+  normalizedLogs.forEach(log => {
+    const oldIndex = STAGE_ORDER.indexOf(log.old_status)
+    const newIndex = STAGE_ORDER.indexOf(log.new_status)
+    if (newIndex >= 0) reached.set(log.new_status, log)
+    if (oldIndex >= 0 && newIndex > oldIndex + 1) {
+      STAGE_ORDER.slice(oldIndex + 1, newIndex).forEach(stage => skipped.add(stage))
+    }
+  })
+
+  const currentIndex = STAGE_ORDER.indexOf(currentStatus)
+  const steps = STAGE_ORDER.map((stage, index) => {
+    const entry = reached.get(stage)
+    const isCurrentStage = stage === currentStatus
+    let status = 'upcoming'
+    let description = 'Upcoming'
+    if (isCurrentStage) {
+      status = TERMINAL_STATUSES.has(stage) ? 'completed' : 'active'
+      description = TERMINAL_STATUSES.has(stage) ? 'Current outcome' : 'Currently in progress'
+    } else if (entry) {
+      status = 'completed'
+      description = 'Completed'
+    } else if (skipped.has(stage)) {
+      status = 'skipped'
+      description = 'Skipped by a recorded workflow transition'
+    } else if (currentIndex >= 0 && index < currentIndex) {
+      status = 'unrecorded'
+      description = 'No activity recorded for this stage'
+    }
+    return { title: STAGE_LABELS[stage], status, isCurrent: isCurrentStage, date: formatDate(entry?.changed_at), description }
+  })
+  // The current database model uses Closed, but keep the display truthful if a
+  // future workflow introduces another terminal state such as Rejected.
+  if (currentStatus && currentIndex < 0) {
+    const entry = [...logs].filter(log => log.new_status === currentStatus).at(-1)
+    steps.push({
+      title: currentStatus,
+      status: TERMINAL_STATUSES.has(currentStatus) ? 'completed' : 'active',
+      isCurrent: true,
+      date: formatDate(entry?.changed_at),
+      description: TERMINAL_STATUSES.has(currentStatus) ? 'Current outcome' : 'Current status'
+    })
+  }
+  return steps
+}
 
 const fetchTracking = async () => {
   if (!route.params.id) {
@@ -193,30 +283,13 @@ const fetchTracking = async () => {
     )
     complaint.value = data.complaint
 
-    const currentIndex = STAGE_ORDER.indexOf(complaint.value.status)
-    timelineSteps.value = STAGE_ORDER.map((stage, index) => {
-      const logEntry = data.activity_log.find(l => l.new_status === stage)
-      let status
-      if (index === currentIndex) {
-        status = 'active'
-      } else if (index < currentIndex) {
-        status = logEntry ? 'completed' : 'skipped'
-      } else {
-        status = 'upcoming'
-      }
-      return {
-        title: STAGE_LABELS[stage],
-        status,
-        date: logEntry?.changed_at
-          ? new Date(logEntry.changed_at).toLocaleDateString('en-US', { month: 'short', day: '2-digit', year: 'numeric' })
-          : null
-      }
-    })
+    timelineSteps.value = buildTimeline(data.activity_log || [], complaint.value.status)
 
     activityLog.value = data.activity_log.map((log, index) => ({
       id: index,
       date: log.changed_at ? new Date(log.changed_at).toLocaleString() : '—',
       status: log.new_status,
+      transition: log.old_status ? `${log.old_status} → ${log.new_status}` : `Created as ${log.new_status}`,
       officer: STAGE_ORDER.indexOf(log.new_status) >= STAGE_ORDER.indexOf('Assigned') ? (complaint.value.officer?.name || '—') : '—',
       remarks: log.remark || '—',
     }))
