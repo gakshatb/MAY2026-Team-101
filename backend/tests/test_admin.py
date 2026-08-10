@@ -156,3 +156,18 @@ def test_update_department_success(client, admin_auth_headers, test_department):
     dept = Department.query.get(test_department.id)
     assert dept.department_name == update_data['name']
     assert dept.status == update_data['status']
+
+def test_delete_department_success(client, admin_auth_headers, test_department):
+    """Test deleting a department (no complaints/members)."""
+    # Ensure department has no members or complaints
+    response = client.delete(f'/api/admin/departments/{test_department.id}',
+                            headers=admin_auth_headers)
+    data = response.get_json()
+    
+    assert response.status_code == 200
+    assert data['success'] is True
+    assert 'Department deleted' in data['message']
+    
+    # Verify deleted
+    dept = Department.query.get(test_department.id)
+    assert dept is None
