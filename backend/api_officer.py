@@ -19,7 +19,11 @@ VALID_PRIORITIES = {'Low', 'Medium', 'High', 'Emergency'}
 
 # Statuses an officer is allowed to set directly via /status. 'Resolved' is set
 # by the worker on task completion; 'Closed' is admin-only (see api_admin.py).
-OFFICER_SETTABLE_STATUSES = {'Assigned', 'In Progress'}
+# Officers may begin work on a case allocated to them. Resolution is a worker
+# action and a case must never regress from In Progress back to Assigned.
+OFFICER_STATUS_TRANSITIONS = {
+    'Assigned': {'In Progress'},
+}
 
 # Placeholder SLA window used only for the "days remaining" widget on
 # ComplaintDetails.vue until per-category SLAs are modelled.
@@ -69,7 +73,12 @@ def _serialize_complaint_detail(c):
     ]
     related = (
         Complaint.query
-        .filter(Complaint.area == c.area, Complaint.id != c.id, Complaint.area.isnot(None))
+        .filter(
+            Complaint.area == c.area,
+            Complaint.id != c.id,
+            Complaint.area.isnot(None),
+            Complaint.assigned_officer == c.assigned_officer,
+        )
         .order_by(Complaint.created_at.desc())
         .limit(5)
         .all()
@@ -206,9 +215,12 @@ def update_status(complaint_id):
 
     data = request.get_json(silent=True) or {}
     new_status = data.get('status')
-    if new_status not in OFFICER_SETTABLE_STATUSES:
+    if not isinstance(new_status, str):
+        return jsonify(message="status must be a string."), 400
+    allowed_statuses = OFFICER_STATUS_TRANSITIONS.get(c.status, set())
+    if new_status not in allowed_statuses:
         return jsonify(
-            message=f"Officers can only set status to one of: {', '.join(sorted(OFFICER_SETTABLE_STATUSES))}."
+            message=f"Cannot change a complaint from {c.status} to {new_status or 'an empty status'}."
         ), 400
     if c.status in ('Resolved', 'Closed'):
         return jsonify(message=f"Cannot change status of a complaint that is already {c.status}."), 400
@@ -244,6 +256,8 @@ def update_priority(complaint_id):
 
     data = request.get_json(silent=True) or {}
     new_priority = data.get('priority')
+    if not isinstance(new_priority, str):
+        return jsonify(message="priority must be a string."), 400
     if new_priority not in VALID_PRIORITIES:
         return jsonify(message=f"Priority must be one of: {', '.join(sorted(VALID_PRIORITIES))}."), 400
 
@@ -344,7 +358,7 @@ def assign_worker(complaint_id):
 
     data = request.get_json(silent=True) or {}
     worker_id = data.get('worker_id')
-    if not worker_id:
+    if not isinstance(worker_id, int) or isinstance(worker_id, bool):
         return jsonify(message="worker_id is required."), 400
 
     worker = User.query.get(worker_id)
@@ -366,14 +380,18 @@ def assign_worker(complaint_id):
     old_status = c.status
     c.status = 'In Progress'
 
+    Assignment.query.filter_by(complaint_id=c.id).delete()
     db.session.add(Assignment(complaint_id=c.id, worker_id=worker.id, assigned_by=officer.id))
     remark = f'Assigned to field worker {worker.name}.'
     if notes:
         remark += f' Instructions: {notes}'
-    db.session.add(StatusLog(
-        complaint_id=c.id, old_status=old_status, new_status=c.status,
-        remark=remark
-    ))
+    # Reassignment of an already in-progress task has no status transition;
+    # avoid writing a duplicate In Progress history row.
+    if old_status != c.status:
+        db.session.add(StatusLog(
+            complaint_id=c.id, old_status=old_status, new_status=c.status,
+            remark=remark
+        ))
 
     db.session.add(Notification(
         user_id=worker.id, complaint_id=c.id,
