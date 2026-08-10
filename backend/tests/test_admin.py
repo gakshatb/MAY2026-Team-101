@@ -41,3 +41,17 @@ def test_admin_dashboard_requires_admin_role(client, citizen_auth_headers):
     """Test dashboard requires admin role."""
     response = client.get('/api/admin/dashboard', headers=citizen_auth_headers)
     assert response.status_code in [403, 401]
+
+def test_approve_pending_officer(client, admin_auth_headers, registered_officer):
+    """Test approving a pending officer."""
+    response = client.patch(f'/api/admin/users/{registered_officer['user_record'].id}/approve',
+                           headers=admin_auth_headers)
+    data = response.get_json()
+    
+    assert response.status_code == 200
+    assert data['success'] is True
+    assert 'approved' in data['message']
+    
+    # Verify user status changed
+    user = User.query.get(registered_officer['user_record'].id)
+    assert user.status == 'active'
