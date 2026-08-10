@@ -36,3 +36,8 @@ def test_admin_dashboard_requires_auth(client):
     """Test dashboard requires authentication."""
     response = client.get('/api/admin/dashboard')
     assert response.status_code == 401
+
+def test_admin_dashboard_requires_admin_role(client, citizen_auth_headers):
+    """Test dashboard requires admin role."""
+    response = client.get('/api/admin/dashboard', headers=citizen_auth_headers)
+    assert response.status_code in [403, 401]
