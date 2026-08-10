@@ -185,3 +185,12 @@ def sample_complaint_data():
         "urgencyNote": "This needs immediate attention as it's causing accidents."
     }
 
+@pytest.fixture
+def created_complaint(client, citizen_auth_headers, sample_complaint_data):
+    """Create a complaint and return the complaint ID."""
+    response = client.post('/api/citizen/complaints', 
+                          data=sample_complaint_data,
+                          headers=citizen_auth_headers,
+                          content_type='multipart/form-data')
+    data = response.get_json()
+    return data['complaint']['raw_id']

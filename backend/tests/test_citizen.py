@@ -166,3 +166,17 @@ def test_complaints_summary_success(client, citizen_auth_headers, sample_complai
     assert 'summary' in data
     assert data['summary']['total'] >= 1
     assert data['summary']['pending'] >= 1
+
+def test_get_complaint_success(client, citizen_auth_headers, created_complaint):
+    """Test getting a single complaint by ID."""
+    response = client.get(f'/api/citizen/complaints/{created_complaint}',
+                         headers=citizen_auth_headers)
+    data = response.get_json()
+    
+    assert response.status_code == 200
+    assert data['success'] is True
+    assert data['complaint']['raw_id'] == created_complaint
+    assert 'description' in data['complaint']  # Full details returned
+    assert 'images' in data['complaint']
+
+    
