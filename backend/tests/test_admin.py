@@ -91,3 +91,28 @@ def test_list_departments_success(client, admin_auth_headers):
     assert 'top_stats' in data
     assert 'quick_insights' in data
     assert len(data['departments']) >= 1
+
+
+def test_create_department_success(client, admin_auth_headers):
+    """Test creating a new department."""
+    dept_data = {
+        "name": "Sanitation Department 1",
+        "code": "SAN1",
+        "description": "Handles garbage and waste management",
+        "status": "Active"
+    }
+    
+    response = client.post('/api/admin/departments',
+                          json=dept_data,
+                          headers=admin_auth_headers)
+    data = response.get_json()
+    
+    assert response.status_code == 201
+    assert data['success'] is True
+    assert 'Department created' in data['message']
+    assert data['department']['name'] == dept_data['name']
+    
+
+    dept = Department.query.filter_by(department_name=dept_data['name']).first()
+    assert dept is not None
+    assert dept.code == dept_data['code']

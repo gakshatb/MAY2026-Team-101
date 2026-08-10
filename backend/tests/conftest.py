@@ -33,7 +33,9 @@ def client():
         db.drop_all()
 
 
-
+#==============================================
+#----------ADMIN TEST FIXTURES----------------
+#==============================================
 
 @pytest.fixture
 def sample_admin_data():
@@ -99,7 +101,9 @@ def admin_auth_headers(client, registered_admin):
     }
 
 
-
+#==============================================
+#----------CITIZEN TEST FIXTURES----------------
+#==============================================
 
 
 @pytest.fixture
