@@ -39,9 +39,9 @@ def client():
 def sample_admin_data():
     """Sample valid user data."""
     return {
-        "fullName": "Administrator",
-        "email": "admin@gmail.com",
-        "mobile": "9999999999",
+        "fullName": "Admin",
+        "email": "admin1@gmail.com",
+        "mobile": "9991999999",
         "role": "Admin",
         "address": "123 Main Street",
         "city": "Mumbai",
@@ -50,6 +50,57 @@ def sample_admin_data():
         "gender": "Male",
         "password": "Admin@123"
     }
+
+@pytest.fixture
+def registered_admin(sample_admin_data):
+    """Fixture that pre-registers an active user directly into the database."""
+    # Create the user object exactly how your backend expects it
+    user = User(
+        name=sample_admin_data["fullName"],
+        email=sample_admin_data["email"].lower(),
+        phone=sample_admin_data["mobile"],
+        password=generate_password_hash(sample_admin_data["password"]),
+        address=sample_admin_data["address"],
+        city=sample_admin_data["city"],
+        state=sample_admin_data.get("state"),
+        pincode=sample_admin_data["pincode"],
+        gender=sample_admin_data.get("gender"),
+        role=sample_admin_data["role"],
+        status='active'  # Explicitly make them active so login doesn't return 403
+    )
+    
+    db.session.add(user)
+    db.session.commit()
+    
+    # Return both the database user object and the raw password for testing login
+    return {
+        "user_record": user,
+        "raw_credentials": {
+            "email": sample_admin_data["email"],
+            "password": sample_admin_data["password"]
+        }
+    }
+
+
+@pytest.fixture
+def admin_auth_headers(client, registered_admin):
+    """Get authentication headers for admin user."""
+
+    credentaisl = registered_admin['raw_credentials']
+    response = client.post('/api/login', json={
+        'email': credentaisl['email'],
+        'password': credentaisl['password']
+    })
+    data = response.get_json()
+    return {
+        'Authorization': f"Bearer {data['access_token']}",
+        'refresh_token': data['refresh_token'],
+        'user_id': registered_admin['user_record'].id
+    }
+
+
+
+
 
 @pytest.fixture
 def sample_officer_data():
