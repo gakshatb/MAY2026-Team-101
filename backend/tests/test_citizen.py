@@ -269,3 +269,24 @@ def test_dashboard_success(client, citizen_auth_headers, sample_complaint_data):
     assert 'recent_activity' in data
     assert data['summary']['total'] >= 1
     assert data['summary']['pending'] >= 1
+
+
+def test_dashboard_summary_fields(client, citizen_auth_headers):
+    """Test that dashboard returns all expected summary fields."""
+    response = client.get('/api/citizen/dashboard',
+                         headers=citizen_auth_headers)
+    data = response.get_json()
+    
+    assert response.status_code == 200
+    summary = data['summary']
+    
+    expected_fields = [
+        'total', 'pending', 'under_review', 'assigned',
+        'in_progress', 'resolved', 'closed', 'escalated',
+        'unread_notifications', 'avg_resolution_days',
+        'resolution_rate', 'avg_first_response_hours',
+        'avg_rating', 'aging_open'
+    ]
+    
+    for field in expected_fields:
+        assert field in summary
