@@ -80,3 +80,17 @@ def test_submit_complaint_short_description(client, citizen_auth_headers, sample
     
     assert response.status_code == 400
     assert 'at least 30 characters' in data['message']
+
+def test_submit_complaint_missing_area(client, citizen_auth_headers, sample_complaint_data):
+    """Test complaint submission with missing area."""
+    data = sample_complaint_data.copy()
+    data['area'] = ''
+    
+    response = client.post('/api/citizen/complaints',
+                          data=data,
+                          headers=citizen_auth_headers,
+                          content_type='multipart/form-data')
+    data = response.get_json()
+    
+    assert response.status_code == 400
+    assert 'Area/Locality is required' in data['message']
