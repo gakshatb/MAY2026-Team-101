@@ -201,3 +201,18 @@ def test_track_complaint_success(client, citizen_auth_headers, created_complaint
     assert 'activity_log' in data
     assert len(data['activity_log']) >= 1
     assert data['activity_log'][0]['new_status'] == 'Pending'
+
+def test_submit_feedback_complaint_not_resolved(client, citizen_auth_headers, created_complaint):
+    """Test submitting feedback for a complaint that is not resolved."""
+    feedback_data = {
+        "overallRating": 4,
+        "comment": "This is a test feedback comment."
+    }
+    
+    response = client.post(f'/api/citizen/complaints/{created_complaint}/feedback',
+                          json=feedback_data,
+                          headers=citizen_auth_headers)
+    data = response.get_json()
+    
+    assert response.status_code == 400
+    assert 'only be submitted for resolved complaints' in data['message']
