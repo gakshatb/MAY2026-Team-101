@@ -290,3 +290,18 @@ def test_dashboard_summary_fields(client, citizen_auth_headers):
     
     for field in expected_fields:
         assert field in summary
+
+
+def test_citizen_endpoint_requires_auth(client):
+    """Test that citizen endpoints require authentication."""
+    endpoints = [
+        '/api/citizen/complaints',
+        '/api/citizen/profile',
+        '/api/citizen/dashboard',
+        '/api/citizen/notifications',
+        '/api/citizen/activity'
+    ]
+    
+    for endpoint in endpoints:
+        response = client.get(endpoint)
+        assert response.status_code == 401
