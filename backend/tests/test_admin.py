@@ -70,3 +70,12 @@ def test_reject_pending_officer(client, admin_auth_headers, registered_officer):
     # Verify user status changed
     user = User.query.get(registered_officer['user_record'].id)
     assert user.status == 'rejected'
+
+def test_approve_nonexistent_user(client, admin_auth_headers):
+    """Test approving a non-existent user."""
+    response = client.patch('/api/admin/users/99999/approve',
+                           headers=admin_auth_headers)
+    data = response.get_json()
+    
+    assert response.status_code == 404
+    assert 'User not found' in data['message']
