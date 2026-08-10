@@ -146,6 +146,8 @@ def role_required(*roles):
                 return jsonify(
                     message=f"Access denied. Required role(s): {', '.join(roles)}."
                 ), 403
+            if user.status != 'active':
+                return jsonify(message="This account is not active."), 403
             return fn(*args, **kwargs)
         return wrapper
     return decorator

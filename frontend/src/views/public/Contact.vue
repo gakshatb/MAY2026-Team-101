@@ -115,7 +115,7 @@
         <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-6">
           <div v-for="member in team" :key="member.name"
             class="bg-white p-6 rounded-[14px] border border-slate-100 text-center hover:shadow-md transition-all">
-            <img :src="member.image" :alt="member.name"
+            <img :src="member.image" :alt="member.name" @error="useAvatar"
               class="w-20 h-20 bg-slate-100 rounded-full mx-auto mb-4 border-2 border-slate-50" />
             <h4 class="font-bold text-slate-900">{{ member.name }}</h4>
             <p class="text-sm text-[#2563EB] font-medium">{{ member.role }}</p>
@@ -169,6 +169,10 @@ const team = [
   { name: 'Akash Maurya', role: 'QA & Testing', image: '/Team/akash.jpg' },
   { name: 'Girish M', role: 'Code Reviewer', image: '/Team/girish.jpg' }
 ]
+
+const useAvatar = (event) => {
+  event.target.src = `https://ui-avatars.com/api/?name=${encodeURIComponent(event.target.alt)}&background=2563EB&color=fff`
+}
 
 const inputClasses = (hasError) => [
   'w-full px-4 py-3 rounded-lg border transition-all',

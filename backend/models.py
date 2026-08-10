@@ -12,6 +12,13 @@ def now_ist():
 
 class User(db.Model):
     __tablename__ = 'users'
+    __table_args__ = (
+        # The admin, officer, and worker queues repeatedly scope users by role,
+        # account state, and department. Foreign keys are not indexed
+        # automatically by every database engine.
+        db.Index('ix_users_role_status', 'role', 'status'),
+        db.Index('ix_users_department_role_status', 'department_id', 'role', 'status'),
+    )
 
     id         = db.Column(db.Integer, primary_key=True, autoincrement=True)
     name       = db.Column(db.String(255), nullable=False)
@@ -93,6 +100,13 @@ class Department(db.Model):
 
 class Complaint(db.Model):
     __tablename__ = 'complaints'
+    __table_args__ = (
+        # Matches the citizen list/dashboard, officer queue, and admin queue
+        # query patterns without changing the persisted data shape.
+        db.Index('ix_complaints_citizen_status_created', 'created_by', 'status', 'created_at'),
+        db.Index('ix_complaints_officer_status', 'assigned_officer', 'status'),
+        db.Index('ix_complaints_department_status', 'department', 'status'),
+    )
 
     id               = db.Column(db.Integer,    primary_key=True, autoincrement=True)
     title            = db.Column(db.String(255), nullable=False)
@@ -128,6 +142,9 @@ class Complaint(db.Model):
 
 class StatusLog(db.Model):
     __tablename__ = 'status_logs'
+    __table_args__ = (
+        db.Index('ix_status_logs_complaint_changed', 'complaint_id', 'changed_at'),
+    )
 
     id           = db.Column(db.Integer,     primary_key=True, autoincrement=True)
     complaint_id = db.Column(db.Integer,     db.ForeignKey('complaints.id'), nullable=False)
@@ -172,6 +189,9 @@ class Feedback(db.Model):
 
 class Notification(db.Model):
     __tablename__ = 'notifications'
+    __table_args__ = (
+        db.Index('ix_notifications_user_read_created', 'user_id', 'is_read', 'created_at'),
+    )
 
     id           = db.Column(db.Integer,     primary_key=True, autoincrement=True)
     user_id      = db.Column(db.Integer,     db.ForeignKey('users.id'), nullable=False)
@@ -190,6 +210,9 @@ class Notification(db.Model):
 
 class Assignment(db.Model):
     __tablename__ = 'assignments'
+    __table_args__ = (
+        db.Index('ix_assignments_worker_complaint', 'worker_id', 'complaint_id'),
+    )
 
     id           = db.Column(db.Integer,  primary_key=True, autoincrement=True)
     complaint_id = db.Column(db.Integer,  db.ForeignKey('complaints.id'), nullable=False)
@@ -206,6 +229,9 @@ class Assignment(db.Model):
 # ─────────────────────────────────────────────────────────────────────────────
 class ActivityLog(db.Model):
     __tablename__ = 'activity_logs'
+    __table_args__ = (
+        db.Index('ix_activity_logs_user_created', 'user_id', 'created_at'),
+    )
 
     id            = db.Column(db.Integer,     primary_key=True, autoincrement=True)
     user_id       = db.Column(db.Integer,     db.ForeignKey('users.id'), nullable=False)
@@ -243,6 +269,9 @@ class TokenBlocklist(db.Model):
 # ─────────────────────────────────────────────────────────────────────────────
 class LoginSession(db.Model):
     __tablename__ = 'login_sessions'
+    __table_args__ = (
+        db.Index('ix_login_sessions_user_status_created', 'user_id', 'status', 'created_at'),
+    )
 
     id             = db.Column(db.Integer,     primary_key=True, autoincrement=True)
     user_id        = db.Column(db.Integer,     db.ForeignKey('users.id'), nullable=False)
@@ -353,6 +382,16 @@ def init_db(app, admin_config):
     db.init_app(app)
     with app.app_context():
         db.create_all()
+        # create_all() does not add indexes to an already-created table on all
+        # SQLAlchemy dialects. Creating named indexes with checkfirst is
+        # idempotent and preserves existing SQLite/PostgreSQL data.
+        for table in (
+            User.__table__, Complaint.__table__, StatusLog.__table__,
+            Notification.__table__, Assignment.__table__, ActivityLog.__table__,
+            LoginSession.__table__,
+        ):
+            for index in table.indexes:
+                index.create(bind=db.engine, checkfirst=True)
         if not User.query.filter_by(role="Admin").first():
             admin = User(
                 name=admin_config.get("name") or "Administrator",
