@@ -145,3 +145,52 @@ def registered_officer(sample_officer_data):
             "password": sample_officer_data["password"]
         }
     }
+
+
+###########################################################
+
+@pytest.fixture
+def citizen_auth_headers(client, registered_user):
+    """Get authentication headers for citizen user."""
+
+    credentials = registered_user['raw_credentials']
+
+    response = client.post('/api/login', json={
+        'email': credentials['email'],
+        'password': credentials['password']
+    })
+    data = response.get_json()
+    return {
+        'Authorization': f"Bearer {data['access_token']}",
+        'refresh_token': data['refresh_token'],
+        'user_id': registered_user['user_record'].id
+    }
+
+
+@pytest.fixture
+def sample_complaint_data():
+    """Sample complaint data for testing."""
+    return {
+        "title": "Pothole on Main Road",
+        "category": "Potholes",
+        "priority": "High",
+        "description": "There is a large pothole on Main Road near the market. It has been there for weeks and is causing traffic issues.",
+        "city": "Mumbai",
+        "ward": "Ward 5",
+        "area": "Andheri East",
+        "street": "Main Road",
+        "landmark": "Near City Market",
+        "incidentDate": "2026-08-01",
+        "visitTime": "10:00 AM",
+        "urgencyNote": "This needs immediate attention as it's causing accidents."
+    }
+
+@pytest.fixture
+def created_complaint(client, citizen_auth_headers, sample_complaint_data):
+    """Create a complaint and return the complaint ID."""
+    response = client.post('/api/citizen/complaints', 
+                          data=sample_complaint_data,
+                          headers=citizen_auth_headers,
+                          content_type='multipart/form-data')
+    data = response.get_json()
+    return data['complaint']['raw_id']
