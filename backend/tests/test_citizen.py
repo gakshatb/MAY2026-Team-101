@@ -50,3 +50,18 @@ def test_submit_complaint_with_image(client, citizen_auth_headers, sample_compla
     complaint = Complaint.query.get(complaint_id)
     assert complaint.images is not None
     assert len(complaint.images) > 0
+
+
+def test_submit_complaint_invalid_category(client, citizen_auth_headers, sample_complaint_data):
+    """Test complaint submission with invalid category."""
+    data = sample_complaint_data.copy()
+    data['category'] = 'Invalid Category'
+    
+    response = client.post('/api/citizen/complaints',
+                          data=data,
+                          headers=citizen_auth_headers,
+                          content_type='multipart/form-data')
+    data = response.get_json()
+    
+    assert response.status_code == 400
+    assert 'Invalid category' in data['message']
