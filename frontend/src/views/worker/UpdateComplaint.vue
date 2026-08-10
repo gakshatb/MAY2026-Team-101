@@ -355,7 +355,9 @@
 </template>
 
 <script setup>
-import { ref, reactive, computed } from 'vue'
+import { ref, reactive, computed, onMounted } from 'vue'
+import { useRoute } from 'vue-router'
+import axios from 'axios'
 import Sidebar from '@/components/dashboard/Sidebar.vue'
 import DashboardNavbar from '@/components/dashboard/DashboardNavbar.vue'
 import { 
@@ -370,6 +372,7 @@ const showIssueReporting = ref(false)
 const showConfirmModal = ref(false)
 const showSuccessModal = ref(false)
 const isSubmitting = ref(false)
+const route = useRoute()
 
 const form = reactive({
   status: 'In Progress',
@@ -397,7 +400,7 @@ const complaint = reactive({
 })
 
 const stages = ['Assigned', 'Accepted', 'Travelling', 'Reached Site', 'Work Started', 'In Progress', 'Quality Check', 'Completed']
-const statusOptions = ['Accepted', 'Travelling', 'Reached Site', 'Work Started', 'In Progress', 'Waiting for Materials', 'Temporarily Paused', 'Completed']
+const statusOptions = ['In Progress', 'Resolved']
 
 const siteChecklist = reactive({
   'Reached Location': true,
@@ -456,12 +459,12 @@ const priorityBadge = (priority) => {
 }
 
 const statusBadge = (status) => {
-  const map = { 'Assigned': 'bg-slate-100 text-slate-700', 'In Progress': 'bg-amber-100 text-amber-700', 'Completed': 'bg-green-100 text-green-700' }
+  const map = { 'Assigned': 'bg-slate-100 text-slate-700', 'In Progress': 'bg-amber-100 text-amber-700', 'Resolved': 'bg-green-100 text-green-700' }
   return map[status] || 'bg-slate-100 text-slate-700'
 }
 
 const handleStatusChange = () => {
-  if (form.status === 'Completed') form.progress = 100
+  if (form.status === 'Resolved') form.progress = 100
   if (form.status === 'Work Started' && form.progress === 0) form.progress = 10
 }
 
@@ -482,11 +485,34 @@ const openConfirmModal = () => showConfirmModal.value = true
 
 const processUpdate = async () => {
   isSubmitting.value = true
-  await new Promise(resolve => setTimeout(resolve, 1500)) // Simulate network request
-  isSubmitting.value = false
-  showConfirmModal.value = false
-  showSuccessModal.value = true
+  try {
+    const { data } = await axios.patch(
+      `http://127.0.0.1:5000/api/worker/tasks/${route.params.id}/status`,
+      { status: form.status, notes: form.notes },
+      { headers: { Authorization: `Bearer ${localStorage.getItem('token')}` } }
+    )
+    Object.assign(complaint, data.task)
+    showConfirmModal.value = false
+    showSuccessModal.value = true
+  } catch (error) {
+    alert(error.response?.data?.message || 'Unable to update this task. Please try again.')
+  } finally {
+    isSubmitting.value = false
+  }
 }
+
+onMounted(async () => {
+  try {
+    const { data } = await axios.get(
+      `http://127.0.0.1:5000/api/worker/tasks/${route.params.id}`,
+      { headers: { Authorization: `Bearer ${localStorage.getItem('token')}` } }
+    )
+    Object.assign(complaint, data.task)
+    form.status = data.task.status === 'Assigned' ? 'In Progress' : data.task.status
+  } catch (error) {
+    alert(error.response?.data?.message || 'Unable to load this task.')
+  }
+})
 </script>
 
 <style scoped>

@@ -293,7 +293,8 @@
 </template>
 
 <script setup>
-import { ref, reactive, computed } from 'vue'
+import { ref, reactive, computed, onMounted } from 'vue'
+import axios from 'axios'
 import Sidebar from '@/components/dashboard/Sidebar.vue'
 import DashboardNavbar from '@/components/dashboard/DashboardNavbar.vue'
 import { 
@@ -325,12 +326,12 @@ const summaryStats = [
   { title: 'Overdue', value: '1', icon: AlertTriangle, iconBg: 'bg-red-50', iconColor: 'text-red-600' }
 ]
 
-const tasks = [
+const tasks = ref([
   { id: 'CMP-8902', title: 'Fallen Live Wire near Park', category: 'Electrical', priority: 'Emergency', status: 'Travelling', area: 'Downtown Sector 4', ward: 'Ward 14', dateAssigned: 'Jul 09, 2026', deadline: 'Today, 12:00 PM', officer: 'Officer S. Patel', description: 'Extremely dangerous live wire fallen on the main pedestrian walkway. Isolate the area immediately.', image: 'https://images.unsplash.com/photo-1544257121-654dbbc305e7?w=150&h=150&fit=crop', instructions: 'Priority 1. Ensure safety gear is worn. Wait for power grid shutdown confirmation before handling.', materials: ['Safety Gloves Class 2', 'Warning Cones', 'Insulation Tape', 'Barricade Tape'] },
   { id: 'CMP-8875', title: 'Deep Pothole causing traffic', category: 'Road Maintenance', priority: 'High', status: 'In Progress', area: 'MG Road', ward: 'Ward 12', dateAssigned: 'Jul 08, 2026', deadline: 'Today, 05:00 PM', officer: 'Officer R. Kumar', description: 'Large pothole developed after recent rains causing severe traffic jams during peak hours.', image: 'https://images.unsplash.com/photo-1515162816999-a0c47dc192f7?w=150&h=150&fit=crop', instructions: 'Clear debris, apply cold mix asphalt, and compact thoroughly. Ensure traffic flow is managed.', materials: ['Cold Mix Asphalt', 'Compactor', 'Warning Cones'] },
   { id: 'CMP-8850', title: 'Blocked Drainage outside Metro Station', category: 'Drainage', priority: 'Medium', status: 'Assigned', area: 'North Zone', ward: 'Ward 8', dateAssigned: 'Jul 08, 2026', deadline: 'Tomorrow, 10:00 AM', officer: 'Officer P. Sharma', description: 'Water logging reported due to blocked storm water drain. Needs immediate clearing before next rain.', image: 'https://images.unsplash.com/photo-1584985614946-bdeeb2bc4db1?w=150&h=150&fit=crop', instructions: 'Use jetting machine to clear blockages. Remove silt and solid waste from the drain cover.', materials: ['Jetting Machine', 'Gum Boots', 'Silt Shovel'] },
   { id: 'CMP-8812', title: 'Overflowing public dustbin', category: 'Garbage', priority: 'Low', status: 'Work Started', area: 'South Suburbs', ward: 'Ward 2', dateAssigned: 'Jul 07, 2026', deadline: 'Today, 02:00 PM', officer: 'Officer R. Kumar', description: 'Dustbin overflowing and spreading bad odor in the residential area. Needs emptying and sanitization.', image: 'https://images.unsplash.com/photo-1532996122724-e3c354a0b15b?w=150&h=150&fit=crop', instructions: 'Empty bin into compactor truck. Spray area with municipal sanitizer powder.', materials: ['Garbage Truck', 'Sanitizer Powder', 'Gloves'] },
-]
+])
 
 const schedule = [
   { title: 'Morning Briefing', time: '08:30 AM', status: 'past' },
@@ -342,7 +343,7 @@ const schedule = [
 
 // --- Computed & Methods ---
 const filteredTasks = computed(() => {
-  let result = tasks
+  let result = [...tasks.value]
 
   // Search
   if (filters.search) {
@@ -404,6 +405,20 @@ const actionButtonIcon = (status) => {
   if (status === 'Work Started' || status === 'In Progress') return Play
   return CheckCircle
 }
+
+onMounted(async () => {
+  try {
+    const { data } = await axios.get('http://127.0.0.1:5000/api/worker/tasks', {
+      headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
+    })
+    // Preserve the presentation-only fields while replacing task ownership,
+    // title, location, priority, and status with the live API response.
+    tasks.value = data.tasks.map(task => ({ ...task, ward: '', deadline: '', dateAssigned: task.assigned_at, description: '', image: task.images?.[0] }))
+  } catch (error) {
+    // Keep the screen usable with its existing empty state if the API is unavailable.
+    tasks.value = []
+  }
+})
 
 </script>
 
