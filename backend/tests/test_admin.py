@@ -55,3 +55,18 @@ def test_approve_pending_officer(client, admin_auth_headers, registered_officer)
     # Verify user status changed
     user = User.query.get(registered_officer['user_record'].id)
     assert user.status == 'active'
+
+
+def test_reject_pending_officer(client, admin_auth_headers, registered_officer):
+    """Test rejecting a pending officer."""
+    response = client.patch(f'/api/admin/users/{registered_officer['user_record'].id}/reject',
+                           headers=admin_auth_headers)
+    data = response.get_json()
+    
+    assert response.status_code == 200
+    assert data['success'] is True
+    assert 'rejected' in data['message']
+    
+    # Verify user status changed
+    user = User.query.get(registered_officer['user_record'].id)
+    assert user.status == 'rejected'
