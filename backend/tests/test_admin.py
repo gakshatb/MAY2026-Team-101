@@ -31,3 +31,8 @@ def test_admin_dashboard_success(client, admin_auth_headers):
     assert 'total_workers' in top_stats
     assert 'total_complaints' in top_stats
     assert 'resolved_today' in top_stats
+
+def test_admin_dashboard_requires_auth(client):
+    """Test dashboard requires authentication."""
+    response = client.get('/api/admin/dashboard')
+    assert response.status_code == 401
