@@ -133,3 +133,26 @@ def test_create_duplicate_department(client, admin_auth_headers, test_department
     
     assert response.status_code == 409
     assert 'already exists' in data['message']
+
+def test_update_department_success(client, admin_auth_headers, test_department):
+    """Test updating a department."""
+    update_data = {
+        "name": "Updated Department",
+        "code": "UPD",
+        "description": "Updated description",
+        "status": "Inactive"
+    }
+    
+    response = client.put(f'/api/admin/departments/{test_department.id}',
+                         json=update_data,
+                         headers=admin_auth_headers)
+    data = response.get_json()
+    
+    assert response.status_code == 200
+    assert data['success'] is True
+    assert 'Department updated' in data['message']
+    
+    # Verify in database
+    dept = Department.query.get(test_department.id)
+    assert dept.department_name == update_data['name']
+    assert dept.status == update_data['status']
