@@ -230,3 +230,18 @@ def test_list_notifications_success(client, citizen_auth_headers):
     assert 'all' in data['summary']
     assert 'unread' in data['summary']
     assert 'read' in data['summary']
+
+def test_get_profile_success(client, citizen_auth_headers):
+    """Test getting citizen profile."""
+    response = client.get('/api/citizen/profile',
+                         headers=citizen_auth_headers)
+    data = response.get_json()
+    
+    assert response.status_code == 200
+    assert data['success'] is True
+    assert 'profile' in data
+    assert data['profile']['fullName'] == 'John Doe'
+    assert data['profile']['email'] == 'john.doe@example.com'
+    assert data['profile']['mobile'] == '9876543210'
+    assert 'accountId' in data['profile']
+    assert 'memberSince' in data['profile']
