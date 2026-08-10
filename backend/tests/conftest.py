@@ -4,7 +4,7 @@ import pytest
 from flask import Flask
 from api_auth_utils import limiter
 from werkzeug.security import generate_password_hash
-from models import db ,User
+from models import db ,User , Department
 # Add parent directory to path for imports
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
@@ -242,6 +242,7 @@ def sample_complaint_data():
 
 @pytest.fixture
 def created_complaint(client, citizen_auth_headers, sample_complaint_data):
+
     """Create a complaint and return the complaint ID."""
     response = client.post('/api/citizen/complaints', 
                           data=sample_complaint_data,
@@ -249,3 +250,19 @@ def created_complaint(client, citizen_auth_headers, sample_complaint_data):
                           content_type='multipart/form-data')
     data = response.get_json()
     return data['complaint']['raw_id']
+
+
+@pytest.fixture
+def test_department(registered_admin):
+    """Create a test department."""
+    dept = Department(
+        department_name="Test Department",
+        code="TEST",
+        description="Test department for admin tests",
+        status="Active",
+        user_id=registered_admin['user_record'].id
+    )
+    db.session.add(dept)
+    db.session.commit()
+    db.session.refresh(dept)
+    return dept

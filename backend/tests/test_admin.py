@@ -116,3 +116,20 @@ def test_create_department_success(client, admin_auth_headers):
     dept = Department.query.filter_by(department_name=dept_data['name']).first()
     assert dept is not None
     assert dept.code == dept_data['code']
+
+def test_create_duplicate_department(client, admin_auth_headers, test_department):
+    """Test creating a department with duplicate name."""
+    dept_data = {
+        "name": test_department.department_name,
+        "code": "DUP",
+        "description": "Duplicate department",
+        "status": "Active"
+    }
+    
+    response = client.post('/api/admin/departments',
+                          json=dept_data,
+                          headers=admin_auth_headers)
+    data = response.get_json()
+    
+    assert response.status_code == 409
+    assert 'already exists' in data['message']
