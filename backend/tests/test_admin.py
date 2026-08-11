@@ -248,3 +248,23 @@ def test_reactivate_officer(client, admin_auth_headers, pending_officer):
     officer = User.query.get(pending_officer.id)
     assert officer.status == 'active'
 
+def test_transfer_officer(client, admin_auth_headers, pending_officer, test_department):
+    """Test transferring an officer to another department."""
+    # Approve the officer
+    client.patch(f'/api/admin/users/{pending_officer.id}/approve',
+                headers=admin_auth_headers)
+    
+    # Transfer
+    response = client.patch(f'/api/admin/officers/{pending_officer.id}/transfer',
+                           json={"departmentId": test_department.id},
+                           headers=admin_auth_headers)
+    data = response.get_json()
+    
+    assert response.status_code == 200
+    assert data['success'] is True
+    assert 'transferred' in data['message']
+    
+    # Verify
+    officer = User.query.get(pending_officer.id)
+    assert officer.department_id == test_department.id
+
