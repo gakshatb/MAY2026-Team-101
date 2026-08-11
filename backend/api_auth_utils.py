@@ -40,7 +40,7 @@ ACTIVITY_TYPES = {
     'profile_updated', 'profile_photo_updated', 'profile_photo_removed',
     'complaint_submitted', 'complaint_assigned', 'complaint_sent_back',
     'complaint_returned', 'complaint_status_updated', 'complaint_closed',
-    'worker_assigned', 'task_completed', 'feedback_submitted',
+    'worker_assigned', 'worker_status_updated', 'task_completed', 'feedback_submitted',
     'officer_approved', 'officer_rejected', 'officer_suspended',
     'officer_reactivated', 'officer_updated', 'officer_transferred',
     'department_created', 'department_updated', 'department_deleted',

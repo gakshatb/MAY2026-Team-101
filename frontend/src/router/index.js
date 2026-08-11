@@ -102,9 +102,9 @@ const router = createRouter({
       children: [
         { path: 'dashboard', name: 'OfficerDashboard', component: OfficerDashboard, meta: { title: 'Officer Dashboard | CivicDesk', pageTitle: 'Dashboard' } },
         { path: 'complaints', name: 'OfficerComplaintManagement', component: ComplaintManagement, meta: { title: 'Complaint Management | CivicDesk', pageTitle: 'Complaint Management' } },
-        { path: 'complaintdetails/:id', name: 'OfficerComplaintDetails', component: OfficerComplaintDetails, meta: { title: 'Complaint Details | CivicDesk', pageTitle: 'Complaint Details' }, props: true },
+        { path: 'complaintdetails/:id?', name: 'OfficerComplaintDetails', component: OfficerComplaintDetails, meta: { title: 'Complaint Details | CivicDesk', pageTitle: 'Complaint Details' }, props: true },
         { path: 'workers', name: 'ManageWorkers', component: ManageWorkers, meta: { title: 'Manage Workers | CivicDesk', pageTitle: 'Manage Workers' } },
-        { path: 'assign/:id', name: 'AssignWorker', component: AssignWorker, meta: { title: 'Assign Worker | CivicDesk', pageTitle: 'Assign Worker' }, props: true },
+        { path: 'assign/:id?', name: 'AssignWorker', component: AssignWorker, meta: { title: 'Assign Worker | CivicDesk', pageTitle: 'Assign Worker' }, props: true },
         { path: 'analytics', name: 'AnalyticsReports', component: AnalyticsReports, meta: { title: 'Analytics | CivicDesk', pageTitle: 'Analytics & Reports' } },
         { path: 'notifications', name: 'OfficerNotifications', component: OfficerNotifications, meta: { title: 'Notifications | CivicDesk', pageTitle: 'Notifications' } },
         { path: 'profile', name: 'OfficerProfile', component: OfficerProfile, meta: { title: 'Profile | CivicDesk', pageTitle: 'Profile' } },
