@@ -400,3 +400,16 @@ def test_create_announcement_publish(client, admin_auth_headers):
     assert response.status_code == 201
     assert data['success'] is True
     assert data['announcement']['status'] == 'Published'
+
+
+def test_list_announcements(client, admin_auth_headers):
+    """Test listing all announcements."""
+    response = client.get('/api/admin/announcements', headers=admin_auth_headers)
+    data = response.get_json()
+    
+    assert response.status_code == 200
+    assert data['success'] is True
+    assert 'announcements' in data
+    assert 'top_stats' in data
+    assert 'quick_insights' in data
+    assert 'pinned' in data
