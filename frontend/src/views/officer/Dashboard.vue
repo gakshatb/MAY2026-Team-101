@@ -364,7 +364,7 @@ import Chart from 'chart.js/auto'
 import { 
   MapPin, Calendar, TrendingUp, TrendingDown, Activity, ClipboardList, Users, 
   UserCheck, Clock, ShieldCheck, Building, CheckCircle, AlertTriangle, Search, 
-  BarChart3, PieChart, Star, FileText, Bell, Award, Flag, Edit, Settings
+  BarChart3, PieChart, Star, FileText, Bell, Award, Flag, Edit, Settings, Eye
 } from 'lucide-vue-next'
 
 const API_BASE = 'http://127.0.0.1:5000/api/officer'
