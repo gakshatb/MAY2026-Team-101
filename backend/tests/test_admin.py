@@ -622,3 +622,20 @@ def test_activity_logs_with_limit(client, admin_auth_headers):
     assert response.status_code == 200
     assert data['success'] is True
     assert len(data['logs']) <= 10
+
+def test_admin_endpoints_require_auth(client):
+    """Test that all admin endpoints require authentication."""
+    endpoints = [
+        '/api/admin/dashboard',
+        '/api/admin/departments',
+        '/api/admin/officers',
+        '/api/admin/complaints',
+        '/api/admin/announcements',
+        '/api/admin/analytics',
+        '/api/admin/profile',
+        '/api/admin/activity-logs'
+    ]
+    
+    for endpoint in endpoints:
+        response = client.get(endpoint)
+        assert response.status_code == 401
