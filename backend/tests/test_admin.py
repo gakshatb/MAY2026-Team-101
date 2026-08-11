@@ -568,3 +568,30 @@ def test_admin_profile_requires_admin_role(client, citizen_auth_headers):
     """Test profile requires admin role."""
     response = client.get('/api/admin/profile', headers=citizen_auth_headers)
     assert response.status_code in [403, 401]
+
+def test_system_analytics_success(client, admin_auth_headers):
+    """Test system analytics endpoint."""
+    response = client.get('/api/admin/analytics', headers=admin_auth_headers)
+    data = response.get_json()
+    
+    assert response.status_code == 200
+    assert data['success'] is True
+    assert 'kpis' in data
+    assert 'insights' in data
+    assert 'emergency' in data
+    assert 'department_analytics' in data
+    assert 'category_breakdown' in data
+    assert 'status_breakdown' in data
+    assert 'satisfaction' in data
+    assert 'top_officers' in data
+    assert 'top_workers' in data
+    assert 'growth_trend' in data
+    
+    # Check KPIs
+    kpis = data['kpis']
+    assert 'total_complaints' in kpis
+    assert 'open_complaints' in kpis
+    assert 'resolved_complaints' in kpis
+    assert 'total_citizens' in kpis
+    assert 'total_officers' in kpis
+    assert 'departments' in kpis
