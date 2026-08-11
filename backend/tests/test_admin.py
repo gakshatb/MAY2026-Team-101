@@ -557,3 +557,10 @@ def test_update_admin_profile(client, admin_auth_headers):
     user = User.query.filter_by(email='admin1@gmail.com').first()
     assert user.name == update_data['name']
     assert user.phone == update_data['phone']
+
+
+def test_admin_profile_requires_auth(client):
+    """Test profile requires authentication."""
+    response = client.get('/api/admin/profile')
+    assert response.status_code == 401
+
