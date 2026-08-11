@@ -612,3 +612,13 @@ def test_activity_logs_success(client, admin_auth_headers):
     assert 'security_events' in data
     assert 'critical_events' in data
     assert 'active_users' in data
+
+def test_activity_logs_with_limit(client, admin_auth_headers):
+    """Test activity logs with limit parameter."""
+    response = client.get('/api/admin/activity-logs?limit=10',
+                         headers=admin_auth_headers)
+    data = response.get_json()
+    
+    assert response.status_code == 200
+    assert data['success'] is True
+    assert len(data['logs']) <= 10
