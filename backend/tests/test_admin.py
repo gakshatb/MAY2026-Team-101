@@ -526,3 +526,34 @@ def test_get_admin_profile(client, admin_auth_headers):
     # Check profile data
     assert data['profile']['name'] == 'Admin'
     assert data['profile']['email'] == 'admin1@gmail.com'
+
+
+def test_update_admin_profile(client, admin_auth_headers):
+    """Test updating admin profile."""
+    update_data = {
+        "name": "Updated Admin",
+        "phone": "9876543219",
+        "address": "New Address",
+        "city": "New City",
+        "state": "New State",
+        "zip": "400099",
+        "gender": "Female",
+        "designation": "Senior Administrator",
+        "nationality": "Indian",
+        "emergency": "9876543220",
+        "recoveryEmail": "recovery@example.com"
+    }
+    
+    response = client.put('/api/admin/profile',
+                         json=update_data,
+                         headers=admin_auth_headers)
+    data = response.get_json()
+    
+    assert response.status_code == 200
+    assert data['success'] is True
+    assert 'Profile updated successfully' in data['message']
+    
+    # Verify
+    user = User.query.filter_by(email='admin1@gmail.com').first()
+    assert user.name == update_data['name']
+    assert user.phone == update_data['phone']
