@@ -123,6 +123,7 @@ def sample_officer_data():
     }
 
 
+
 @pytest.fixture
 def sample_user_data():
     """Sample valid user data for registration and login tests."""
@@ -201,7 +202,9 @@ def registered_officer(sample_officer_data):
         }
     }
 
-
+@pytest.fixture
+def pending_officer(registered_officer):
+    return registered_officer['user_record']
 
 
 ###########################################################

@@ -226,3 +226,25 @@ def test_suspend_officer(client, admin_auth_headers, registered_officer):
     
     officer = User.query.get(registered_officer['user_record'].id)
     assert officer.status == 'suspended'
+
+def test_reactivate_officer(client, admin_auth_headers, pending_officer):
+    """Test reactivating a suspended officer."""
+    
+    client.patch(f'/api/admin/users/{pending_officer.id}/approve',
+                headers=admin_auth_headers)
+    client.patch(f'/api/admin/officers/{pending_officer.id}/suspend',
+                json={"reason": "Test"},
+                headers=admin_auth_headers)
+   
+    response = client.patch(f'/api/admin/officers/{pending_officer.id}/reactivate',
+                           headers=admin_auth_headers)
+    data = response.get_json()
+    
+    assert response.status_code == 200
+    assert data['success'] is True
+    assert 'reactivated' in data['message']
+    
+
+    officer = User.query.get(pending_officer.id)
+    assert officer.status == 'active'
+
