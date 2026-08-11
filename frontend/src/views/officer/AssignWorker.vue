@@ -9,7 +9,7 @@
                 <span class="mx-2">›</span>
                 <router-link to="/officer/complaints" class="hover:text-[#2563EB] transition-colors">Complaint Management</router-link>
                 <span class="mx-2">›</span>
-                <router-link to="/officer/details/CMP-2026-0892" class="hover:text-[#2563EB] transition-colors">CMP-2026-0892</router-link>
+                <router-link :to="`/officer/complaintdetails/${route.params.id}`" class="hover:text-[#2563EB] transition-colors">{{ complaint.id }}</router-link>
                 <span class="mx-2">›</span>
                 <span class="text-slate-900 font-semibold">Assign Worker</span>
               </nav>
@@ -18,16 +18,14 @@
             </div>
             
             <div class="flex gap-2">
-              <button class="p-2.5 bg-white border border-slate-200 text-slate-600 rounded-lg hover:bg-slate-50 transition-colors tooltip-trigger">
-                <Printer class="w-4 h-4" />
-              </button>
-              <button class="p-2.5 bg-white border border-slate-200 text-slate-600 rounded-lg hover:bg-slate-50 transition-colors tooltip-trigger">
-                <Download class="w-4 h-4" />
-              </button>
-              <button class="px-4 py-2 bg-white border border-slate-200 text-slate-700 font-medium rounded-lg hover:bg-slate-50 transition-colors flex items-center gap-2">
+              <router-link :to="`/officer/complaintdetails/${route.params.id}`" class="px-4 py-2 bg-white border border-slate-200 text-slate-700 font-medium rounded-lg hover:bg-slate-50 transition-colors flex items-center gap-2">
                 <Eye class="w-4 h-4 text-slate-400" /> View Complaint
-              </button>
+              </router-link>
             </div>
+          </div>
+
+          <div v-if="loadError" class="bg-red-50 border border-red-100 text-red-600 text-sm rounded-[14px] p-4 flex items-center justify-between">
+            {{ loadError }} <button @click="fetchAll" class="font-bold underline shrink-0 ml-4">Retry</button>
           </div>
 
           <div class="grid grid-cols-2 md:grid-cols-5 gap-4">
@@ -35,42 +33,42 @@
               <div class="w-10 h-10 rounded-full bg-green-50 text-[#22C55E] flex items-center justify-center shrink-0"><UserCheck class="w-5 h-5" /></div>
               <div>
                 <p class="text-xs font-medium text-slate-500">Available</p>
-                <p class="text-lg font-bold text-slate-900">18</p>
+                <p class="text-lg font-bold text-slate-900">{{ (summary.active ?? 0) - (summary.busyNow ?? 0) }}</p>
               </div>
             </div>
             <div class="bg-white p-4 rounded-[14px] shadow-sm border border-slate-100 flex items-center gap-4">
               <div class="w-10 h-10 rounded-full bg-amber-50 text-amber-500 flex items-center justify-center shrink-0"><Briefcase class="w-5 h-5" /></div>
               <div>
                 <p class="text-xs font-medium text-slate-500">Busy Workers</p>
-                <p class="text-lg font-bold text-slate-900">42</p>
+                <p class="text-lg font-bold text-slate-900">{{ summary.busyNow ?? 0 }}</p>
               </div>
             </div>
             <div class="bg-white p-4 rounded-[14px] shadow-sm border border-slate-100 flex items-center gap-4">
               <div class="w-10 h-10 rounded-full bg-blue-50 text-[#2563EB] flex items-center justify-center shrink-0"><Users class="w-5 h-5" /></div>
               <div>
                 <p class="text-xs font-medium text-slate-500">Total Workers</p>
-                <p class="text-lg font-bold text-slate-900">64</p>
+                <p class="text-lg font-bold text-slate-900">{{ summary.total ?? 0 }}</p>
               </div>
             </div>
             <div class="bg-white p-4 rounded-[14px] shadow-sm border border-slate-100 flex items-center gap-4">
-              <div class="w-10 h-10 rounded-full bg-red-50 text-red-500 flex items-center justify-center shrink-0"><AlertTriangle class="w-5 h-5" /></div>
+              <div class="w-10 h-10 rounded-full bg-purple-50 text-purple-500 flex items-center justify-center shrink-0"><Star class="w-5 h-5" /></div>
               <div>
-                <p class="text-xs font-medium text-slate-500">Emergency Tasks</p>
-                <p class="text-lg font-bold text-slate-900">3</p>
+                <p class="text-xs font-medium text-slate-500">Avg Rating</p>
+                <p class="text-lg font-bold text-slate-900">{{ summary.avgRating ?? '—' }}</p>
               </div>
             </div>
             <div class="bg-white p-4 rounded-[14px] shadow-sm border border-slate-100 flex items-center gap-4">
-              <div class="w-10 h-10 rounded-full bg-purple-50 text-purple-500 flex items-center justify-center shrink-0"><Clock class="w-5 h-5" /></div>
+              <div class="w-10 h-10 rounded-full bg-teal-50 text-teal-600 flex items-center justify-center shrink-0"><Clipboard class="w-5 h-5" /></div>
               <div>
-                <p class="text-xs font-medium text-slate-500">Avg Response</p>
-                <p class="text-lg font-bold text-slate-900">1.2 Hrs</p>
+                <p class="text-xs font-medium text-slate-500">Completed Total</p>
+                <p class="text-lg font-bold text-slate-900">{{ summary.completedTotal ?? 0 }}</p>
               </div>
             </div>
           </div>
 
-          <div class="bg-white rounded-[14px] shadow-sm border border-slate-100 p-5 flex flex-col md:flex-row gap-6">
-            <div class="w-full md:w-32 h-24 rounded-lg overflow-hidden shrink-0 border border-slate-200">
-              <img :src="complaint.image" alt="Thumbnail" class="w-full h-full object-cover" />
+          <div v-if="!isLoading" class="bg-white rounded-[14px] shadow-sm border border-slate-100 p-5 flex flex-col md:flex-row gap-6">
+            <div class="w-full md:w-32 h-24 rounded-lg overflow-hidden shrink-0 border border-slate-200 bg-slate-50">
+              <img v-if="complaint.images?.length" :src="`http://127.0.0.1:5000${complaint.images[0]}`" alt="Thumbnail" class="w-full h-full object-cover" />
             </div>
             <div class="flex-1">
               <div class="flex flex-wrap items-start justify-between gap-3 mb-2">
@@ -84,11 +82,12 @@
               <p class="text-sm text-slate-600 line-clamp-2 mb-3">{{ complaint.description }}</p>
               <div class="flex flex-wrap gap-x-6 gap-y-2 text-sm">
                 <span class="flex items-center gap-1.5 text-slate-500"><Building class="w-4 h-4 text-slate-400" /> {{ complaint.category }}</span>
-                <span class="flex items-center gap-1.5 text-slate-500"><MapPin class="w-4 h-4 text-slate-400" /> {{ complaint.area }}, {{ complaint.ward }}</span>
+                <span class="flex items-center gap-1.5 text-slate-500"><MapPin class="w-4 h-4 text-slate-400" /> {{ complaint.location?.area }}, {{ complaint.location?.ward }}</span>
                 <span class="flex items-center gap-1.5 text-slate-500"><Calendar class="w-4 h-4 text-slate-400" /> Target: {{ complaint.targetDate }}</span>
               </div>
             </div>
           </div>
+          <div v-else class="bg-white rounded-[14px] shadow-sm border border-slate-100 p-8 text-center text-slate-400">Loading complaint…</div>
 
           <div class="grid grid-cols-1 xl:grid-cols-12 gap-6">
             
@@ -106,14 +105,6 @@
                 </div>
                 
                 <div class="flex flex-wrap items-center gap-2 w-full lg:w-auto">
-                  <select v-model="filters.department" class="bg-slate-50 border border-slate-200 text-slate-700 text-sm rounded-lg focus:ring-[#2563EB] focus:border-[#2563EB] px-3 py-2">
-                    <option value="All">All Departments</option>
-                    <option value="Road Maintenance">Road Maintenance</option>
-                    <option value="Electrical">Electrical</option>
-                    <option value="Sanitation">Sanitation</option>
-                    <option value="Water Supply">Water Supply</option>
-                  </select>
-
                   <select v-model="filters.availability" class="bg-slate-50 border border-slate-200 text-slate-700 text-sm rounded-lg focus:ring-[#2563EB] focus:border-[#2563EB] px-3 py-2">
                     <option value="All">All Statuses</option>
                     <option value="Available">Available</option>
@@ -123,12 +114,13 @@
                   <select v-model="filters.sort" class="bg-slate-50 border border-slate-200 text-slate-700 text-sm rounded-lg focus:ring-[#2563EB] focus:border-[#2563EB] px-3 py-2">
                     <option value="Lowest Workload">Lowest Workload</option>
                     <option value="Highest Rating">Highest Rating</option>
-                    <option value="Experience">Experience</option>
+                    <option value="Most Completed">Most Completed</option>
                   </select>
                 </div>
               </div>
 
-              <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div v-if="isLoading" class="text-center text-slate-400 py-16">Loading workers…</div>
+              <div v-else class="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div 
                   v-for="worker in filteredWorkers" :key="worker.id" 
                   class="bg-white rounded-[14px] shadow-sm border p-5 transition-all duration-200"
@@ -136,27 +128,27 @@
                 >
                   <div class="flex justify-between items-start mb-3">
                     <div class="flex items-center gap-3">
-                      <img :src="worker.avatar" class="w-12 h-12 rounded-full object-cover border border-slate-200" />
+                      <img :src="workerAvatar(worker)" class="w-12 h-12 rounded-full object-cover border border-slate-200" />
                       <div>
                         <h4 class="font-bold text-slate-900 text-sm leading-tight">{{ worker.name }}</h4>
-                        <p class="text-xs text-slate-500">{{ worker.department }} • {{ worker.experience }} Yrs</p>
+                        <p class="text-xs text-slate-500">{{ worker.department }} • Since {{ worker.memberSince || '—' }}</p>
                       </div>
                     </div>
-                    <span :class="`px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider ${availabilityClass(worker.status)}`">{{ worker.status }}</span>
+                    <span :class="`px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider ${availabilityClass(workerAvailability(worker))}`">{{ workerAvailability(worker) }}</span>
                   </div>
                   
                   <div class="grid grid-cols-2 gap-2 text-xs mb-4">
-                    <div class="flex items-center gap-1.5 text-slate-600"><MapPin class="w-3.5 h-3.5 text-slate-400" /> {{ worker.area }}</div>
-                    <div class="flex items-center gap-1.5 text-slate-600"><Star class="w-3.5 h-3.5 text-amber-400 fill-amber-400" /> {{ worker.rating }} / 5.0</div>
+                    <div class="flex items-center gap-1.5 text-slate-600"><Clipboard class="w-3.5 h-3.5 text-slate-400" /> {{ worker.completedTasks }} completed</div>
+                    <div class="flex items-center gap-1.5 text-slate-600"><Star class="w-3.5 h-3.5 text-amber-400 fill-amber-400" /> {{ worker.avgRating ?? '—' }} / 5.0</div>
                   </div>
 
                   <div class="mb-4">
                     <div class="flex justify-between text-xs mb-1">
                       <span class="font-medium text-slate-600">Current Workload</span>
-                      <span class="font-bold text-slate-900">{{ worker.tasks }} / {{ worker.maxTasks }} Tasks</span>
+                      <span class="font-bold text-slate-900">{{ worker.activeTasks }} active task{{ worker.activeTasks === 1 ? '' : 's' }}</span>
                     </div>
                     <div class="w-full h-1.5 bg-slate-100 rounded-full overflow-hidden">
-                      <div class="h-full rounded-full transition-all duration-500" :class="workloadColor(worker.tasks, worker.maxTasks)" :style="`width: ${(worker.tasks / worker.maxTasks) * 100}%`"></div>
+                      <div class="h-full rounded-full transition-all duration-500" :class="workloadColor(worker.activeTasks)" :style="`width: ${Math.min(100, worker.activeTasks * 25)}%`"></div>
                     </div>
                   </div>
 
@@ -167,35 +159,19 @@
                     </button>
                   </div>
                 </div>
+                <div v-if="filteredWorkers.length === 0" class="md:col-span-2 bg-white p-10 rounded-[14px] border border-slate-100 text-center text-slate-400">No workers match these filters.</div>
               </div>
 
-              <div class="bg-white rounded-[14px] shadow-sm border border-slate-100 overflow-hidden">
-                <div class="p-5 border-b border-slate-100 flex items-center gap-2">
-                  <Clipboard class="w-5 h-5 text-slate-400" />
-                  <h2 class="font-bold text-slate-900">Recent Assignments</h2>
+              <div class="bg-white rounded-[14px] shadow-sm border border-slate-100 p-5">
+                <h2 class="font-bold text-slate-900 mb-4">Assignment History</h2>
+                <div v-if="complaint.history?.length" class="relative pl-4 border-l-2 border-slate-100 space-y-5">
+                  <div v-for="entry in complaint.history" :key="entry.date + entry.time" class="relative">
+                    <div class="absolute -left-[21px] w-2.5 h-2.5 bg-[#F59E0B] rounded-full ring-4 ring-white"></div>
+                    <p class="text-sm font-bold text-slate-900">{{ entry.action }}</p>
+                    <p class="text-xs text-slate-500">{{ entry.date }} • {{ entry.time }}<span v-if="entry.detail"> — {{ entry.detail }}</span></p>
+                  </div>
                 </div>
-                <div class="overflow-x-auto">
-                  <table class="w-full text-left text-sm whitespace-nowrap">
-                    <thead class="bg-slate-50 text-slate-500 font-medium">
-                      <tr>
-                        <th class="px-5 py-3">ID</th>
-                        <th class="px-5 py-3">Worker</th>
-                        <th class="px-5 py-3">Category</th>
-                        <th class="px-5 py-3">Assigned Date</th>
-                        <th class="px-5 py-3">Status</th>
-                      </tr>
-                    </thead>
-                    <tbody class="divide-y divide-slate-100">
-                      <tr v-for="assign in recentAssignments" :key="assign.id" class="hover:bg-slate-50">
-                        <td class="px-5 py-3 font-mono font-medium text-slate-900">{{ assign.id }}</td>
-                        <td class="px-5 py-3 font-medium text-slate-700">{{ assign.worker }}</td>
-                        <td class="px-5 py-3 text-slate-600">{{ assign.category }}</td>
-                        <td class="px-5 py-3 text-slate-500">{{ assign.date }}</td>
-                        <td class="px-5 py-3"><span :class="`px-2 py-0.5 rounded text-[10px] font-bold ${statusBadge(assign.status)}`">{{ assign.status }}</span></td>
-                      </tr>
-                    </tbody>
-                  </table>
-                </div>
+                <p v-else class="text-sm text-slate-400">No history yet for this complaint.</p>
               </div>
             </div>
 
@@ -289,25 +265,6 @@
                 </div>
               </div>
 
-              <div class="bg-white rounded-[14px] shadow-sm border border-slate-100 p-5">
-                <h2 class="font-bold text-slate-900 mb-4">Assignment History</h2>
-                <div class="relative pl-4 border-l-2 border-slate-100 space-y-5">
-                  <div class="relative">
-                    <div class="absolute -left-[21px] w-2.5 h-2.5 bg-[#F59E0B] rounded-full ring-4 ring-white"></div>
-                    <p class="text-sm font-bold text-slate-900">Complaint Verified</p>
-                    <p class="text-xs text-slate-500">Jul 08, 2026 • 10:15 AM</p>
-                  </div>
-                  <div class="relative opacity-40">
-                    <div class="absolute -left-[21px] w-2.5 h-2.5 bg-slate-300 rounded-full ring-4 ring-white"></div>
-                    <p class="text-sm font-bold text-slate-900">Assigned to Worker</p>
-                  </div>
-                  <div class="relative opacity-40">
-                    <div class="absolute -left-[21px] w-2.5 h-2.5 bg-slate-300 rounded-full ring-4 ring-white"></div>
-                    <p class="text-sm font-bold text-slate-900">Work Started</p>
-                  </div>
-                </div>
-              </div>
-
             </div>
           </div>
         </div>
@@ -319,29 +276,30 @@
         <div class="w-full max-w-md bg-white h-full shadow-2xl flex flex-col transform transition-transform animate-slide-in" @click.stop>
           <div class="p-6 border-b border-slate-100 flex justify-between items-start bg-slate-50">
             <div class="flex items-center gap-4">
-              <img :src="activeProfile.avatar" class="w-16 h-16 rounded-full object-cover border-2 border-white shadow-sm" />
+              <img :src="workerAvatar(activeProfile)" class="w-16 h-16 rounded-full object-cover border-2 border-white shadow-sm" />
               <div>
                 <h2 class="text-xl font-bold text-slate-900">{{ activeProfile.name }}</h2>
                 <p class="text-sm text-slate-500">{{ activeProfile.department }}</p>
-                <span :class="`px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider mt-1 inline-block ${availabilityClass(activeProfile.status)}`">{{ activeProfile.status }}</span>
+                <span :class="`px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider mt-1 inline-block ${availabilityClass(workerAvailability(activeProfile))}`">{{ workerAvailability(activeProfile) }}</span>
               </div>
             </div>
             <button @click="profileDrawer = false" class="text-slate-400 hover:text-slate-600"><X class="w-6 h-6"/></button>
           </div>
           
-          <div class="flex-1 overflow-y-auto p-6 space-y-6">
+          <div v-if="isProfileLoading" class="flex-1 flex items-center justify-center text-slate-400">Loading profile…</div>
+          <div v-else class="flex-1 overflow-y-auto p-6 space-y-6">
             <div class="grid grid-cols-2 gap-4">
               <div class="p-4 bg-slate-50 rounded-xl border border-slate-100">
-                <p class="text-xs font-medium text-slate-500 mb-1">Experience</p>
-                <p class="font-bold text-slate-900">{{ activeProfile.experience }} Years</p>
+                <p class="text-xs font-medium text-slate-500 mb-1">Member Since</p>
+                <p class="font-bold text-slate-900">{{ activeProfile.memberSince || '—' }}</p>
               </div>
               <div class="p-4 bg-slate-50 rounded-xl border border-slate-100">
                 <p class="text-xs font-medium text-slate-500 mb-1">Rating</p>
-                <p class="font-bold text-slate-900 flex items-center gap-1"><Star class="w-4 h-4 text-amber-400 fill-amber-400"/> {{ activeProfile.rating }}</p>
+                <p class="font-bold text-slate-900 flex items-center gap-1"><Star class="w-4 h-4 text-amber-400 fill-amber-400"/> {{ activeProfile.avgRating ?? '—' }}</p>
               </div>
               <div class="p-4 bg-slate-50 rounded-xl border border-slate-100">
                 <p class="text-xs font-medium text-slate-500 mb-1">Current Workload</p>
-                <p class="font-bold text-slate-900">{{ activeProfile.tasks }} Tasks</p>
+                <p class="font-bold text-slate-900">{{ activeProfile.activeTasks }} Tasks</p>
               </div>
               <div class="p-4 bg-slate-50 rounded-xl border border-slate-100">
                 <p class="text-xs font-medium text-slate-500 mb-1">Completed</p>
@@ -352,19 +310,23 @@
             <div>
               <h3 class="font-bold text-slate-900 mb-3">Contact Information</h3>
               <div class="space-y-3 text-sm">
-                <div class="flex items-center gap-3 text-slate-600"><Phone class="w-4 h-4 text-slate-400" /> {{ activeProfile.phone }}</div>
-                <div class="flex items-center gap-3 text-slate-600"><Mail class="w-4 h-4 text-slate-400" /> {{ activeProfile.email }}</div>
-                <div class="flex items-center gap-3 text-slate-600"><MapPin class="w-4 h-4 text-slate-400" /> Current Area: {{ activeProfile.area }}</div>
+                <div class="flex items-center gap-3 text-slate-600"><Phone class="w-4 h-4 text-slate-400" /> {{ activeProfile.phone || '—' }}</div>
+                <div class="flex items-center gap-3 text-slate-600"><Mail class="w-4 h-4 text-slate-400" /> {{ activeProfile.email || '—' }}</div>
               </div>
             </div>
 
             <div>
-              <h3 class="font-bold text-slate-900 mb-3">Skills & Expertise</h3>
-              <div class="flex flex-wrap gap-2">
-                <span v-for="skill in activeProfile.skills" :key="skill" class="px-3 py-1 bg-slate-100 text-slate-700 text-xs font-semibold rounded-full border border-slate-200">
-                  {{ skill }}
-                </span>
+              <h3 class="font-bold text-slate-900 mb-3">Current Assignments</h3>
+              <div v-if="activeProfile.currentAssignments?.length" class="space-y-2">
+                <div v-for="a in activeProfile.currentAssignments" :key="a.id" class="flex items-center justify-between p-3 bg-slate-50 rounded-lg border border-slate-100 text-sm">
+                  <div>
+                    <p class="font-mono font-bold text-slate-900">{{ a.id }}</p>
+                    <p class="text-xs text-slate-500">{{ a.category }}<span v-if="a.expectedCompletionDate"> • due {{ a.expectedCompletionDate }}</span></p>
+                  </div>
+                  <span class="px-2 py-0.5 rounded text-[10px] font-bold uppercase bg-blue-100 text-blue-700">{{ a.status }}</span>
+                </div>
               </div>
+              <p v-else class="text-sm text-slate-400">No active assignments right now.</p>
             </div>
           </div>
           
@@ -387,6 +349,7 @@
             <div class="flex justify-between"><span class="text-slate-500">Priority:</span> <span class="font-bold text-slate-900">{{ form.priority }}</span></div>
             <div class="flex justify-between"><span class="text-slate-500">Expected:</span> <span class="font-bold text-slate-900">{{ form.completionDate || 'Not set' }}</span></div>
           </div>
+          <p v-if="assignError" class="text-red-600 text-xs mb-4">{{ assignError }}</p>
           <div class="flex gap-3">
             <button @click="showConfirm = false" class="flex-1 py-2.5 bg-slate-100 text-slate-700 font-bold rounded-lg hover:bg-slate-200 transition-colors">Cancel</button>
             <button @click="processAssignment" class="flex-1 py-2.5 bg-[#2563EB] text-white font-bold rounded-lg hover:bg-[#1E40AF] transition-colors flex justify-center items-center gap-2">
@@ -408,7 +371,7 @@
           <h3 class="text-xl font-bold text-slate-900 mb-2">Assigned Successfully</h3>
           <p class="text-sm text-slate-600 mb-6">The complaint has been assigned to {{ selectedWorker?.name }}. They have been notified.</p>
           <div class="space-y-3">
-            <router-link to="/officer/details/CMP-2026-0892" class="block w-full py-2.5 bg-[#2563EB] text-white font-bold rounded-lg hover:bg-[#1E40AF] transition-colors">View Complaint</router-link>
+            <router-link :to="`/officer/complaintdetails/${route.params.id}`" class="block w-full py-2.5 bg-[#2563EB] text-white font-bold rounded-lg hover:bg-[#1E40AF] transition-colors">View Complaint</router-link>
             <router-link to="/officer/dashboard" class="block w-full py-2.5 bg-slate-100 text-slate-700 font-bold rounded-lg hover:bg-slate-200 transition-colors">Dashboard</router-link>
           </div>
         </div>
@@ -417,96 +380,135 @@
 </template>
 
 <script setup>
-import { ref, reactive, computed } from 'vue'
+import { ref, reactive, computed, onMounted } from 'vue'
+import axios from 'axios'
+import { useRoute, useRouter } from 'vue-router'
 import Sidebar from '@/components/dashboard/Sidebar.vue'
 import DashboardNavbar from '@/components/dashboard/DashboardNavbar.vue'
-import { 
-  Printer, Download, Eye, Clock, Calendar, AlertCircle, Flag, MapPin, 
-  Building, UserCheck, Briefcase, Users, AlertTriangle, Search, Star, 
+import {
+  Eye, Clock, Calendar, MapPin,
+  Building, UserCheck, Briefcase, Users, Search, Star,
   Clipboard, Phone, Mail, X, CheckCircle
 } from 'lucide-vue-next'
+
+const API_BASE = 'http://127.0.0.1:5000/api/officer'
+const authHeaders = () => ({ headers: { Authorization: `Bearer ${localStorage.getItem('token')}` } })
+const defaultAvatar = 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=200&h=200&fit=crop'
+
+const route = useRoute()
+const router = useRouter()
 
 const isSidebarOpen = ref(false)
 const profileDrawer = ref(false)
 const showConfirm = ref(false)
 const showSuccess = ref(false)
 const isSubmitting = ref(false)
+const isLoading = ref(true)
+const isProfileLoading = ref(false)
+const loadError = ref('')
+const assignError = ref('')
 
 const activeProfile = ref({})
 const selectedWorker = ref(null)
 const searchQuery = ref('')
 
+const complaint = ref({})
+const workers = ref([])
+const summary = ref({})
+
 const filters = reactive({
-  department: 'All',
   availability: 'All',
   sort: 'Lowest Workload'
 })
 
 const form = reactive({
   priority: 'High',
-  completionDate: '2026-07-12',
+  completionDate: '',
   completionTime: '1 Day',
   notes: '',
   remarks: '',
   checks: {
-    verified: true,
+    verified: false,
     materials: false,
-    location: true,
+    location: false,
     notified: false
   }
 })
 
-// Dummy Complaint
-const complaint = reactive({
-  id: 'CMP-2026-0892',
-  title: 'Deep Pothole causing traffic disruption',
-  category: 'Road Maintenance',
-  priority: 'High',
-  status: 'Verified',
-  description: 'Massive pothole formed after the recent rains. Causing severe traffic slowdowns and dangerous for two-wheelers.',
-  targetDate: 'Jul 12, 2026',
-  area: 'Downtown',
-  ward: 'Ward 14',
-  image: 'https://images.unsplash.com/photo-1515162816999-a0c47dc192f7?auto=format&fit=crop&q=80&w=400'
-})
-
-// Dummy Workers
-const workers = reactive([
-  { id: 'W001', name: 'Amit Singh', avatar: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&q=80&w=200', department: 'Road Maintenance', experience: 5, status: 'Available', tasks: 2, maxTasks: 5, rating: 4.8, area: 'Downtown', phone: '+91 98765 11111', email: 'amit.s@civicdesk.in', completedTasks: 142, skills: ['Asphalt Laying', 'Heavy Machinery', 'Traffic Mgmt'] },
-  { id: 'W002', name: 'Suresh Patil', avatar: 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?auto=format&fit=crop&q=80&w=200', department: 'Road Maintenance', experience: 8, status: 'Busy', tasks: 5, maxTasks: 5, rating: 4.9, area: 'North Zone', phone: '+91 98765 22222', email: 'suresh.p@civicdesk.in', completedTasks: 310, skills: ['Surveying', 'Concrete Repair'] },
-  { id: 'W003', name: 'Vijay Sharma', avatar: 'https://images.unsplash.com/photo-1599566150163-29194dcaad36?auto=format&fit=crop&q=80&w=200', department: 'Sanitation', experience: 3, status: 'Available', tasks: 1, maxTasks: 6, rating: 4.5, area: 'Downtown', phone: '+91 98765 33333', email: 'vijay.s@civicdesk.in', completedTasks: 89, skills: ['Waste Management', 'Driving'] },
-  { id: 'W004', name: 'Rahul Verma', avatar: 'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?auto=format&fit=crop&q=80&w=200', department: 'Electrical', experience: 2, status: 'Available', tasks: 3, maxTasks: 4, rating: 4.2, area: 'East Ward', phone: '+91 98765 44444', email: 'rahul.v@civicdesk.in', completedTasks: 45, skills: ['Wiring', 'Streetlight Repair'] }
-])
-
-const recentAssignments = [
-  { id: 'CMP-0891', worker: 'Suresh Patil', category: 'Road Maintenance', date: 'Jul 09, 2026', status: 'In Progress' },
-  { id: 'CMP-0870', worker: 'Rahul Verma', category: 'Electrical', date: 'Jul 08, 2026', status: 'Completed' },
-]
-
 // Computed
 const filteredWorkers = computed(() => {
-  let result = workers.filter(w => {
-    const matchSearch = !searchQuery.value || w.name.toLowerCase().includes(searchQuery.value.toLowerCase()) || w.area.toLowerCase().includes(searchQuery.value.toLowerCase()) || w.id.toLowerCase().includes(searchQuery.value.toLowerCase())
-    const matchDept = filters.department === 'All' || w.department === filters.department
-    const matchAvail = filters.availability === 'All' || w.status === filters.availability
-    return matchSearch && matchDept && matchAvail
+  let result = workers.value.filter(w => {
+    const q = searchQuery.value.toLowerCase()
+    const matchSearch = !q || w.name.toLowerCase().includes(q) || w.empId.toLowerCase().includes(q)
+    const matchAvail = filters.availability === 'All' || workerAvailability(w) === filters.availability
+    return matchSearch && matchAvail
   })
 
-  if (filters.sort === 'Lowest Workload') result.sort((a, b) => (a.tasks / a.maxTasks) - (b.tasks / b.maxTasks))
-  if (filters.sort === 'Highest Rating') result.sort((a, b) => b.rating - a.rating)
-  if (filters.sort === 'Experience') result.sort((a, b) => b.experience - a.experience)
+  if (filters.sort === 'Lowest Workload') result = [...result].sort((a, b) => a.activeTasks - b.activeTasks)
+  if (filters.sort === 'Highest Rating') result = [...result].sort((a, b) => (b.avgRating || 0) - (a.avgRating || 0))
+  if (filters.sort === 'Most Completed') result = [...result].sort((a, b) => b.completedTasks - a.completedTasks)
 
   return result
 })
 
 // Methods
+const workerAvatar = (w) => w?.profilePhoto ? `http://127.0.0.1:5000${w.profilePhoto}` : defaultAvatar
+const workerAvailability = (w) => (w?.accountStatus === 'active' && w?.activeTasks === 0) ? 'Available' : 'Busy'
 const availabilityClass = (status) => status === 'Available' ? 'bg-green-100 text-green-700' : 'bg-amber-100 text-amber-700'
-const workloadColor = (tasks, max) => (tasks / max) > 0.8 ? 'bg-red-500' : (tasks / max) > 0.5 ? 'bg-amber-400' : 'bg-green-500'
-const statusBadge = (status) => status === 'Completed' ? 'bg-green-100 text-green-700' : 'bg-blue-100 text-blue-700'
+const workloadColor = (activeTasks) => activeTasks >= 4 ? 'bg-red-500' : activeTasks >= 2 ? 'bg-amber-400' : 'bg-green-500'
 
-const openProfile = (worker) => {
+const fetchComplaint = async () => {
+  let id = route.params.id
+  if (!id) {
+    // No complaint id in the URL (e.g. reached via the sidebar's generic
+    // "Assign Worker" link) — fall back to the oldest complaint of this
+    // officer's that's still waiting on a worker, and put it in the URL
+    // so the rest of this page keeps working off route.params.id as before.
+    const { data: listData } = await axios.get(`${API_BASE}/complaints`, { ...authHeaders(), params: { status: 'Assigned' } })
+    const rows = listData.complaints || []
+    const target = rows[rows.length - 1]
+    if (!target) {
+      throw new Error('NO_COMPLAINTS_TO_ASSIGN')
+    }
+    id = target.rawId
+    await router.replace(`/officer/assign/${id}`)
+  }
+  const { data } = await axios.get(`${API_BASE}/complaints/${id}`, authHeaders())
+  complaint.value = data.complaint
+}
+
+const fetchWorkers = async () => {
+  const { data } = await axios.get(`${API_BASE}/workers`, authHeaders())
+  workers.value = data.workers
+  summary.value = data.summary
+}
+
+const fetchAll = async () => {
+  isLoading.value = true
+  loadError.value = ''
+  try {
+    await Promise.all([fetchComplaint(), fetchWorkers()])
+  } catch (err) {
+    loadError.value = err.message === 'NO_COMPLAINTS_TO_ASSIGN'
+      ? 'There are no complaints waiting on a worker right now.'
+      : (err.response?.data?.message || 'Failed to load assignment data.')
+  } finally {
+    isLoading.value = false
+  }
+}
+
+const openProfile = async (worker) => {
   activeProfile.value = worker
   profileDrawer.value = true
+  isProfileLoading.value = true
+  try {
+    const { data } = await axios.get(`${API_BASE}/workers/${worker.id}`, authHeaders())
+    activeProfile.value = data.worker
+  } catch (err) {
+    loadError.value = err.response?.data?.message || 'Failed to load worker profile.'
+  } finally {
+    isProfileLoading.value = false
+  }
 }
 
 const selectWorker = (worker) => {
@@ -523,6 +525,8 @@ const resetForm = () => {
   form.notes = ''
   form.remarks = ''
   form.priority = 'High'
+  form.completionDate = ''
+  form.completionTime = '1 Day'
   Object.keys(form.checks).forEach(k => form.checks[k] = false)
 }
 
@@ -531,12 +535,29 @@ const confirmAssignment = () => {
 }
 
 const processAssignment = async () => {
+  if (!selectedWorker.value) return
   isSubmitting.value = true
-  await new Promise(resolve => setTimeout(resolve, 1500)) // Fake API call
-  isSubmitting.value = false
-  showConfirm.value = false
-  showSuccess.value = true
+  assignError.value = ''
+  try {
+    await axios.patch(`${API_BASE}/complaints/${route.params.id}/assign-worker`, {
+      worker_id: selectedWorker.value.id,
+      priority: form.priority,
+      notes: form.notes,
+      remarks: form.remarks,
+      expectedCompletionDate: form.completionDate || undefined,
+      expectedDuration: form.completionTime,
+      checks: { ...form.checks },
+    }, authHeaders())
+    showConfirm.value = false
+    showSuccess.value = true
+  } catch (err) {
+    assignError.value = err.response?.data?.message || 'Failed to assign worker.'
+  } finally {
+    isSubmitting.value = false
+  }
 }
+
+onMounted(fetchAll)
 </script>
 
 <style scoped>

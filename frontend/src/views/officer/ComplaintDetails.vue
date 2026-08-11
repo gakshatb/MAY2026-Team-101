@@ -118,27 +118,34 @@
                 </div>
               </div>
 
-              <!-- Internal Notes Workspace (session-local — see note below) -->
+              <!-- Internal Notes Workspace -->
               <div class="bg-white rounded-[14px] shadow-sm border border-slate-100 overflow-hidden">
                 <div class="p-5 border-b border-slate-100 flex justify-between items-center bg-amber-50/30">
                   <div class="flex items-center gap-2">
                     <Lock class="w-5 h-5 text-amber-500" />
                     <h2 class="font-bold text-slate-900">Internal Officer Notes</h2>
                   </div>
-                  <span class="text-xs font-medium text-amber-600 bg-amber-100 px-2 py-0.5 rounded">Not saved yet — see note</span>
+                  <span class="text-xs font-medium text-slate-500">Private — never shown to citizen or worker</span>
                 </div>
                 <div class="p-5">
                   <div class="mb-4">
                     <textarea v-model="newNote" rows="3" placeholder="Add an internal note or observation..." class="w-full p-3 border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-[#2563EB]/20 focus:border-[#2563EB] transition-all"></textarea>
                     <div class="flex justify-end mt-2">
-                      <button @click="addNote" class="px-4 py-2 bg-[#2563EB] text-white text-sm font-medium rounded-lg hover:bg-[#1E40AF] transition-colors">Save Note</button>
+                      <button @click="addNote" :disabled="isSavingNote || !newNote.trim()" class="px-4 py-2 bg-[#2563EB] text-white text-sm font-medium rounded-lg hover:bg-[#1E40AF] transition-colors disabled:opacity-50 disabled:cursor-not-allowed">
+                        {{ isSavingNote ? 'Saving…' : 'Save Note' }}
+                      </button>
                     </div>
                   </div>
                   <div class="space-y-3">
-                    <div v-for="note in internalNotes" :key="note.id" class="p-3 bg-slate-50 border border-slate-100 rounded-lg">
+                    <div v-for="note in internalNotes" :key="note.id" class="p-3 bg-slate-50 border border-slate-100 rounded-lg group">
                       <div class="flex justify-between items-center mb-1">
                         <span class="text-xs font-bold text-slate-900">{{ note.author }}</span>
-                        <span class="text-[10px] text-slate-500 font-medium">{{ note.timestamp }}</span>
+                        <div class="flex items-center gap-2">
+                          <span class="text-[10px] text-slate-500 font-medium">{{ note.timestamp }}</span>
+                          <button @click="deleteNote(note.id)" class="opacity-0 group-hover:opacity-100 transition-opacity text-slate-400 hover:text-red-500" title="Delete note">
+                            <X class="w-3.5 h-3.5" />
+                          </button>
+                        </div>
                       </div>
                       <p class="text-sm text-slate-700">{{ note.text }}</p>
                     </div>
@@ -435,7 +442,20 @@ const fetchComplaint = async () => {
   isLoading.value = true
   loadError.value = ''
   try {
-    const { data } = await axios.get(`${API_BASE}/complaints/${route.params.id}`, authHeaders())
+    let id = route.params.id
+    if (!id) {
+      const { data: listData } = await axios.get(`${API_BASE}/complaints`, { ...authHeaders(), params: { status: 'All' } })
+      const openRows = (listData.complaints || []).filter(c => c.status === 'Assigned' || c.status === 'In Progress')
+      const target = openRows[openRows.length - 1]
+      if (!target) {
+        loadError.value = 'You have no complaints to show yet.'
+        isLoading.value = false
+        return
+      }
+      id = target.rawId
+      await router.replace(`/officer/complaintdetails/${id}`)
+    }
+    const { data } = await axios.get(`${API_BASE}/complaints/${id}`, authHeaders())
     complaint.value = data.complaint
   } catch (err) {
     loadError.value = err.response?.data?.message || 'Failed to load this complaint.'
@@ -544,20 +564,31 @@ const assignWorker = async (workerId) => {
   }
 }
 
-// Internal notes — NOTE: there is no backing DB table for these yet, so they
-// only live in this browser tab and are lost on refresh. Wire up a real
-// Note model + officer endpoint before relying on this for anything real.
+// Internal officer notes — persisted via /complaints/<id>/notes
 const newNote = ref('')
-const internalNotes = reactive([])
-const addNote = () => {
-  if (!newNote.value.trim()) return
-  internalNotes.unshift({
-    id: Date.now(),
-    author: 'You',
-    timestamp: 'Just now',
-    text: newNote.value
-  })
-  newNote.value = ''
+const internalNotes = computed(() => complaint.value.officerNotes || [])
+const isSavingNote = ref(false)
+const addNote = async () => {
+  if (!newNote.value.trim() || isSavingNote.value) return
+  isSavingNote.value = true
+  try {
+    const { data } = await axios.post(`${API_BASE}/complaints/${route.params.id}/notes`,
+      { text: newNote.value.trim() }, authHeaders())
+    complaint.value.officerNotes = [data.note, ...(complaint.value.officerNotes || [])]
+    newNote.value = ''
+  } catch (err) {
+    modalError.value = err.response?.data?.message || 'Failed to save note.'
+  } finally {
+    isSavingNote.value = false
+  }
+}
+const deleteNote = async (noteId) => {
+  try {
+    await axios.delete(`${API_BASE}/complaints/${route.params.id}/notes/${noteId}`, authHeaders())
+    complaint.value.officerNotes = (complaint.value.officerNotes || []).filter(n => n.id !== noteId)
+  } catch (err) {
+    modalError.value = err.response?.data?.message || 'Failed to delete note.'
+  }
 }
 
 // Helper methods
