@@ -336,3 +336,23 @@ def test_assign_complaint_to_officer(client, admin_auth_headers, test_complaint,
     # Verify
     complaint = Complaint.query.get(test_complaint.id)
     assert complaint.assigned_officer == pending_officer.id
+
+def test_close_complaint_by_admin(client, admin_auth_headers, test_complaint):
+    """Test closing a complaint directly by admin."""
+    response = client.patch(f'/api/admin/complaints/{test_complaint.id}/close',
+                           json={"remark": "Duplicate complaint"},
+                           headers=admin_auth_headers)
+    data = response.get_json()
+    
+    assert response.status_code == 200
+    assert data['success'] is True
+    assert 'Complaint closed' in data['message']
+    
+    # Verify
+    complaint = Complaint.query.get(test_complaint.id)
+    assert complaint.status == 'Closed'
+    
+    # Check status log
+    status_log = StatusLog.query.filter_by(complaint_id=test_complaint.id).first()
+    assert status_log is not None
+    assert 'Duplicate complaint' in status_log.remark
