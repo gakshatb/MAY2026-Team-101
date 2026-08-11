@@ -564,3 +564,7 @@ def test_admin_profile_requires_auth(client):
     response = client.get('/api/admin/profile')
     assert response.status_code == 401
 
+def test_admin_profile_requires_admin_role(client, citizen_auth_headers):
+    """Test profile requires admin role."""
+    response = client.get('/api/admin/profile', headers=citizen_auth_headers)
+    assert response.status_code in [403, 401]
