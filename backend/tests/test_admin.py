@@ -205,3 +205,24 @@ def test_list_officers_success(client, admin_auth_headers):
     assert 'top_stats' in data
     assert 'quick_insights' in data
     assert 'pending_registrations' in data
+
+
+def test_suspend_officer(client, admin_auth_headers, registered_officer):
+    """Test suspending an officer."""
+    
+    client.patch(f'/api/admin/users/{registered_officer['user_record'].id}/approve',
+                headers=admin_auth_headers)
+    
+    
+    response = client.patch(f'/api/admin/officers/{registered_officer['user_record'].id}/suspend',
+                           json={"reason": "Performance issues"},
+                           headers=admin_auth_headers)
+    data = response.get_json()
+    
+    assert response.status_code == 200
+    assert data['success'] is True
+    assert 'suspended' in data['message']
+    
+    
+    officer = User.query.get(registered_officer['user_record'].id)
+    assert officer.status == 'suspended'
