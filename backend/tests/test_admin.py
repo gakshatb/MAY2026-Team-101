@@ -469,3 +469,16 @@ def test_publish_announcement(client, admin_auth_headers):
     assert response.status_code == 200
     assert data['success'] is True
     assert data['announcement']['status'] == 'Published'
+
+def test_list_contact_messages(client, admin_auth_headers):
+    """Test listing contact messages."""
+    response = client.get('/api/admin/contact-messages',
+                         headers=admin_auth_headers)
+    data = response.get_json()
+    
+    assert response.status_code == 200
+    assert data['success'] is True
+    assert 'messages' in data
+    assert 'summary' in data
+    assert 'total' in data['summary']
+    assert 'unread' in data['summary']
