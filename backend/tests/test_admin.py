@@ -290,3 +290,16 @@ def test_officer_details(client, admin_auth_headers, pending_officer):
     assert officer_data['id'] == pending_officer.id
     assert officer_data['name'] == pending_officer.name
     assert officer_data['email'] == pending_officer.email
+
+
+def test_list_admin_complaints(client, admin_auth_headers, test_complaint):
+    """Test listing all complaints from admin perspective."""
+    response = client.get('/api/admin/complaints', headers=admin_auth_headers)
+    data = response.get_json()
+    
+    assert response.status_code == 200
+    assert data['success'] is True
+    assert 'complaints' in data
+    assert 'summary' in data
+    assert 'departments' in data
+    assert len(data['complaints']) >= 1
