@@ -378,3 +378,25 @@ def test_create_announcement_draft(client, admin_auth_headers):
     assert data['success'] is True
     assert data['announcement']['title'] == ann_data['title']
     assert data['announcement']['status'] == 'Draft'
+
+
+def test_create_announcement_publish(client, admin_auth_headers):
+    """Test creating and publishing an announcement."""
+    ann_data = {
+        "title": "Published Announcement",
+        "content": "This announcement is published immediately.",
+        "summary": "Published test",
+        "category": "Alert",
+        "priority": "Important",
+        "audience": "Citizens",
+        "action": "publish"
+    }
+    
+    response = client.post('/api/admin/announcements',
+                          json=ann_data,
+                          headers=admin_auth_headers)
+    data = response.get_json()
+    
+    assert response.status_code == 201
+    assert data['success'] is True
+    assert data['announcement']['status'] == 'Published'
