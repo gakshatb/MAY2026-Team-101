@@ -413,3 +413,33 @@ def test_list_announcements(client, admin_auth_headers):
     assert 'top_stats' in data
     assert 'quick_insights' in data
     assert 'pinned' in data
+
+def test_delete_announcement(client, admin_auth_headers):
+    """Test deleting an announcement."""
+    # Create announcement
+    ann_data = {
+        "title": "To be deleted",
+        "content": "This announcement will be deleted.",
+        "summary": "Delete test",
+        "category": "General",
+        "priority": "Normal",
+        "audience": "All Users",
+        "action": "draft"
+    }
+    response = client.post('/api/admin/announcements',
+                          json=ann_data,
+                          headers=admin_auth_headers)
+    ann_id = response.get_json()['announcement']['rawId']
+    
+    # Delete it
+    response = client.delete(f'/api/admin/announcements/{ann_id}',
+                            headers=admin_auth_headers)
+    data = response.get_json()
+    
+    assert response.status_code == 200
+    assert data['success'] is True
+    assert 'deleted' in data['message']
+    
+    # Verify deleted
+    ann = Announcement.query.get(ann_id)
+    assert ann is None
