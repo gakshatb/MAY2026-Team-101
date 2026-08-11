@@ -317,3 +317,22 @@ def test_get_admin_complaint_details(client, admin_auth_headers, test_complaint)
     assert 'description' in data['complaint']
     assert 'status_logs' in data['complaint']
     assert 'eligible_officers' in data['complaint']
+
+def test_assign_complaint_to_officer(client, admin_auth_headers, test_complaint, pending_officer):
+    """Test assigning a complaint to an officer."""
+    # Approve the officer
+    client.patch(f'/api/admin/users/{pending_officer.id}/approve',
+                headers=admin_auth_headers)
+    
+    response = client.patch(f'/api/admin/complaints/{test_complaint.id}/assign',
+                           json={"officer_id": pending_officer.id},
+                           headers=admin_auth_headers)
+    data = response.get_json()
+    
+    assert response.status_code == 200
+    assert data['success'] is True
+    assert 'Complaint assigned' in data['message']
+    
+    # Verify
+    complaint = Complaint.query.get(test_complaint.id)
+    assert complaint.assigned_officer == pending_officer.id
