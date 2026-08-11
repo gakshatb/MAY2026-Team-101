@@ -303,3 +303,17 @@ def test_list_admin_complaints(client, admin_auth_headers, test_complaint):
     assert 'summary' in data
     assert 'departments' in data
     assert len(data['complaints']) >= 1
+
+def test_get_admin_complaint_details(client, admin_auth_headers, test_complaint):
+    """Test getting complaint details."""
+    response = client.get(f'/api/admin/complaints/{test_complaint.id}',
+                         headers=admin_auth_headers)
+    data = response.get_json()
+    
+    assert response.status_code == 200
+    assert data['success'] is True
+    assert 'complaint' in data
+    assert data['complaint']['raw_id'] == test_complaint.id
+    assert 'description' in data['complaint']
+    assert 'status_logs' in data['complaint']
+    assert 'eligible_officers' in data['complaint']
