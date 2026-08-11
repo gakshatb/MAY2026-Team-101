@@ -356,3 +356,25 @@ def test_close_complaint_by_admin(client, admin_auth_headers, test_complaint):
     status_log = StatusLog.query.filter_by(complaint_id=test_complaint.id).first()
     assert status_log is not None
     assert 'Duplicate complaint' in status_log.remark
+
+def test_create_announcement_draft(client, admin_auth_headers):
+    """Test creating an announcement as draft."""
+    ann_data = {
+        "title": "Test Announcement",
+        "content": "This is a test announcement content.",
+        "summary": "Test summary",
+        "category": "General",
+        "priority": "Normal",
+        "audience": "All Users",
+        "action": "draft"
+    }
+    
+    response = client.post('/api/admin/announcements',
+                          json=ann_data,
+                          headers=admin_auth_headers)
+    data = response.get_json()
+    
+    assert response.status_code == 201
+    assert data['success'] is True
+    assert data['announcement']['title'] == ann_data['title']
+    assert data['announcement']['status'] == 'Draft'
