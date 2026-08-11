@@ -443,3 +443,29 @@ def test_delete_announcement(client, admin_auth_headers):
     # Verify deleted
     ann = Announcement.query.get(ann_id)
     assert ann is None
+
+def test_publish_announcement(client, admin_auth_headers):
+    """Test publishing a draft announcement."""
+    # First create draft
+    ann_data = {
+        "title": "Draft to Publish",
+        "content": "This will be published later.",
+        "summary": "Draft test",
+        "category": "General",
+        "priority": "Normal",
+        "audience": "All Users",
+        "action": "draft"
+    }
+    response = client.post('/api/admin/announcements',
+                          json=ann_data,
+                          headers=admin_auth_headers)
+    ann_id = response.get_json()['announcement']['rawId']
+    
+    # Publish it
+    response = client.patch(f'/api/admin/announcements/{ann_id}/publish',
+                           headers=admin_auth_headers)
+    data = response.get_json()
+    
+    assert response.status_code == 200
+    assert data['success'] is True
+    assert data['announcement']['status'] == 'Published'
