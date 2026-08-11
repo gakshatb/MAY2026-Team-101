@@ -639,3 +639,20 @@ def test_admin_endpoints_require_auth(client):
     for endpoint in endpoints:
         response = client.get(endpoint)
         assert response.status_code == 401
+
+def test_admin_endpoints_require_admin_role(client, citizen_auth_headers):
+    """Test that admin endpoints require admin role."""
+    endpoints = [
+        '/api/admin/dashboard',
+        '/api/admin/departments',
+        '/api/admin/officers',
+        '/api/admin/complaints',
+        '/api/admin/announcements',
+        '/api/admin/analytics',
+        '/api/admin/profile',
+        '/api/admin/activity-logs'
+    ]
+    
+    for endpoint in endpoints:
+        response = client.get(endpoint, headers=citizen_auth_headers)
+        assert response.status_code in [403, 401]
