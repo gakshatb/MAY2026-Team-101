@@ -595,3 +595,20 @@ def test_system_analytics_success(client, admin_auth_headers):
     assert 'total_citizens' in kpis
     assert 'total_officers' in kpis
     assert 'departments' in kpis
+
+def test_activity_logs_success(client, admin_auth_headers):
+    """Test activity logs endpoint."""
+    response = client.get('/api/admin/activity-logs', headers=admin_auth_headers)
+    data = response.get_json()
+    
+    assert response.status_code == 200
+    assert data['success'] is True
+    assert 'logs' in data
+    assert 'top_stats' in data
+    assert 'log_stats' in data
+    assert 'most_frequent_activities' in data
+    assert 'role_distribution' in data
+    assert 'heatmap' in data
+    assert 'security_events' in data
+    assert 'critical_events' in data
+    assert 'active_users' in data
