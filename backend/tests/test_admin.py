@@ -485,8 +485,6 @@ def test_list_contact_messages(client, admin_auth_headers):
 
 def test_mark_contact_message_read(client, admin_auth_headers):
     """Test marking a contact message as read."""
-    # First create a contact message (assuming there's a public endpoint)
-    # For testing, create directly in database
     message = ContactMessage(
         name="Test User",
         email="test@example.com",
@@ -508,3 +506,23 @@ def test_mark_contact_message_read(client, admin_auth_headers):
     # Verify
     msg = ContactMessage.query.get(message.id)
     assert msg.is_read is True
+
+def test_get_admin_profile(client, admin_auth_headers):
+    """Test getting admin profile."""
+    response = client.get('/api/admin/profile', headers=admin_auth_headers)
+    data = response.get_json()
+    
+    assert response.status_code == 200
+    assert data['success'] is True
+    assert 'profile' in data
+    assert 'stats' in data
+    assert 'personal' in data
+    assert 'permissions' in data
+    assert 'security' in data
+    assert 'notificationPrefs' in data
+    assert 'loginHistory' in data
+    assert 'accountActivities' in data
+    
+    # Check profile data
+    assert data['profile']['name'] == 'Admin'
+    assert data['profile']['email'] == 'admin1@gmail.com'
