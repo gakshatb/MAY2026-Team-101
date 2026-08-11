@@ -268,3 +268,25 @@ def test_transfer_officer(client, admin_auth_headers, pending_officer, test_depa
     officer = User.query.get(pending_officer.id)
     assert officer.department_id == test_department.id
 
+def test_officer_details(client, admin_auth_headers, pending_officer):
+    """Test getting officer details."""
+    
+    client.patch(f'/api/admin/users/{pending_officer.id}/approve',
+                headers=admin_auth_headers)
+    
+    response = client.get(f'/api/admin/officers/{pending_officer.id}',
+                         headers=admin_auth_headers)
+    data = response.get_json()
+    
+    assert response.status_code == 200
+    assert 'officer' in data
+    assert 'top_stats' in data
+    assert 'department' in data
+    assert 'complaint_status_breakdown' in data
+    assert 'monthly_trend' in data
+    
+    
+    officer_data = data['officer']
+    assert officer_data['id'] == pending_officer.id
+    assert officer_data['name'] == pending_officer.name
+    assert officer_data['email'] == pending_officer.email
