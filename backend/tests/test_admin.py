@@ -482,3 +482,29 @@ def test_list_contact_messages(client, admin_auth_headers):
     assert 'summary' in data
     assert 'total' in data['summary']
     assert 'unread' in data['summary']
+
+def test_mark_contact_message_read(client, admin_auth_headers):
+    """Test marking a contact message as read."""
+    # First create a contact message (assuming there's a public endpoint)
+    # For testing, create directly in database
+    message = ContactMessage(
+        name="Test User",
+        email="test@example.com",
+        subject="Test Subject",
+        message="Test message content",
+        is_read=False
+    )
+    db.session.add(message)
+    db.session.commit()
+    
+    response = client.patch(f'/api/admin/contact-messages/{message.id}/read',
+                           json={"read": True},
+                           headers=admin_auth_headers)
+    data = response.get_json()
+    
+    assert response.status_code == 200
+    assert data['success'] is True
+    
+    # Verify
+    msg = ContactMessage.query.get(message.id)
+    assert msg.is_read is True
