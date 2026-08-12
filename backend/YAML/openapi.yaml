@@ -1,0 +1,2838 @@
+openapi: 3.0.0
+info:
+  title: Municipal Citizen Complaint & Facility Management System
+  description: |
+    A comprehensive platform enabling citizens to report civic issues, municipal officers to 
+    manage complaints, and field workers to update resolution progress.
+
+    ## User Stories Mapping
+    
+    ### US1: Submit Civic Complaint with Photos
+    **As a** Citizen (Murali K GB)  
+    **I want to** submit a civic complaint with photos and location  
+    **So that** the municipality can resolve the issue  
+    **APIs:** POST /api/citizen/complaints, GET /api/citizen/complaints/{id}
+
+    ### US2: Assign and Track Complaints
+    **As a** Municipal Officer (Lallu Prashanth)  
+    **I want to** assign complaints to field workers and track their progress  
+    **So that** complaints are resolved efficiently  
+    **APIs:** PATCH /api/officer/complaints/{id}/assign, GET /api/officer/complaints, GET /api/officer/complaints/{id}/tracking
+
+    ### US3: Update Status with Proof
+    **As a** Field Worker (Sarmadh Ameer)  
+    **I want to** view my assigned complaints and update their status with proof of completion  
+    **So that** officers and citizens know the work has been completed  
+    **APIs:** GET /api/worker/complaints, PATCH /api/worker/complaints/{id}/status, POST /api/worker/complaints/{id}/proof
+
+    ### US4: Book Public Facility
+    **As a** Citizen (Ramakrishnan)  
+    **I want to** book a public facility and track my booking status  
+    **So that** I can use the facility on my preferred date  
+    **APIs:** POST /api/citizen/bookings, GET /api/citizen/bookings/{id}
+
+    ### US5: Report Garbage Issues
+    **As a** Shop Owner (Priyanshu Singh)  
+    **I want to** report garbage-related issues with location details  
+    **So that** the area around my shop remains clean  
+    **APIs:** POST /api/citizen/complaints (category: Garbage), GET /api/citizen/complaints/{id}/tracking
+
+    ### US6: Report Faulty Streetlight
+    **As a** Working Professional (Omkar Jaiswal)  
+    **I want to** report a faulty streetlight with location and track progress  
+    **So that** I can travel safely at night  
+    **APIs:** POST /api/citizen/complaints (category: Streetlight), GET /api/citizen/complaints/{id}/tracking
+
+    ### US7: Report Potholes
+    **As a** College Student (Mangalam Shrivastav)  
+    **I want to** report potholes near my college with exact location  
+    **So that** students and commuters can travel safely  
+    **APIs:** POST /api/citizen/complaints (category: Road), GET /api/citizen/complaints/{id}/tracking
+
+    ### US8: Report Overflowing Dustbins
+    **As a** Local Resident (Dhruv Raghav)  
+    **I want to** report overflowing or missing public dustbins with location  
+    **So that** my locality remains clean and hygienic  
+    **APIs:** POST /api/citizen/complaints (category: Garbage), GET /api/citizen/complaints/{id}/tracking
+
+    ### US9: Report Blocked Drainage
+    **As a** Local Resident (Azhar Mohd)  
+    **I want to** report blocked drainage with exact location and track  
+    **So that** roads remain clean and safe, especially during rainy season  
+    **APIs:** POST /api/citizen/complaints (category: Drainage), GET /api/citizen/complaints/{id}/tracking
+
+  version: 1.0.0
+  contact:
+    name: Municipal Corporation Support
+    email: support@municipal.gov.in
+    url: https://municipal.gov.in/support
+
+servers:
+  - url: https://api.municipal.gov.in/v1
+    description: Production server
+  - url: https://staging-api.municipal.gov.in/v1
+    description: Staging server
+  - url: http://localhost:5000/api
+    description: Local development server
+
+tags:
+  - name: Authentication
+    description: User authentication, registration, and account management
+  - name: Citizen Services
+    description: |
+      **User Stories:** US1, US4, US5, US6, US7, US8, US9
+      Complaint submission, tracking, feedback, profile management, and facility booking for citizens
+  - name: Officer Services
+    description: |
+      **User Stories:** US2
+      Complaint assignment, monitoring, and management for municipal officers
+  - name: Worker Services
+    description: |
+      **User Stories:** US3
+      Complaint viewing, status updates, and proof submission for field workers
+  - name: Public Services
+    description: Public-facing APIs for checking complaint status without login
+
+components:
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: |
+        JWT token obtained from /api/login endpoint.
+        Format: Bearer {access_token}
+        Token expires in 15 minutes.
+
+  schemas:
+    # ============ ERROR SCHEMAS ============
+    ErrorResponse:
+      type: object
+      required:
+        - success
+        - message
+      properties:
+        success:
+          type: boolean
+          example: false
+        message:
+          type: string
+          description: Human-readable error message
+        code:
+          type: string
+          description: Error code for API consumers
+        timestamp:
+          type: string
+          format: date-time
+          description: ISO 8601 timestamp
+        path:
+          type: string
+          description: API endpoint path
+
+    ValidationError:
+      type: object
+      required:
+        - success
+        - message
+        - errors
+      properties:
+        success:
+          type: boolean
+          example: false
+        message:
+          type: string
+          example: "Validation failed"
+        errors:
+          type: object
+          additionalProperties:
+            type: array
+            items:
+              type: string
+          description: Field-specific validation errors
+
+    AuthenticationError:
+      type: object
+      required:
+        - success
+        - message
+      properties:
+        success:
+          type: boolean
+          example: false
+        message:
+          type: string
+          example: "Authentication required"
+        code:
+          type: string
+          example: "AUTH_001"
+
+    AuthorizationError:
+      type: object
+      required:
+        - success
+        - message
+      properties:
+        success:
+          type: boolean
+          example: false
+        message:
+          type: string
+          example: "Insufficient permissions"
+        code:
+          type: string
+          example: "AUTH_002"
+
+    # ============ USER SCHEMAS ============
+    User:
+      type: object
+      properties:
+        id:
+          type: integer
+          example: 1001
+        fullName:
+          type: string
+          example: "Murali K GB"
+        email:
+          type: string
+          format: email
+          example: "murali@example.com"
+        mobile:
+          type: string
+          pattern: '^[0-9]{10}$'
+          example: "9876543210"
+        role:
+          type: string
+          enum: [Citizen, Officer, Worker, Admin]
+          example: "Citizen"
+        status:
+          type: string
+          enum: [active, pending, disabled]
+          example: "active"
+        profilePhoto:
+          type: string
+          nullable: true
+          example: "https://api.municipal.gov.in/uploads/profile/photo_123.jpg"
+        createdAt:
+          type: string
+          format: date-time
+          nullable: true
+
+    # ============ COMPLAINT SCHEMAS ============
+    Complaint:
+      type: object
+      required:
+        - id
+        - title
+        - category
+        - description
+        - ward
+        - area
+        - street
+      properties:
+        id:
+          type: string
+          example: "CMP-2026-001234"
+          description: "Format: CMP-YYYY-XXXXX"
+        rawId:
+          type: integer
+          example: 1234
+          description: "Internal numeric ID"
+        title:
+          type: string
+          minLength: 5
+          maxLength: 200
+          example: "Broken streetlight near MG Road"
+        category:
+          type: string
+          enum: [Road, Drainage, Electricity, Water, Garbage, Streetlight, Other]
+          example: "Streetlight"
+        subCategory:
+          type: string
+          description: "Specific sub-category for better routing"
+          example: "Faulty bulb"
+        priority:
+          type: string
+          enum: [Low, Medium, High, Emergency]
+          default: "Medium"
+          example: "High"
+        description:
+          type: string
+          minLength: 30
+          maxLength: 2000
+          example: "The streetlight at the corner of MG Road and Brigade Road has been flickering for a week and is completely dead since yesterday. This is a busy intersection with heavy pedestrian traffic."
+        location:
+          type: object
+          properties:
+            address:
+              type: string
+              example: "123, MG Road, Brigade Area, Bengaluru - 560001"
+            ward:
+              type: string
+              example: "Ward 12"
+            area:
+              type: string
+              example: "Brigade Area"
+            street:
+              type: string
+              example: "MG Road"
+            landmark:
+              type: string
+              nullable: true
+              example: "Near ICICI Bank ATM"
+            city:
+              type: string
+              example: "Bengaluru"
+            state:
+              type: string
+              example: "Karnataka"
+            pincode:
+              type: string
+              pattern: '^[0-9]{6}$'
+              example: "560001"
+            latitude:
+              type: number
+              format: float
+              example: 12.9716
+            longitude:
+              type: number
+              format: float
+              example: 77.5946
+        incidentDate:
+          type: string
+          format: date
+          nullable: true
+          example: "2026-07-15"
+        visitTime:
+          type: string
+          nullable: true
+          example: "10:00 AM"
+        urgencyNote:
+          type: string
+          nullable: true
+          example: "School children cross this road daily"
+        images:
+          type: array
+          maxItems: 5
+          items:
+            type: string
+            format: uri
+            example: "https://api.municipal.gov.in/uploads/complaints/CMP-2026-001234/image1.jpg"
+        status:
+          type: string
+          enum: [pending, assigned, in_progress, resolved, closed, rejected]
+          example: "pending"
+        department:
+          type: string
+          example: "Street Lighting Department"
+        assignedTo:
+          type: integer
+          nullable: true
+          description: "Worker ID if assigned"
+          example: 2034
+        assignedToName:
+          type: string
+          nullable: true
+          example: "Sarmadh Ameer"
+        assignedBy:
+          type: integer
+          nullable: true
+          description: "Officer ID who assigned"
+          example: 1025
+        assignedAt:
+          type: string
+          format: date-time
+          nullable: true
+          example: "2026-07-16T10:30:00Z"
+        resolvedAt:
+          type: string
+          format: date-time
+          nullable: true
+          example: "2026-07-20T14:00:00Z"
+        createdAt:
+          type: string
+          format: date-time
+          example: "2026-07-15T09:15:00Z"
+        updatedAt:
+          type: string
+          format: date-time
+          example: "2026-07-15T09:15:00Z"
+        isEscalated:
+          type: boolean
+          default: false
+        hasFeedback:
+          type: boolean
+          default: false
+        feedback:
+          $ref: '#/components/schemas/Feedback'
+
+    ComplaintInput:
+      type: object
+      required:
+        - title
+        - category
+        - description
+        - ward
+        - area
+        - street
+      properties:
+        title:
+          type: string
+          minLength: 5
+          maxLength: 200
+        category:
+          type: string
+          enum: [Road, Drainage, Electricity, Water, Garbage, Streetlight, Other]
+        subCategory:
+          type: string
+          maxLength: 100
+        priority:
+          type: string
+          enum: [Low, Medium, High, Emergency]
+          default: "Medium"
+        description:
+          type: string
+          minLength: 30
+          maxLength: 2000
+        city:
+          type: string
+          example: "Bengaluru"
+        ward:
+          type: string
+          example: "Ward 12"
+        area:
+          type: string
+          example: "Brigade Area"
+        street:
+          type: string
+          example: "MG Road"
+        landmark:
+          type: string
+          maxLength: 200
+        pincode:
+          type: string
+          pattern: '^[0-9]{6}$'
+        incidentDate:
+          type: string
+          format: date
+        visitTime:
+          type: string
+        urgencyNote:
+          type: string
+          maxLength: 500
+        latitude:
+          type: number
+          format: float
+          minimum: -90
+          maximum: 90
+        longitude:
+          type: number
+          format: float
+          minimum: -180
+          maximum: 180
+
+    # ============ FEEDBACK SCHEMAS ============
+    Feedback:
+      type: object
+      properties:
+        id:
+          type: integer
+        complaintId:
+          type: string
+          example: "CMP-2026-001234"
+        overallRating:
+          type: integer
+          minimum: 1
+          maximum: 5
+          example: 4
+        serviceRatings:
+          type: object
+          properties:
+            responseTime:
+              type: integer
+              minimum: 1
+              maximum: 5
+            resolutionQuality:
+              type: integer
+              minimum: 1
+              maximum: 5
+            communication:
+              type: integer
+              minimum: 1
+              maximum: 5
+        categories:
+          type: array
+          items:
+            type: string
+          example: ["Timeliness", "Quality", "Communication"]
+        comment:
+          type: string
+          minLength: 20
+          maxLength: 1000
+          example: "The complaint was resolved quickly. The worker was professional and completed the work on time."
+        improvement:
+          type: string
+          nullable: true
+          maxLength: 500
+          example: "Could improve communication about estimated completion time"
+        wouldRecommend:
+          type: string
+          enum: [Yes, No, Maybe]
+          example: "Yes"
+        isAnonymous:
+          type: boolean
+          default: false
+        submittedAt:
+          type: string
+          format: date-time
+
+    # ============ NOTIFICATION SCHEMAS ============
+    Notification:
+      type: object
+      properties:
+        id:
+          type: integer
+        title:
+          type: string
+          example: "Complaint Assigned"
+        message:
+          type: string
+          example: "Your complaint CMP-2026-001234 has been assigned to Sarmadh Ameer"
+        type:
+          type: string
+          enum: [status_update, assignment, feedback_request, general]
+        complaintId:
+          type: string
+          nullable: true
+          example: "CMP-2026-001234"
+        isRead:
+          type: boolean
+          default: false
+        createdAt:
+          type: string
+          format: date-time
+
+    # ============ BOOKING SCHEMAS ============
+    FacilityBooking:
+      type: object
+      properties:
+        id:
+          type: string
+          example: "BKG-2026-001234"
+        facilityName:
+          type: string
+          example: "Community Hall A"
+        facilityType:
+          type: string
+          enum: [CommunityHall, Park, SportsGround, Auditorium, FunctionHall]
+        bookingDate:
+          type: string
+          format: date
+        startTime:
+          type: string
+          example: "09:00"
+        endTime:
+          type: string
+          example: "17:00"
+        purpose:
+          type: string
+          example: "Wedding Reception"
+        numberOfPeople:
+          type: integer
+        status:
+          type: string
+          enum: [pending, confirmed, rejected, completed, cancelled]
+        amenities:
+          type: array
+          items:
+            type: string
+          example: ["Parking", "Catering", "Stage"]
+        bookingAmount:
+          type: number
+          format: float
+        depositAmount:
+          type: number
+          format: float
+        bookingDateRequested:
+          type: string
+          format: date-time
+        confirmedAt:
+          type: string
+          format: date-time
+          nullable: true
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+
+    # ============ ACTIVITY LOG SCHEMAS ============
+    ActivityLog:
+      type: object
+      properties:
+        id:
+          type: integer
+        complaintId:
+          type: string
+          nullable: true
+        bookingId:
+          type: string
+          nullable: true
+        type:
+          type: string
+          enum: [submitted, assigned, status_change, proof_uploaded, escalated, resolved, feedback_submitted]
+        description:
+          type: string
+        oldStatus:
+          type: string
+          nullable: true
+        newStatus:
+          type: string
+          nullable: true
+        remark:
+          type: string
+          nullable: true
+        changedBy:
+          type: integer
+        changedByName:
+          type: string
+        changedAt:
+          type: string
+          format: date-time
+
+    # ============ WORKER SCHEMAS ============
+    WorkerAssignment:
+      type: object
+      properties:
+        complaintId:
+          type: string
+        workerId:
+          type: integer
+        workerName:
+          type: string
+        assignedAt:
+          type: string
+          format: date-time
+        deadline:
+          type: string
+          format: date
+        priority:
+          type: string
+          enum: [Low, Medium, High, Emergency]
+        status:
+          type: string
+          enum: [pending, in_progress, completed, delayed]
+        proofImage:
+          type: string
+          format: uri
+          nullable: true
+        completionNote:
+          type: string
+          nullable: true
+
+    # ============ OFFICER SCHEMAS ============
+    OfficerDashboard:
+      type: object
+      properties:
+        summary:
+          type: object
+          properties:
+            totalComplaints:
+              type: integer
+            pendingAssignment:
+              type: integer
+            inProgress:
+              type: integer
+            resolvedToday:
+              type: integer
+            overdue:
+              type: integer
+            avgResolutionTime:
+              type: number
+              description: "Average resolution time in hours"
+        wardStats:
+          type: array
+          items:
+            type: object
+            properties:
+              ward:
+                type: string
+              total:
+                type: integer
+              pending:
+                type: integer
+        workerPerformance:
+          type: array
+          items:
+            type: object
+            properties:
+              workerId:
+                type: integer
+              workerName:
+                type: string
+              assignedCount:
+                type: integer
+              resolvedCount:
+                type: integer
+              avgCompletionTime:
+                type: number
+              rating:
+                type: number
+                format: float
+
+  parameters:
+    ComplaintIdParam:
+      name: complaintId
+      in: path
+      required: true
+      schema:
+        type: string
+        pattern: '^CMP-\d{4}-\d{6}$'
+      description: "Complaint ID in format CMP-YYYY-XXXXX"
+      example: "CMP-2026-001234"
+
+    BookingIdParam:
+      name: bookingId
+      in: path
+      required: true
+      schema:
+        type: string
+        pattern: '^BKG-\d{4}-\d{6}$'
+      description: "Booking ID in format BKG-YYYY-XXXXX"
+      example: "BKG-2026-001234"
+
+    LimitParam:
+      name: limit
+      in: query
+      schema:
+        type: integer
+        default: 20
+        minimum: 1
+        maximum: 100
+      description: "Maximum number of records to return"
+
+    OffsetParam:
+      name: offset
+      in: query
+      schema:
+        type: integer
+        default: 0
+        minimum: 0
+      description: "Number of records to skip for pagination"
+
+  responses:
+    UnauthorizedError:
+      description: "JWT token is missing or invalid"
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/AuthenticationError'
+          example:
+            success: false
+            message: "Authentication required. Please provide a valid JWT token."
+            code: "AUTH_001"
+            timestamp: "2026-08-01T10:30:00Z"
+
+    ForbiddenError:
+      description: "User does not have required role/permission"
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/AuthorizationError'
+          example:
+            success: false
+            message: "Insufficient permissions. This endpoint requires 'Citizen' role."
+            code: "AUTH_002"
+            timestamp: "2026-08-01T10:30:00Z"
+
+    ValidationError:
+      description: "Request validation failed"
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ValidationError'
+          example:
+            success: false
+            message: "Validation failed"
+            errors:
+              title:
+                - "Title must be at least 5 characters"
+                - "Title is required"
+              category:
+                - "Category must be one of: Road, Drainage, Electricity, Water, Garbage, Streetlight, Other"
+              description:
+                - "Description must be at least 30 characters"
+
+    NotFoundError:
+      description: "Resource not found"
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          example:
+            success: false
+            message: "Complaint not found"
+            code: "RES_001"
+            timestamp: "2026-08-01T10:30:00Z"
+
+    ConflictError:
+      description: "Resource conflict"
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          example:
+            success: false
+            message: "Feedback has already been submitted for this complaint"
+            code: "CONF_001"
+            timestamp: "2026-08-01T10:30:00Z"
+
+    RateLimitError:
+      description: "Rate limit exceeded"
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          example:
+            success: false
+            message: "Rate limit exceeded. Please try again after 60 seconds."
+            code: "RATE_001"
+            timestamp: "2026-08-01T10:30:00Z"
+
+security:
+  - BearerAuth: []
+
+paths:
+  # ============================================
+  # AUTHENTICATION ENDPOINTS
+  # ============================================
+  /auth/register:
+    post:
+      tags:
+        - Authentication
+      summary: "US1, US4, US5, US6, US7, US8, US9 | Register as Citizen"
+      description: |
+        **User Stories:**
+        - US1: Murali K GB - Register to submit complaints
+        - US4: Ramakrishnan - Register to book facilities
+        - US5: Priyanshu Singh - Register to report garbage issues
+        - US6: Omkar Jaiswal - Register to report streetlight issues
+        - US7: Mangalam Shrivastav - Register to report potholes
+        - US8: Dhruv Raghav - Register to report dustbin issues
+        - US9: Azhar Mohd - Register to report drainage issues
+        
+        Citizens can register with their details. Admin accounts cannot be created via registration endpoint.
+      operationId: registerUser
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - fullName
+                - email
+                - mobile
+                - role
+                - address
+                - city
+                - state
+                - pincode
+                - password
+              properties:
+                fullName:
+                  type: string
+                  minLength: 3
+                  maxLength: 100
+                  example: "Murali K GB"
+                email:
+                  type: string
+                  format: email
+                  example: "murali@example.com"
+                mobile:
+                  type: string
+                  pattern: '^[0-9]{10}$'
+                  example: "9876543210"
+                role:
+                  type: string
+                  enum: [Citizen, Officer, Worker]
+                  description: "Only Citizen, Officer, or Worker roles can be created. Admin not allowed."
+                  example: "Citizen"
+                address:
+                  type: string
+                  minLength: 10
+                  maxLength: 500
+                  example: "123, MG Road, Brigade Area"
+                city:
+                  type: string
+                  example: "Bengaluru"
+                state:
+                  type: string
+                  example: "Karnataka"
+                pincode:
+                  type: string
+                  pattern: '^[0-9]{6}$'
+                  example: "560001"
+                password:
+                  type: string
+                  minLength: 8
+                  pattern: '^(?=.*[A-Za-z])(?=.*\d)[A-Za-z\d@$!%*?&]{8,}$'
+                  description: "At least 8 characters with at least one letter and one number"
+                  example: "Secure@123"
+                gender:
+                  type: string
+                  enum: [Male, Female, Other]
+                  example: "Male"
+                dateOfBirth:
+                  type: string
+                  format: date
+                  example: "1990-05-15"
+            example:
+              fullName: "Murali K GB"
+              email: "murali@example.com"
+              mobile: "9876543210"
+              role: "Citizen"
+              address: "123, MG Road, Brigade Area"
+              city: "Bengaluru"
+              state: "Karnataka"
+              pincode: "560001"
+              password: "Secure@123"
+              gender: "Male"
+      responses:
+        '201':
+          description: Registration successful
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  message:
+                    type: string
+                    example: "Registration successful. Please verify your email."
+                  userId:
+                    type: integer
+                    example: 1001
+                  accountId:
+                    type: string
+                    example: "CVC-USR-1234"
+        '400':
+          $ref: '#/components/responses/ValidationError'
+        '403':
+          description: Admin accounts cannot be created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                success: false
+                message: "Admin accounts cannot be created via registration."
+                code: "AUTH_003"
+                timestamp: "2026-08-01T10:30:00Z"
+        '409':
+          description: Email already registered
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                success: false
+                message: "This email is already registered."
+                code: "AUTH_004"
+                timestamp: "2026-08-01T10:30:00Z"
+
+  /auth/login:
+    post:
+      tags:
+        - Authentication
+      summary: "US1-US9 | Authenticate user"
+      description: |
+        **All User Stories:** All users need to login to access the platform.
+        
+        Valid credentials return JWT tokens and user information.
+      operationId: loginUser
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - email
+                - password
+              properties:
+                email:
+                  type: string
+                  format: email
+                  example: "murali@example.com"
+                password:
+                  type: string
+                  example: "Secure@123"
+      responses:
+        '200':
+          description: Login successful
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  access_token:
+                    type: string
+                    description: "JWT access token (expires in 15 minutes)"
+                  refresh_token:
+                    type: string
+                    description: "JWT refresh token (expires in 7 days)"
+                  token_type:
+                    type: string
+                    example: "Bearer"
+                  expires_in:
+                    type: integer
+                    example: 900
+                  user:
+                    $ref: '#/components/schemas/User'
+        '400':
+          $ref: '#/components/responses/ValidationError'
+        '401':
+          description: Invalid credentials
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                success: false
+                message: "Invalid email or password."
+                code: "AUTH_005"
+                timestamp: "2026-08-01T10:30:00Z"
+        '403':
+          description: Account not active
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                success: false
+                message: "Your account is pending verification. Please check your email."
+                code: "AUTH_006"
+                timestamp: "2026-08-01T10:30:00Z"
+
+  /auth/refresh:
+    post:
+      tags:
+        - Authentication
+      summary: Refresh access token
+      description: |
+        **All User Stories:** Users need to refresh their session.
+        
+        Exchange a valid refresh token for a new access token.
+      operationId: refreshToken
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: New access token generated
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  access_token:
+                    type: string
+                  expires_in:
+                    type: integer
+                    example: 900
+        '401':
+          description: Token revoked or invalid
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                success: false
+                message: "Token has been revoked. Please log in again."
+                code: "AUTH_007"
+                timestamp: "2026-08-01T10:30:00Z"
+
+  /auth/logout:
+    post:
+      tags:
+        - Authentication
+      summary: Logout user
+      description: |
+        **All User Stories:** Users need to log out securely.
+        
+        Revoke current access token and optionally a refresh token.
+      operationId: logoutUser
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                refresh_token:
+                  type: string
+                  description: "Optional refresh token to also revoke"
+      responses:
+        '200':
+          description: Logout successful
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessResponse'
+              example:
+                success: true
+                message: "Logged out successfully."
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+
+  # ============================================
+  # CITIZEN COMPLAINT ENDPOINTS
+  # ============================================
+  /citizen/complaints:
+    post:
+      tags:
+        - Citizen Services
+      summary: |
+        **US1, US5, US6, US7, US8, US9**
+        Submit a new complaint
+      description: |
+        **User Stories:**
+        - **US1** (Murali K GB): Submit civic complaint with photos and location
+        - **US5** (Priyanshu Singh): Report garbage issues with location details
+        - **US6** (Omkar Jaiswal): Report faulty streetlight with location and track
+        - **US7** (Mangalam Shrivastav): Report potholes near college with exact location
+        - **US8** (Dhruv Raghav): Report overflowing/missing dustbins with location
+        - **US9** (Azhar Mohd): Report blocked drainage with exact location
+        
+        Citizens can submit complaints with:
+        - Title, category, description (min 30 characters)
+        - Location details (ward, area, street, pincode)
+        - Optional photos (max 5, each <= 5MB)
+        - Priority level (Low/Medium/High/Emergency)
+        - GPS coordinates (latitude, longitude)
+        
+        **Business Rules:**
+        - Emergency priority automatically escalates response time
+        - Garbage category routes to Sanitation Department
+        - Streetlight category routes to Electrical Department
+        - Road category routes to Roads & Infrastructure Department
+        - Drainage category routes to Sewage & Drainage Department
+      operationId: submitComplaint
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              allOf:
+                - $ref: '#/components/schemas/ComplaintInput'
+                - type: object
+                  properties:
+                    images:
+                      type: array
+                      items:
+                        type: string
+                        format: binary
+                      description: "Image files (PNG, JPG, JPEG, WEBP), max 5 files, each <= 5MB"
+                    image:
+                      type: string
+                      format: binary
+                      description: "Single image upload (for backward compatibility)"
+      responses:
+        '201':
+          description: Complaint submitted successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  message:
+                    type: string
+                    example: "Complaint submitted successfully."
+                  complaint:
+                    $ref: '#/components/schemas/Complaint'
+                  trackingLink:
+                    type: string
+                    example: "https://api.municipal.gov.in/public/track/CMP-2026-001234"
+        '400':
+          $ref: '#/components/responses/ValidationError'
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+        '403':
+          $ref: '#/components/responses/ForbiddenError'
+        '413':
+          description: Image file too large
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                success: false
+                message: "Image file size exceeds 5MB limit"
+                code: "FILE_001"
+        '415':
+          description: Unsupported image format
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                success: false
+                message: "Unsupported file format. Please upload PNG, JPG, JPEG, or WEBP."
+                code: "FILE_002"
+        '429':
+          $ref: '#/components/responses/RateLimitError'
+
+    get:
+      tags:
+        - Citizen Services
+      summary: |
+        **US1, US5, US6, US7, US8, US9**
+        List citizen's complaints
+      description: |
+        **All Citizen Stories:** Track all complaints submitted by the citizen.
+        
+        Get a list of complaints with optional filtering by status or search.
+        
+        **Filtering Options:**
+        - status: pending, assigned, in_progress, resolved, closed, rejected, All
+        - search: Search in title and description
+        - category: Filter by specific category
+        - dateFrom, dateTo: Filter by submission date range
+      operationId: getCitizenComplaints
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: status
+          in: query
+          schema:
+            type: string
+            enum: [pending, assigned, in_progress, resolved, closed, rejected, All]
+            default: All
+          description: "Filter by complaint status"
+          example: "pending"
+        - name: search
+          in: query
+          schema:
+            type: string
+            minLength: 2
+          description: "Search in title, description, or category"
+          example: "streetlight"
+        - name: category
+          in: query
+          schema:
+            type: string
+            enum: [Road, Drainage, Electricity, Water, Garbage, Streetlight, Other]
+          description: "Filter by category"
+          example: "Garbage"
+        - name: dateFrom
+          in: query
+          schema:
+            type: string
+            format: date
+          description: "Filter complaints submitted after this date"
+          example: "2026-07-01"
+        - name: dateTo
+          in: query
+          schema:
+            type: string
+            format: date
+          description: "Filter complaints submitted before this date"
+          example: "2026-07-31"
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 20
+            minimum: 1
+            maximum: 100
+          description: "Number of complaints to return"
+        - name: offset
+          in: query
+          schema:
+            type: integer
+            default: 0
+            minimum: 0
+          description: "Number of complaints to skip"
+      responses:
+        '200':
+          description: List of complaints
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  total:
+                    type: integer
+                    example: 45
+                  limit:
+                    type: integer
+                    example: 20
+                  offset:
+                    type: integer
+                    example: 0
+                  complaints:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Complaint'
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+        '403':
+          $ref: '#/components/responses/ForbiddenError'
+
+  /citizen/complaints/summary:
+    get:
+      tags:
+        - Citizen Services
+      summary: |
+        **US1, US5, US6, US7, US8, US9**
+        Get complaint summary counts
+      description: |
+        **All Citizen Stories:** Get quick overview of complaint statistics.
+        
+        Returns count of complaints by status for quick dashboard display.
+      operationId: getComplaintSummary
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: Summary counts
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  summary:
+                    type: object
+                    properties:
+                      total:
+                        type: integer
+                        example: 45
+                      pending:
+                        type: integer
+                        example: 10
+                      assigned:
+                        type: integer
+                        example: 8
+                      in_progress:
+                        type: integer
+                        example: 12
+                      resolved:
+                        type: integer
+                        example: 10
+                      closed:
+                        type: integer
+                        example: 3
+                      rejected:
+                        type: integer
+                        example: 2
+                  category_breakdown:
+                    type: object
+                    additionalProperties:
+                      type: integer
+                    example:
+                      Road: 12
+                      Streetlight: 8
+                      Garbage: 10
+                      Drainage: 7
+                      Electricity: 5
+                      Water: 3
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+
+  /citizen/complaints/{complaintId}:
+    get:
+      tags:
+        - Citizen Services
+      summary: |
+        **US1, US5, US6, US7, US8, US9**
+        Get complaint details
+      description: |
+        **All Citizen Stories:** View full details of a specific complaint.
+        
+        Includes:
+        - All complaint details with location
+        - Images uploaded
+        - Status history
+        - Assignment details (officer/worker assigned)
+        - Feedback if submitted
+        - Escalation status
+        
+        **Security:** Only the complaint owner can view details.
+      operationId: getComplaintDetails
+      security:
+        - BearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/ComplaintIdParam'
+      responses:
+        '200':
+          description: Complaint details
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  complaint:
+                    $ref: '#/components/schemas/Complaint'
+                  activity_log:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/ActivityLog'
+                  estimatedResolution:
+                    type: string
+                    format: date
+                    nullable: true
+                    description: "Estimated date of resolution based on priority and department"
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+        '403':
+          description: Access denied
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                success: false
+                message: "You do not have access to this complaint."
+                code: "AUTH_008"
+                timestamp: "2026-08-01T10:30:00Z"
+        '404':
+          $ref: '#/components/responses/NotFoundError'
+
+  /citizen/complaints/{complaintId}/tracking:
+    get:
+      tags:
+        - Citizen Services
+      summary: |
+        **US1, US5, US6, US7, US8, US9**
+        Track complaint status history
+      description: |
+        **All Citizen Stories:** Track complaint progress through the resolution lifecycle.
+        
+        Returns:
+        - Current status with timestamp
+        - Full status change history with remarks
+        - Who changed the status (system/worker/officer)
+        - Estimated completion time
+        
+        **User Story Mapping:**
+        - US5: Shop owner tracks garbage complaint progress
+        - US6: Working professional tracks streetlight repair
+        - US7: College student tracks pothole repair
+        - US8: Local resident tracks dustbin resolution
+        - US9: Local resident tracks drainage clearance
+      operationId: trackComplaint
+      security:
+        - BearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/ComplaintIdParam'
+      responses:
+        '200':
+          description: Tracking information
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  current_status:
+                    type: string
+                  status_timeline:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        old_status:
+                          type: string
+                          nullable: true
+                        new_status:
+                          type: string
+                        remark:
+                          type: string
+                          nullable: true
+                        changed_by:
+                          type: string
+                        changed_at:
+                          type: string
+                          format: date-time
+                  estimated_completion:
+                    type: string
+                    format: date-time
+                    nullable: true
+                  sla_breach:
+                    type: boolean
+                    description: "Whether complaint has breached SLA"
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+        '403':
+          $ref: '#/components/responses/ForbiddenError'
+        '404':
+          $ref: '#/components/responses/NotFoundError'
+
+  /citizen/complaints/{complaintId}/feedback:
+    post:
+      tags:
+        - Citizen Services
+      summary: |
+        **US1, US5, US6, US7, US8, US9**
+        Submit feedback for resolved complaint
+      description: |
+        **All Citizen Stories:** Provide feedback after complaint resolution.
+        
+        **Business Rules:**
+        - Feedback can only be submitted for 'resolved' complaints
+        - One feedback per complaint
+        - Minimum comment length: 20 characters
+        - All ratings and comments help improve services
+        
+        **User Story Benefits:**
+        - Ensures quality of service delivery
+        - Holds municipality accountable
+        - Improves future complaint handling
+      operationId: submitFeedback
+      security:
+        - BearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/ComplaintIdParam'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - overallRating
+                - comment
+              properties:
+                overallRating:
+                  type: integer
+                  minimum: 1
+                  maximum: 5
+                  description: "Overall experience rating (1=Very Poor, 5=Excellent)"
+                  example: 4
+                serviceRatings:
+                  type: object
+                  properties:
+                    responseTime:
+                      type: integer
+                      minimum: 1
+                      maximum: 5
+                      description: "Rating for response time"
+                    resolutionQuality:
+                      type: integer
+                      minimum: 1
+                      maximum: 5
+                      description: "Rating for quality of resolution"
+                    communication:
+                      type: integer
+                      minimum: 1
+                      maximum: 5
+                      description: "Rating for communication during process"
+                categories:
+                  type: array
+                  items:
+                    type: string
+                    enum: [Timeliness, Quality, Communication, Professionalism, Overall]
+                  description: "Aspect categories being rated"
+                comment:
+                  type: string
+                  minLength: 20
+                  maxLength: 1000
+                  example: "The streetlight was repaired within 48 hours. The worker was professional and kept us informed."
+                improvement:
+                  type: string
+                  maxLength: 500
+                  nullable: true
+                  example: "Could provide estimated time of completion earlier"
+                wouldRecommend:
+                  type: string
+                  enum: [Yes, No, Maybe]
+                  example: "Yes"
+                anonymous:
+                  type: boolean
+                  default: false
+                  description: "Whether to keep feedback anonymous"
+      responses:
+        '201':
+          description: Feedback submitted
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  message:
+                    type: string
+                    example: "Thank you! Your feedback has been submitted."
+                  feedbackId:
+                    type: integer
+        '400':
+          $ref: '#/components/responses/ValidationError'
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+        '403':
+          $ref: '#/components/responses/ForbiddenError'
+        '404':
+          $ref: '#/components/responses/NotFoundError'
+        '409':
+          $ref: '#/components/responses/ConflictError'
+
+    get:
+      tags:
+        - Citizen Services
+      summary: |
+        **US1, US5, US6, US7, US8, US9**
+        Get submitted feedback
+      description: |
+        **All Citizen Stories:** View feedback already submitted for a complaint.
+      operationId: getFeedback
+      security:
+        - BearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/ComplaintIdParam'
+      responses:
+        '200':
+          description: Feedback retrieved
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  feedback:
+                    $ref: '#/components/schemas/Feedback'
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+        '403':
+          $ref: '#/components/responses/ForbiddenError'
+        '404':
+          description: Complaint not found or no feedback
+          content:
+            application/json:
+              schema:
+                oneOf:
+                  - $ref: '#/components/schemas/ErrorResponse'
+                  - type: object
+                    properties:
+                      success:
+                        type: boolean
+                        example: false
+                      message:
+                        type: string
+                        example: "No feedback has been submitted for this complaint"
+
+  /citizen/complaints/{complaintId}/escalate:
+    post:
+      tags:
+        - Citizen Services
+      summary: |
+        **US1, US5, US6, US7, US8, US9**
+        Escalate a complaint
+      description: |
+        **All Citizen Stories:** Escalate complaint if not resolved within SLA.
+        
+        **Business Rules:**
+        - Only pending/in_progress complaints can be escalated
+        - Citizen can escalate once per complaint
+        - Escalation requires a reason
+        - Escalation sends notification to higher authorities
+        
+        **SLA Guidelines:**
+        - Emergency: 24 hours
+        - High: 48 hours
+        - Medium: 5 days
+        - Low: 7 days
+      operationId: escalateComplaint
+      security:
+        - BearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/ComplaintIdParam'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - reason
+              properties:
+                reason:
+                  type: string
+                  minLength: 20
+                  maxLength: 500
+                  example: "The complaint is unresolved for 5 days despite being marked as High priority. The streetlight is still not functioning and creating safety issues."
+      responses:
+        '200':
+          description: Complaint escalated
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  message:
+                    type: string
+                    example: "Complaint has been escalated to higher authorities."
+                  escalationId:
+                    type: integer
+        '400':
+          $ref: '#/components/responses/ValidationError'
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+        '403':
+          $ref: '#/components/responses/ForbiddenError'
+        '404':
+          $ref: '#/components/responses/NotFoundError'
+        '409':
+          description: Already escalated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                success: false
+                message: "This complaint has already been escalated."
+                code: "ESC_001"
+
+  # ============================================
+  # CITIZEN BOOKING ENDPOINTS (US4)
+  # ============================================
+  /citizen/bookings:
+    post:
+      tags:
+        - Citizen Services
+      summary: |
+        **US4** (Ramakrishnan)
+        Book a public facility
+      description: |
+        **User Story:** As a citizen, I want to book a public facility and track my booking status so that I can use the facility on my preferred date.
+        
+        **Available Facilities:**
+        - Community Halls
+        - Parks & Gardens
+        - Sports Grounds
+        - Auditoriums
+        - Function Halls
+        
+        **Business Rules:**
+        - Booking must be at least 24 hours in advance
+        - Maximum booking duration: 12 hours
+        - Facilities can be booked up to 30 days in advance
+        - Booking requires refundable deposit
+        - No overlapping bookings for same facility
+        - Cancellation allowed up to 48 hours before booking
+      operationId: createBooking
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - facilityId
+                - facilityType
+                - bookingDate
+                - startTime
+                - endTime
+                - purpose
+                - numberOfPeople
+              properties:
+                facilityId:
+                  type: integer
+                  description: "ID of the facility to book"
+                  example: 105
+                facilityType:
+                  type: string
+                  enum: [CommunityHall, Park, SportsGround, Auditorium, FunctionHall]
+                  example: "CommunityHall"
+                bookingDate:
+                  type: string
+                  format: date
+                  example: "2026-08-15"
+                startTime:
+                  type: string
+                  pattern: '^([0-1][0-9]|2[0-3]):[0-5][0-9]$'
+                  example: "09:00"
+                endTime:
+                  type: string
+                  pattern: '^([0-1][0-9]|2[0-3]):[0-5][0-9]$'
+                  example: "17:00"
+                purpose:
+                  type: string
+                  minLength: 10
+                  maxLength: 200
+                  example: "Wedding Reception"
+                numberOfPeople:
+                  type: integer
+                  minimum: 1
+                  maximum: 500
+                  example: 100
+                amenities:
+                  type: array
+                  items:
+                    type: string
+                    enum: [Parking, Catering, Stage, Lighting, SoundSystem, AC, WiFi]
+                  example: ["Parking", "Stage"]
+                specialRequests:
+                  type: string
+                  maxLength: 500
+                  example: "Need extra chairs and a sound system"
+                contactNumber:
+                  type: string
+                  pattern: '^[0-9]{10}$'
+                  example: "9876543210"
+      responses:
+        '201':
+          description: Booking created
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  message:
+                    type: string
+                    example: "Booking created successfully. Please pay the deposit to confirm."
+                  booking:
+                    $ref: '#/components/schemas/FacilityBooking'
+                  depositAmount:
+                    type: number
+                    format: float
+                    example: 500.00
+                  paymentLink:
+                    type: string
+                    example: "https://api.municipal.gov.in/payment/booking/BKG-2026-001234"
+        '400':
+          $ref: '#/components/responses/ValidationError'
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+        '403':
+          $ref: '#/components/responses/ForbiddenError'
+        '409':
+          description: Facility already booked
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                success: false
+                message: "Facility is already booked for the selected time slot."
+                code: "BKG_001"
+                available_slots:
+                  - "2026-08-16 14:00-17:00"
+                  - "2026-08-17 09:00-12:00"
+
+    get:
+      tags:
+        - Citizen Services
+      summary: |
+        **US4** (Ramakrishnan)
+        List citizen's bookings
+      description: |
+        **US4:** View all facility bookings made by the citizen.
+        
+        **Filter Options:**
+        - status: pending, confirmed, rejected, completed, cancelled, All
+        - dateFrom, dateTo: Filter by booking date
+      operationId: getCitizenBookings
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: status
+          in: query
+          schema:
+            type: string
+            enum: [pending, confirmed, rejected, completed, cancelled, All]
+            default: All
+          description: "Filter by booking status"
+        - name: dateFrom
+          in: query
+          schema:
+            type: string
+            format: date
+          description: "Filter bookings from this date"
+        - name: dateTo
+          in: query
+          schema:
+            type: string
+            format: date
+          description: "Filter bookings until this date"
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 20
+            minimum: 1
+            maximum: 50
+      responses:
+        '200':
+          description: List of bookings
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  total:
+                    type: integer
+                  bookings:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/FacilityBooking'
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+
+  /citizen/bookings/{bookingId}:
+    get:
+      tags:
+        - Citizen Services
+      summary: |
+        **US4** (Ramakrishnan)
+        Get booking details
+      description: |
+        **US4:** View full details of a specific facility booking.
+      operationId: getBookingDetails
+      security:
+        - BearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/BookingIdParam'
+      responses:
+        '200':
+          description: Booking details
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  booking:
+                    $ref: '#/components/schemas/FacilityBooking'
+                  payment_status:
+                    type: string
+                    enum: [pending, paid, refunded]
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+        '403':
+          $ref: '#/components/responses/ForbiddenError'
+        '404':
+          $ref: '#/components/responses/NotFoundError'
+
+  /citizen/bookings/{bookingId}/cancel:
+    post:
+      tags:
+        - Citizen Services
+      summary: |
+        **US4** (Ramakrishnan)
+        Cancel booking
+      description: |
+        **US4:** Cancel a facility booking.
+        
+        **Business Rules:**
+        - Cancellation allowed up to 48 hours before booking
+        - Deposit refunded for cancellations > 72 hours
+        - 50% deposit refunded for cancellations 48-72 hours
+        - No refund for cancellations < 48 hours
+      operationId: cancelBooking
+      security:
+        - BearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/BookingIdParam'
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                reason:
+                  type: string
+                  maxLength: 500
+                  example: "Change of plans"
+      responses:
+        '200':
+          description: Booking cancelled
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  message:
+                    type: string
+                  refundAmount:
+                    type: number
+                    format: float
+                  refundDate:
+                    type: string
+                    format: date
+        '400':
+          $ref: '#/components/responses/ValidationError'
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+        '403':
+          $ref: '#/components/responses/ForbiddenError'
+        '404':
+          $ref: '#/components/responses/NotFoundError'
+        '409':
+          description: Cannot cancel
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                success: false
+                message: "Cannot cancel booking within 48 hours of the booking date."
+                code: "BKG_002"
+
+  # ============================================
+  # OFFICER ENDPOINTS (US2)
+  # ============================================
+  /officer/complaints:
+    get:
+      tags:
+        - Officer Services
+      summary: |
+        **US2** (Lallu Prashanth)
+        Get all complaints in officer's jurisdiction
+      description: |
+        **User Story:** As a municipal officer, I want to assign complaints to field workers and track their progress so that complaints are resolved efficiently.
+        
+        **Officer Capabilities:**
+        - View all complaints in their ward/department
+        - Filter by status, priority, category
+        - Sort by date, priority, or status
+        - View unassigned complaints needing attention
+        - Monitor worker performance metrics
+      operationId: getOfficerComplaints
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: status
+          in: query
+          schema:
+            type: string
+            enum: [pending, assigned, in_progress, resolved, closed, rejected, all]
+            default: all
+        - name: priority
+          in: query
+          schema:
+            type: string
+            enum: [Low, Medium, High, Emergency]
+        - name: category
+          in: query
+          schema:
+            type: string
+            enum: [Road, Drainage, Electricity, Water, Garbage, Streetlight, Other]
+        - name: assigned
+          in: query
+          schema:
+            type: boolean
+            description: "True for assigned, False for unassigned"
+        - name: ward
+          in: query
+          schema:
+            type: string
+          description: "Filter by ward number"
+        - name: fromDate
+          in: query
+          schema:
+            type: string
+            format: date
+        - name: toDate
+          in: query
+          schema:
+            type: string
+            format: date
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 50
+            maximum: 200
+        - name: offset
+          in: query
+          schema:
+            type: integer
+            default: 0
+      responses:
+        '200':
+          description: List of complaints with officer view
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  total:
+                    type: integer
+                  pending_count:
+                    type: integer
+                  summary:
+                    type: object
+                    properties:
+                      total:
+                        type: integer
+                      unassigned:
+                        type: integer
+                      overdue:
+                        type: integer
+                      emergency:
+                        type: integer
+                  complaints:
+                    type: array
+                    items:
+                      allOf:
+                        - $ref: '#/components/schemas/Complaint'
+                        - type: object
+                          properties:
+                            worker_name:
+                              type: string
+                              nullable: true
+                            days_open:
+                              type: integer
+                            sla_breached:
+                              type: boolean
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+        '403':
+          $ref: '#/components/responses/ForbiddenError'
+
+  /officer/complaints/{complaintId}/assign:
+    patch:
+      tags:
+        - Officer Services
+      summary: |
+        **US2** (Lallu Prashanth)
+        Assign complaint to a field worker
+      description: |
+        **US2:** Assign complaints to field workers and track their progress.
+        
+        **Business Rules:**
+        - Only officers can assign complaints
+        - Worker must be in the same ward/department
+        - Worker's workload is considered (max 15 active complaints)
+        - Deadline automatically calculated based on priority
+        - Notification sent to worker and citizen
+      operationId: assignComplaint
+      security:
+        - BearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/ComplaintIdParam'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - workerId
+              properties:
+                workerId:
+                  type: integer
+                  description: "ID of the field worker to assign"
+                  example: 2034
+                deadline:
+                  type: string
+                  format: date
+                  description: "Optional custom deadline (default: based on priority)"
+                  example: "2026-07-30"
+                notes:
+                  type: string
+                  maxLength: 500
+                  example: "Please prioritize this as it's near the school"
+      responses:
+        '200':
+          description: Complaint assigned successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  message:
+                    type: string
+                    example: "Complaint assigned to Sarmadh Ameer successfully."
+                  assignment:
+                    $ref: '#/components/schemas/WorkerAssignment'
+                  worker:
+                    type: object
+                    properties:
+                      id:
+                        type: integer
+                      name:
+                        type: string
+                      mobile:
+                        type: string
+        '400':
+          $ref: '#/components/responses/ValidationError'
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+        '403':
+          $ref: '#/components/responses/ForbiddenError'
+        '404':
+          $ref: '#/components/responses/NotFoundError'
+        '409':
+          description: Worker unavailable
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                success: false
+                message: "Worker is already assigned to 15 active complaints. Please choose another worker."
+                code: "ASSIGN_001"
+                available_workers:
+                  - id: 2035
+                    name: "Rajesh Kumar"
+                    workload: 8
+                  - id: 2036
+                    name: "Priya Sharma"
+                    workload: 5
+
+  /officer/complaints/{complaintId}/reassign:
+    patch:
+      tags:
+        - Officer Services
+      summary: |
+        **US2** (Lallu Prashanth)
+        Reassign complaint to another worker
+      description: |
+        **US2:** Reassign complaint if current worker is unable to complete.
+      operationId: reassignComplaint
+      security:
+        - BearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/ComplaintIdParam'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - workerId
+              properties:
+                workerId:
+                  type: integer
+                reason:
+                  type: string
+                  minLength: 20
+                  maxLength: 500
+      responses:
+        '200':
+          description: Complaint reassigned
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  message:
+                    type: string
+        '400':
+          $ref: '#/components/responses/ValidationError'
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+        '403':
+          $ref: '#/components/responses/ForbiddenError'
+        '404':
+          $ref: '#/components/responses/NotFoundError'
+
+  /officer/dashboard:
+    get:
+      tags:
+        - Officer Services
+      summary: |
+        **US2** (Lallu Prashanth)
+        Officer dashboard
+      description: |
+        **US2:** Get comprehensive dashboard with:
+        - Complaint statistics
+        - Worker performance
+        - Ward-wise breakdown
+        - SLA compliance metrics
+        - Priority distribution
+      operationId: getOfficerDashboard
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: Dashboard data
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OfficerDashboard'
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+        '403':
+          $ref: '#/components/responses/ForbiddenError'
+
+  /officer/workers:
+    get:
+      tags:
+        - Officer Services
+      summary: |
+        **US2** (Lallu Prashanth)
+        Get list of available workers
+      description: |
+        **US2:** View all field workers in officer's jurisdiction with workload status.
+      operationId: getWorkers
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: availability
+          in: query
+          schema:
+            type: boolean
+          description: "True for available workers (workload < 15)"
+        - name: ward
+          in: query
+          schema:
+            type: string
+        - name: skill
+          in: query
+          schema:
+            type: string
+            enum: [Road, Drainage, Electricity, Water, Garbage, Streetlight, General]
+      responses:
+        '200':
+          description: List of workers
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  workers:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        id:
+                          type: integer
+                        name:
+                          type: string
+                        mobile:
+                          type: string
+                        ward:
+                          type: string
+                        skills:
+                          type: array
+                          items:
+                            type: string
+                        active_complaints:
+                          type: integer
+                        rating:
+                          type: number
+                          format: float
+                        availability:
+                          type: boolean
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+
+  # ============================================
+  # WORKER ENDPOINTS (US3)
+  # ============================================
+  /worker/complaints:
+    get:
+      tags:
+        - Worker Services
+      summary: |
+        **US3** (Sarmadh Ameer)
+        View assigned complaints
+      description: |
+        **User Story:** As a field worker, I want to view my assigned complaints and update their status with proof of completion so that officers and citizens know the work has been completed.
+        
+        **Worker Capabilities:**
+        - View all assigned complaints
+        - Filter by status (pending, in_progress, completed)
+        - Sort by priority or deadline
+        - View complaint details and location
+        - Update status with proof
+        - Mark work as completed
+      operationId: getWorkerComplaints
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: status
+          in: query
+          schema:
+            type: string
+            enum: [pending, in_progress, completed, all]
+            default: all
+        - name: priority
+          in: query
+          schema:
+            type: string
+            enum: [Emergency, High, Medium, Low]
+        - name: sortBy
+          in: query
+          schema:
+            type: string
+            enum: [deadline, priority, assigned_date]
+            default: deadline
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 20
+            maximum: 100
+      responses:
+        '200':
+          description: List of assigned complaints
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  total:
+                    type: integer
+                  pending_count:
+                    type: integer
+                  in_progress_count:
+                    type: integer
+                  completed_count:
+                    type: integer
+                  complaints:
+                    type: array
+                    items:
+                      allOf:
+                        - $ref: '#/components/schemas/Complaint'
+                        - type: object
+                          properties:
+                            deadline:
+                              type: string
+                              format: date
+                            days_remaining:
+                              type: integer
+                            is_overdue:
+                              type: boolean
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+        '403':
+          $ref: '#/components/responses/ForbiddenError'
+
+  /worker/complaints/{complaintId}/status:
+    patch:
+      tags:
+        - Worker Services
+      summary: |
+        **US3** (Sarmadh Ameer)
+        Update complaint status
+      description: |
+        **US3:** Update status of assigned complaint with proof of completion.
+        
+        **Workflow:**
+        1. Worker accepts assignment (status: pending → in_progress)
+        2. Worker works on complaint
+        3. Worker completes work (status: in_progress → resolved)
+        4. Worker uploads proof of completion
+        5. Officer verifies and closes (status: resolved → closed)
+        
+        **Business Rules:**
+        - Only assigned worker can update status
+        - Status transitions must follow workflow
+        - Proof required for 'resolved' status
+        - Comments required for any status change
+      operationId: updateComplaintStatus
+      security:
+        - BearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/ComplaintIdParam'
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required:
+                - status
+                - comment
+              properties:
+                status:
+                  type: string
+                  enum: [pending, in_progress, resolved, rejected]
+                  description: "New status for the complaint"
+                comment:
+                  type: string
+                  minLength: 10
+                  maxLength: 500
+                  description: "Comment about the work done or reason for status change"
+                proofImage:
+                  type: string
+                  format: binary
+                  description: "Photo proof of work completion (required for 'resolved' status)"
+                proofVideo:
+                  type: string
+                  format: binary
+                  description: "Video proof of work completion (optional)"
+                notes:
+                  type: string
+                  maxLength: 1000
+                  description: "Additional notes for the officer"
+      responses:
+        '200':
+          description: Status updated successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  message:
+                    type: string
+                  complaint:
+                    $ref: '#/components/schemas/Complaint'
+                  updated_at:
+                    type: string
+                    format: date-time
+        '400':
+          $ref: '#/components/responses/ValidationError'
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+        '403':
+          description: Not assigned to this complaint
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                success: false
+                message: "You are not assigned to this complaint."
+                code: "WORK_001"
+        '404':
+          $ref: '#/components/responses/NotFoundError'
+        '409':
+          description: Invalid status transition
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                success: false
+                message: "Invalid status transition from 'pending' to 'resolved'."
+                code: "WORK_002"
+                valid_transitions: ["in_progress"]
+
+  /worker/complaints/{complaintId}/proof:
+    post:
+      tags:
+        - Worker Services
+      summary: |
+        **US3** (Sarmadh Ameer)
+        Upload proof of completion
+      description: |
+        **US3:** Upload additional proof photos/videos for completed work.
+      operationId: uploadProof
+      security:
+        - BearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/ComplaintIdParam'
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              properties:
+                images:
+                  type: array
+                  items:
+                    type: string
+                    format: binary
+                  description: "Proof images (max 5 files, each <= 5MB)"
+                videos:
+                  type: array
+                  items:
+                    type: string
+                    format: binary
+                  description: "Proof videos (max 2 files, each <= 50MB)"
+                note:
+                  type: string
+                  maxLength: 500
+      responses:
+        '200':
+          description: Proof uploaded
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  message:
+                    type: string
+                    example: "Proof uploaded successfully."
+                  uploaded_files:
+                    type: array
+                    items:
+                      type: string
+                  total_count:
+                    type: integer
+        '400':
+          $ref: '#/components/responses/ValidationError'
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+        '403':
+          $ref: '#/components/responses/ForbiddenError'
+        '404':
+          $ref: '#/components/responses/NotFoundError'
+
+  /worker/dashboard:
+    get:
+      tags:
+        - Worker Services
+      summary: |
+        **US3** (Sarmadh Ameer)
+        Worker dashboard
+      description: |
+        **US3:** Get worker's dashboard with:
+        - Summary of assigned complaints
+        - Performance metrics
+        - Upcoming deadlines
+        - Recent completions
+        - Rating history
+      operationId: getWorkerDashboard
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: Worker dashboard
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  summary:
+                    type: object
+                    properties:
+                      assigned:
+                        type: integer
+                      in_progress:
+                        type: integer
+                      completed_this_week:
+                        type: integer
+                      pending:
+                        type: integer
+                      overdue:
+                        type: integer
+                  performance:
+                    type: object
+                    properties:
+                      avg_completion_time:
+                        type: number
+                        description: "Average time to resolve in hours"
+                      completion_rate:
+                        type: number
+                        description: "Percentage of complaints completed"
+                      rating:
+                        type: number
+                        format: float
+                        description: "Average rating from citizens"
+                  upcoming_deadlines:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        complaint_id:
+                          type: string
+                        title:
+                          type: string
+                        deadline:
+                          type: string
+                          format: date
+                        days_left:
+                          type: integer
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+        '403':
+          $ref: '#/components/responses/ForbiddenError'
+
+  # ============================================
+  # PUBLIC ENDPOINTS
+  # ============================================
+  /public/track/{complaintId}:
+    get:
+      tags:
+        - Public Services
+      summary: |
+        **All Stories**
+        Track complaint publicly without login
+      description: |
+        **All Stories:** Public tracking endpoint for citizens to check complaint status without logging in.
+        
+        **Security:** Limited information shown without authentication.
+      operationId: publicTrackComplaint
+      security: []
+      parameters:
+        - $ref: '#/components/parameters/ComplaintIdParam'
+      responses:
+        '200':
+          description: Complaint tracking information
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  complaint:
+                    type: object
+                    properties:
+                      id:
+                        type: string
+                      title:
+                        type: string
+                      category:
+                        type: string
+                      status:
+                        type: string
+                      created_at:
+                        type: string
+                        format: date-time
+                      last_updated:
+                        type: string
+                        format: date-time
+                      current_stage:
+                        type: string
+                        description: "Human readable stage"
+                      estimated_completion:
+                        type: string
+                        format: date
+                        nullable: true
+                      status_history:
+                        type: array
+                        items:
+                          type: object
+                          properties:
+                            status:
+                              type: string
+                            timestamp:
+                              type: string
+                              format: date-time
+                            note:
+                              type: string
+                      assigned_to:
+                        type: string
+                        nullable: true
+        '404':
+          $ref: '#/components/responses/NotFoundError'
+
+  /public/status:
+    get:
+      tags:
+        - Public Services
+      summary: System health check
+      description: Public health check endpoint for API monitoring.
+      security: []
+      responses:
+        '200':
+          description: System healthy
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: "healthy"
+                  version:
+                    type: string
+                    example: "1.0.0"
+                  timestamp:
+                    type: string
+                    format: date-time
+
+  /public/faq:
+    get:
+      tags:
+        - Public Services
+      summary: Get FAQs
+      description: |
+        Frequently asked questions about the complaint system.
+      security: []
+      responses:
+        '200':
+          description: List of FAQs
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  faqs:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        id:
+                          type: integer
+                        question:
+                          type: string
+                        answer:
+                          type: string
+                        category:
+                          type: string
