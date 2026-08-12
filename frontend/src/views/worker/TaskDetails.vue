@@ -210,6 +210,8 @@ import {
 const API_BASE = 'http://127.0.0.1:5000/api'
 const authHeaders = () => ({ Authorization: `Bearer ${localStorage.getItem('token')}` })
 
+defineProps({ id: { type: [String, Number], default: null } })
+
 const route = useRoute()
 const router = useRouter()
 const loading = ref(true)
