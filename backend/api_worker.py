@@ -1,7 +1,10 @@
 from flask import Blueprint, jsonify, request  # type: ignore
 from flask_jwt_extended import get_jwt_identity  # type: ignore
 
-from models import db, Assignment, Complaint, ComplaintImages, Notification, StatusLog, User
+from models import (
+    db, Assignment, Complaint, ComplaintImages, Notification, StatusLog, User,
+    Feedback, ActivityLog
+)
 from api_auth_utils import log_activity, role_required
 from api_citizen import _save_uploaded_image
 
@@ -41,7 +44,11 @@ def _serialize_task(complaint, include_full=False):
         'officer': officer.name if officer else None,
         'officer_id': officer.id if officer else None,
         'created_at': complaint.created_at.isoformat() if complaint.created_at else None,
+        'updated_at': complaint.updated_at.isoformat() if complaint.updated_at else None,
     }
+    if complaint.status in FINAL_STATUSES:
+        feedback = Feedback.query.filter_by(complaint_id=complaint.id).first()
+        data['rating'] = feedback.rating if feedback else None
     if include_full:
         data.update({
             'description': complaint.description,
@@ -50,6 +57,7 @@ def _serialize_task(complaint, include_full=False):
             'ward': complaint.ward,
             'street': complaint.street,
             'landmark': complaint.landmark,
+            'officer_phone': officer.phone if officer else None,
             'images': [image.image_url for image in complaint.images],
             'history': [{
                 'old_status': entry.old_status,
@@ -208,13 +216,60 @@ def mark_all_notifications_read():
 @role_required('Worker')
 def get_profile():
     worker = _current_worker()
-    return jsonify(success=True, profile={
-        'id': worker.id, 'name': worker.name, 'email': worker.email, 'phone': worker.phone,
-        'address': worker.address, 'city': worker.city, 'state': worker.state,
-        'pincode': worker.pincode, 'designation': worker.designation,
-        'profile_photo': worker.profile_photo,
-        'department': worker.member_department.department_name if worker.member_department else None,
-    }), 200
+    dept = worker.member_department
+
+    last_login = (
+        ActivityLog.query
+        .filter(ActivityLog.user_id == worker.id, ActivityLog.activity_type == 'login')
+        .order_by(ActivityLog.created_at.desc())
+        .first()
+    )
+
+    completed_tasks = _worker_tasks(worker.id, FINAL_STATUSES)
+    completed_count = len(completed_tasks)
+
+    resolved_rows = [t for t in completed_tasks if t.updated_at and t.created_at]
+    if resolved_rows:
+        total_seconds = sum((t.updated_at - t.created_at).total_seconds() for t in resolved_rows)
+        avg_completion_hours = round((total_seconds / len(resolved_rows)) / 3600, 1)
+    else:
+        avg_completion_hours = None
+
+    rating_avg = (
+        db.session.query(db.func.avg(Feedback.rating))
+        .join(Complaint, Feedback.complaint_id == Complaint.id)
+        .join(Assignment, Assignment.complaint_id == Complaint.id)
+        .filter(Assignment.worker_id == worker.id)
+        .scalar()
+    )
+    avg_rating = round(float(rating_avg), 1) if rating_avg is not None else None
+
+    return jsonify(
+        success=True,
+        profile={
+            'id': worker.id,
+            'name': worker.name,
+            'email': worker.email,
+            'phone': worker.phone,
+            'address': worker.address,
+            'city': worker.city,
+            'state': worker.state,
+            'pincode': worker.pincode,
+            'gender': worker.gender,
+            'dob': worker.dob.strftime('%Y-%m-%d') if worker.dob else None,
+            'nationality': worker.nationality,
+            'emergencyContact': worker.emergency_contact,
+            'designation': worker.designation,
+            'profile_photo': worker.profile_photo,
+            'department': dept.department_name if dept else None,
+            'empId': f'FW-{worker.id:04d}',
+            'memberSince': worker.created_at.strftime('%B %d, %Y') if worker.created_at else None,
+            'lastLogin': last_login.created_at.strftime('%b %d, %Y %I:%M %p') if last_login else None,
+            'completedCount': completed_count,
+            'avgCompletionHours': avg_completion_hours,
+            'avgRating': avg_rating,
+        }
+    ), 200
 
 
 @worker_bp.route('/profile', methods=['PUT'])
@@ -222,12 +277,48 @@ def get_profile():
 def update_profile():
     worker = _current_worker()
     data = request.get_json(silent=True) or {}
-    for field in ('name', 'phone', 'address', 'city', 'state', 'pincode'):
+    for field in ('name', 'phone', 'address', 'city', 'state', 'pincode', 'gender', 'nationality'):
         if field in data:
             value = str(data[field]).strip()
             if field == 'name' and not value:
                 return jsonify(message='Name cannot be empty.'), 400
             setattr(worker, field, value or None)
+    if 'emergencyContact' in data:
+        worker.emergency_contact = str(data['emergencyContact']).strip() or None
+    if 'dob' in data and data['dob']:
+        from datetime import datetime
+        try:
+            worker.dob = datetime.strptime(data['dob'], '%Y-%m-%d').date()
+        except ValueError:
+            return jsonify(message='DOB must be in YYYY-MM-DD format.'), 400
     log_activity(worker.id, 'profile_updated', 'Updated worker profile.')
     db.session.commit()
     return get_profile()
+
+
+@worker_bp.route('/profile/photo', methods=['POST'])
+@role_required('Worker')
+def upload_profile_photo():
+    worker = _current_worker()
+    if 'photo' not in request.files:
+        return jsonify(message='No photo file was provided.'), 400
+    try:
+        photo_url = _save_uploaded_image(request.files['photo'])
+    except ValueError as error:
+        return jsonify(message=str(error)), 400
+    if not photo_url:
+        return jsonify(message='No photo file was provided.'), 400
+    worker.profile_photo = photo_url
+    log_activity(worker.id, 'profile_photo_updated', 'Updated profile photo.')
+    db.session.commit()
+    return jsonify(success=True, profilePhoto=photo_url), 200
+
+
+@worker_bp.route('/profile/photo', methods=['DELETE'])
+@role_required('Worker')
+def delete_profile_photo():
+    worker = _current_worker()
+    worker.profile_photo = None
+    log_activity(worker.id, 'profile_photo_removed', 'Removed profile photo.')
+    db.session.commit()
+    return jsonify(success=True), 200
