@@ -120,8 +120,8 @@ const router = createRouter({
       children: [
         { path: 'dashboard', name: 'WorkerDashboard', component: WorkerDashboard, meta: { title: 'Worker Dashboard | CivicDesk', pageTitle: 'Dashboard' } },
         { path: 'tasks', name: 'WorkerAssignedTasks', component: WorkerAssignedTasks, meta: { title: 'Assigned Tasks | CivicDesk', pageTitle: 'Assigned Tasks' } },
-        { path: 'task/:id', name: 'WorkerTaskDetails', component: WorkerTaskDetails, meta: { title: 'Task Details | CivicDesk', pageTitle: 'Task Details' }, props: true },
-        { path: 'update/:id', name: 'WorkerUpdateComplaint', component: WorkerUpdateComplaint, meta: { title: 'Update Complaint | CivicDesk', pageTitle: 'Update Complaint' }, props: true },
+        { path: 'task/:id?', name: 'WorkerTaskDetails', component: WorkerTaskDetails, meta: { title: 'Task Details | CivicDesk', pageTitle: 'Task Details' }, props: true },
+        { path: 'update/:id?', name: 'WorkerUpdateComplaint', component: WorkerUpdateComplaint, meta: { title: 'Update Complaint | CivicDesk', pageTitle: 'Update Complaint' }, props: true },
         { path: 'completed', name: 'WorkerCompletedTasks', component: WorkerCompletedTasks, meta: { title: 'Completed Tasks | CivicDesk', pageTitle: 'Completed Tasks' } },
         { path: 'notifications', name: 'WorkerNotifications', component: WorkerNotifications, meta: { title: 'Notifications | CivicDesk', pageTitle: 'Notifications' } },
         { path: 'profile', name: 'WorkerProfile', component: WorkerProfile, meta: { title: 'Profile | CivicDesk', pageTitle: 'Profile' } },
