@@ -29,7 +29,7 @@
         :to="item.route"
         class="flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-medium transition-all duration-200"
         :class="[
-          $route.path.includes(item.route) 
+          isActiveRoute(item.route)
             ? 'bg-[#2563EB] text-white shadow-md' 
             : 'text-slate-300 hover:bg-slate-800 hover:text-white'
         ]"
@@ -89,6 +89,8 @@ defineEmits(['close-sidebar'])
 const router = useRouter()
 const route = useRoute()
 
+const isActiveRoute = (itemRoute) => route.path === itemRoute || route.path.startsWith(`${itemRoute}/`)
+
 // SMART DETECTION: Automatically determine the role based on the current URL path
 const currentRole = computed(() => {
   const path = route.path.toLowerCase();
@@ -115,6 +117,7 @@ const menuItems = computed(() => {
       return [
         { name: 'Dashboard', icon: LayoutDashboard, route: '/admin/dashboard' },
         { name: 'Department Management', icon: Building2, route: '/admin/departmentmanagement' },
+        { name: 'Department Applications', icon: UserPlus, route: '/admin/departmentapplications' },
         { name: 'Complaint Management', icon: ClipboardList, route: '/admin/complaints' },
         { name: 'Officer Management', icon: Users, route: '/admin/officermanagement' },
         { name: 'Officer Details', icon: UserSearch, route: '/admin/officerdetails' },

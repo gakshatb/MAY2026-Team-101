@@ -50,6 +50,7 @@ import DepartmentApplications from '../views/worker/DepartmentApplications.vue'
 // --- Admin Imports ---
 import AdminDashboard from '../views/admin/Dashboard.vue'
 import DepartmentManagement from '../views/admin/DepartmentManagement.vue'
+import AdminDepartmentApplications from '../views/admin/DepartmentApplications.vue'
 import OfficerDetails from '../views/admin/OfficerDetails.vue'
 import AdminNotifications from '../views/admin/Notifications.vue'
 import OfficerManagement from '../views/admin/OfficerManagement.vue'
@@ -136,6 +137,7 @@ const router = createRouter({
       children: [
         { path: 'dashboard', name: 'AdminDashboard', component: AdminDashboard, meta: { title: 'Admin Dashboard | CivicDesk', pageTitle: 'Dashboard' } },
         { path: 'departmentmanagement', name: 'DepartmentManagement', component: DepartmentManagement, meta: { title: 'Department Management | CivicDesk', pageTitle: 'Department Management' } },
+        { path: 'departmentapplications', name: 'AdminDepartmentApplications', component: AdminDepartmentApplications, meta: { title: 'Department Applications | CivicDesk', pageTitle: 'Department Applications' } },
         { path: 'officerdetails/:id?', name: 'OfficerDetails', component: OfficerDetails, meta: { title: 'Officer Details | CivicDesk', pageTitle: 'Officer Details' }, props: true },
         { path: 'notifications', name: 'AdminNotifications', component: AdminNotifications, meta: { title: 'Notifications | CivicDesk', pageTitle: 'Notifications' } },
         { path: 'officermanagement', name: 'OfficerManagement', component: OfficerManagement, meta: { title: 'Officer Management | CivicDesk', pageTitle: 'Officer Management' } },

@@ -24,7 +24,7 @@
         <Inbox class="w-8 h-8 text-slate-400" />
       </div>
       <h3 class="text-lg font-bold text-slate-900">{{ emptyMessage }}</h3>
-      <button @click="router.push('/citizen/submit')" class="mt-6 px-6 py-2.5 bg-[#2563EB] text-white rounded-lg text-sm font-medium hover:bg-[#1E40AF] transition-colors">
+      <button v-if="showSubmitCta" @click="router.push('/citizen/submit')" class="mt-6 px-6 py-2.5 bg-[#2563EB] text-white rounded-lg text-sm font-medium hover:bg-[#1E40AF] transition-colors">
         Submit a Complaint
       </button>
     </div>
@@ -88,9 +88,15 @@ const props = defineProps({
   emptyMessage: { type: String, default: 'No complaints available.' },
   statusFilter: { type: String, default: null },
   excludeWithFeedback: { type: Boolean, default: false },
+  fetchUrl:     { type: String, default: '/citizen/complaints' },
+  dataKey:      { type: String, default: 'complaints' },
+  showSubmitCta: { type: Boolean, default: true },
 })
 
 defineEmits(['select'])
+
+const API_BASE = 'http://127.0.0.1:5000/api'
+const authHeaders = () => ({ Authorization: `Bearer ${localStorage.getItem('token')}` })
 
 const router    = useRouter()
 const isLoading = ref(true)
@@ -107,11 +113,10 @@ const fetchComplaints = async () => {
   isLoading.value = true
   hasError.value  = false
   try {
-    const token = localStorage.getItem('token')
-    const { data } = await axios.get('http://127.0.0.1:5000/api/citizen/complaints', {
-      headers: { Authorization: `Bearer ${token}` }
+    const { data } = await axios.get(`${API_BASE}${props.fetchUrl}`, {
+      headers: authHeaders()
     })
-    complaints.value = data.complaints.map(c => ({
+    complaints.value = (data[props.dataKey] || []).map(c => ({
       id: c.id, rawId: c.raw_id,
       title: c.title, category: c.category,
       status: c.status, has_feedback: !!c.has_feedback,
