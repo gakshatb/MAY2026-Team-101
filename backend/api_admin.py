@@ -10,7 +10,7 @@ from werkzeug.utils import secure_filename # type: ignore
 from models import (
     db, User, Complaint, Department, ActivityLog, Feedback, Assignment,
     Announcement, LoginSession, NotificationPreference, TokenBlocklist,
-    ContactMessage, Notification, StatusLog, now_ist
+    ContactMessage, Notification, StatusLog, DepartmentApplication, now_ist
 )
 from api_auth_utils import log_activity, role_required, revoke_token
 
@@ -1352,6 +1352,102 @@ def _serialize_admin_complaint(c):
         "created_at":      c.created_at.isoformat() if c.created_at else None,
         "updated_at":      c.updated_at.isoformat() if c.updated_at else None,
     }
+
+
+# ─────────────────────────────────────────────────────────────────────────
+# Department Applications — worker requests to transfer into a department.
+# ─────────────────────────────────────────────────────────────────────────
+def _serialize_dept_application(app):
+    reviewer = app.reviewer
+    return {
+        'id': app.id,
+        'workerId': app.worker_id,
+        'workerName': app.worker.name if app.worker else None,
+        'workerEmail': app.worker.email if app.worker else None,
+        'currentDepartment': app.worker.member_department.department_name if app.worker and app.worker.member_department else None,
+        'departmentId': app.department_id,
+        'departmentName': app.department.department_name if app.department else None,
+        'status': app.status,
+        'message': app.message,
+        'remark': app.remark,
+        'appliedAt': app.applied_at.isoformat() if app.applied_at else None,
+        'reviewedAt': app.reviewed_at.isoformat() if app.reviewed_at else None,
+        'reviewedBy': reviewer.name if reviewer else None,
+    }
+
+
+@admin_bp.route('/department-applications', methods=['GET'])
+@role_required('Admin')
+def list_department_applications():
+    status = request.args.get('status', '').strip()
+    query = DepartmentApplication.query
+    if status and status != 'All':
+        query = query.filter_by(status=status)
+    apps = query.order_by(DepartmentApplication.applied_at.desc()).all()
+    return jsonify(
+        success=True,
+        applications=[_serialize_dept_application(a) for a in apps],
+        counts={
+            'pending': DepartmentApplication.query.filter_by(status='Pending').count(),
+            'approved': DepartmentApplication.query.filter_by(status='Approved').count(),
+            'rejected': DepartmentApplication.query.filter_by(status='Rejected').count(),
+        }
+    ), 200
+
+
+@admin_bp.route('/department-applications/<int:application_id>', methods=['PATCH'])
+@role_required('Admin')
+def review_department_application(application_id):
+    application = DepartmentApplication.query.get(application_id)
+    if not application:
+        return jsonify(message='Application not found.'), 404
+    if application.status != 'Pending':
+        return jsonify(message='This application has already been reviewed.'), 400
+
+    data = request.get_json(silent=True) or {}
+    decision = data.get('status')
+    if decision not in ('Approved', 'Rejected'):
+        return jsonify(message="Status must be 'Approved' or 'Rejected'."), 400
+
+    remark = (data.get('remark') or '').strip()[:500] or None
+    if decision == 'Rejected' and not remark:
+        return jsonify(message='A remark is required when rejecting an application.'), 400
+
+    worker = application.worker
+    dept = application.department
+    admin_id = int(get_jwt_identity())
+
+    if decision == 'Approved':
+        from api_worker import _worker_has_ongoing_task
+        if _worker_has_ongoing_task(worker.id):
+            return jsonify(message=f'{worker.name} currently has an ongoing task and cannot be transferred yet.'), 400
+
+    application.status = decision
+    application.remark = remark
+    application.reviewed_at = now_ist()
+    application.reviewed_by = admin_id
+
+    if decision == 'Approved':
+        old_dept = worker.member_department
+        worker.department_id = dept.id
+        log_activity(admin_id, 'department_application_approved',
+                     f'Approved {worker.name}\'s transfer to {dept.department_name}.')
+        db.session.add(Notification(
+            user_id=worker.id, title='Department Application Approved',
+            message=f'Your application to join {dept.department_name} was approved.',
+            type='resolved'
+        ))
+    else:
+        log_activity(admin_id, 'department_application_rejected',
+                     f'Rejected {worker.name}\'s application to {dept.department_name}.')
+        db.session.add(Notification(
+            user_id=worker.id, title='Department Application Rejected',
+            message=f'Your application to join {dept.department_name} was rejected.' + (f' Reason: {remark}' if remark else ''),
+            type='status_updated'
+        ))
+
+    db.session.commit()
+    return jsonify(success=True, application=_serialize_dept_application(application)), 200
 
 
 @admin_bp.route('/complaints', methods=['GET'])
