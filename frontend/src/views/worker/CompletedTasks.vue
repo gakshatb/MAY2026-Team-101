@@ -80,9 +80,12 @@
                   <div v-if="task.rating" class="flex items-center gap-0.5">
                     <Star v-for="i in 5" :key="i" class="w-3.5 h-3.5" :class="i <= task.rating ? 'text-amber-400 fill-amber-400' : 'text-slate-200 fill-slate-200'" />
                   </div>
-                  <span v-else class="text-xs text-slate-400">No feedback yet</span>
+                  <span v-else class="text-xs text-slate-400">Feedback is yet to submit</span>
                   <router-link :to="`/worker/task/${task.raw_id}`" class="px-3 py-1.5 bg-white border border-slate-200 text-slate-700 text-xs font-bold rounded hover:bg-slate-100 transition-colors">Details</router-link>
                 </div>
+
+                <p v-if="task.rating && task.feedback_comment" class="text-xs text-slate-600 italic mt-2 line-clamp-2">"{{ task.feedback_comment }}"</p>
+                <p v-else-if="task.rating" class="text-xs text-slate-400 italic mt-2">No written comments.</p>
               </div>
             </div>
           </div>
@@ -172,4 +175,11 @@ onMounted(loadCompletedTasks)
 .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
 .custom-scrollbar::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 10px; }
 .custom-scrollbar::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+
+.line-clamp-2 {
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
 </style>

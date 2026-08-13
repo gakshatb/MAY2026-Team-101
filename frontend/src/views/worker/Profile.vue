@@ -32,7 +32,10 @@
               <div class="bg-white rounded-[14px] shadow-sm border border-slate-100 p-6 flex flex-col items-center text-center relative overflow-hidden">
                 <div class="absolute top-0 left-0 w-full h-24 bg-gradient-to-r from-[#1E40AF] to-[#2563EB]"></div>
                 <div class="relative mt-8 mb-4">
-                  <img :src="photoSrc" class="w-28 h-28 rounded-full object-cover border-4 border-white shadow-md bg-white" />
+                  <img v-if="profile.profile_photo" :src="photoSrc" class="w-28 h-28 rounded-full object-cover border-4 border-white shadow-md bg-white" />
+                  <div v-else class="w-28 h-28 rounded-full border-4 border-white shadow-md bg-[#2563EB] text-white flex items-center justify-center text-3xl font-bold">
+                    {{ initials }}
+                  </div>
                 </div>
                 <h2 class="text-xl font-bold text-slate-900 flex items-center justify-center gap-2">
                   {{ profile.name }} <BadgeCheck class="w-5 h-5 text-[#2563EB]" title="Verified Worker" />
@@ -192,7 +195,10 @@
             <div v-if="editError" class="p-3 bg-red-50 border border-red-100 text-red-600 text-sm rounded-lg">{{ editError }}</div>
 
             <div class="flex items-center gap-4 mb-4">
-              <img :src="photoSrc" class="w-16 h-16 rounded-full object-cover border border-slate-200" />
+              <img v-if="profile.profile_photo" :src="photoSrc" class="w-16 h-16 rounded-full object-cover border border-slate-200" />
+              <div v-else class="w-16 h-16 rounded-full border border-slate-200 bg-[#2563EB] text-white flex items-center justify-center text-lg font-bold">
+                {{ initials }}
+              </div>
               <div class="flex flex-col gap-1">
                 <label class="px-3 py-1.5 bg-slate-100 border border-slate-200 text-slate-700 text-xs font-bold rounded hover:bg-slate-200 transition-colors flex items-center gap-2 cursor-pointer w-fit">
                   <Upload class="w-3.5 h-3.5"/> {{ photoUploading ? 'Uploading…' : 'Upload New Photo' }}
@@ -320,8 +326,14 @@ const changingPassword = ref(false)
 const photoSrc = computed(() =>
   profile.profile_photo
     ? (profile.profile_photo.startsWith('http') ? profile.profile_photo : `${API_BASE}/uploads/${profile.profile_photo}`)
-    : `https://ui-avatars.com/api/?name=${encodeURIComponent(profile.name || 'Worker')}&background=2563EB&color=fff`
+    : ''
 )
+
+const initials = computed(() => {
+  const name = profile.name
+  if (!name) return '?'
+  return name.trim().split(/\s+/).slice(0, 2).map(n => n[0]?.toUpperCase()).join('')
+})
 
 const professionalInfo = computed(() => ({
   'Employee ID': profile.empId,

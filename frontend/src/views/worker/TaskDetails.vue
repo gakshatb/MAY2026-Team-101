@@ -147,13 +147,60 @@
             <!-- Right Column: Context & Metadata (4 cols) -->
             <div class="xl:col-span-4 space-y-6">
 
-              <!-- Rating (only for resolved/closed tasks) -->
+              <!-- Citizen Feedback (only for resolved/closed tasks) -->
               <div v-if="['Resolved', 'Closed'].includes(task.status)" class="bg-white rounded-[14px] shadow-sm border border-slate-100 p-5">
-                <h3 class="font-bold text-slate-900 flex items-center gap-2 mb-3"><Star class="w-5 h-5 text-amber-400" /> Citizen Rating</h3>
-                <div v-if="task.rating" class="flex items-center gap-1">
-                  <Star v-for="i in 5" :key="i" class="w-4 h-4" :class="i <= task.rating ? 'text-amber-400 fill-amber-400' : 'text-slate-200 fill-slate-200'" />
-                </div>
-                <p v-else class="text-sm text-slate-500">No feedback submitted yet.</p>
+                <h3 class="font-bold text-slate-900 flex items-center gap-2 mb-4"><Star class="w-5 h-5 text-amber-400" /> Citizen Feedback</h3>
+
+                <template v-if="task.feedback">
+                  <!-- Overall rating -->
+                  <div class="flex items-center justify-between mb-4">
+                    <div class="flex items-center gap-1">
+                      <Star v-for="i in 5" :key="i" class="w-5 h-5" :class="i <= task.feedback.rating ? 'text-amber-400 fill-amber-400' : 'text-slate-200 fill-slate-200'" />
+                    </div>
+                    <span class="text-xs font-semibold text-slate-500">{{ task.feedback.rating }}/5</span>
+                  </div>
+
+                  <!-- Per-service ratings -->
+                  <div v-if="Object.keys(task.feedback.service_ratings || {}).length" class="space-y-2 mb-4 pt-4 border-t border-slate-100">
+                    <div v-for="(score, label) in task.feedback.service_ratings" :key="label" class="flex items-center justify-between text-sm">
+                      <span class="text-slate-600 capitalize">{{ label }}</span>
+                      <div class="flex items-center gap-0.5">
+                        <Star v-for="i in 5" :key="i" class="w-3.5 h-3.5" :class="i <= score ? 'text-amber-400 fill-amber-400' : 'text-slate-200 fill-slate-200'" />
+                      </div>
+                    </div>
+                  </div>
+
+                  <!-- Highlighted categories -->
+                  <div v-if="task.feedback.categories?.length" class="flex flex-wrap gap-1.5 mb-4 pt-4 border-t border-slate-100">
+                    <span v-for="cat in task.feedback.categories" :key="cat" class="px-2 py-1 rounded-full text-[11px] font-semibold bg-blue-50 text-[#2563EB] border border-blue-100">{{ cat }}</span>
+                  </div>
+
+                  <!-- Written comment -->
+                  <div class="pt-4 border-t border-slate-100">
+                    <p class="text-xs font-bold text-slate-500 uppercase tracking-wide mb-1.5">Comments</p>
+                    <p v-if="task.feedback.comment" class="text-sm text-slate-700 leading-relaxed bg-slate-50 p-3 rounded-xl border border-slate-100 whitespace-pre-wrap">{{ task.feedback.comment }}</p>
+                    <p v-else class="text-sm text-slate-400 italic">No written comments.</p>
+                  </div>
+
+                  <!-- What could be improved -->
+                  <div v-if="task.feedback.improvement" class="pt-4 mt-4 border-t border-slate-100">
+                    <p class="text-xs font-bold text-slate-500 uppercase tracking-wide mb-1.5">Suggested Improvement</p>
+                    <p class="text-sm text-slate-700 leading-relaxed bg-slate-50 p-3 rounded-xl border border-slate-100 whitespace-pre-wrap">{{ task.feedback.improvement }}</p>
+                  </div>
+
+                  <!-- Would recommend + submitted date -->
+                  <div class="flex items-center justify-between mt-4 pt-4 border-t border-slate-100">
+                    <div v-if="task.feedback.would_recommend" class="flex items-center gap-1.5">
+                      <span class="text-xs font-bold text-slate-500 uppercase tracking-wide">Would Recommend</span>
+                      <span :class="`px-2 py-0.5 rounded text-[11px] font-bold ${recommendBadge(task.feedback.would_recommend)}`">{{ task.feedback.would_recommend }}</span>
+                    </div>
+                    <span v-if="task.feedback.submitted_at" class="text-[10px] font-medium text-slate-400">{{ formatDate(task.feedback.submitted_at) }}</span>
+                  </div>
+
+                  <p v-if="task.feedback.is_anonymous" class="text-[11px] text-slate-400 italic mt-3">Submitted anonymously</p>
+                </template>
+
+                <p v-else class="text-sm text-slate-500">Feedback is yet to submit.</p>
               </div>
 
               <!-- Task Timeline -->
@@ -235,6 +282,11 @@ const priorityBadge = (priority) => {
 const statusBadge = (status) => {
   const map = { 'Assigned': 'bg-slate-100 text-slate-700', 'In Progress': 'bg-amber-100 text-amber-700', 'Resolved': 'bg-green-100 text-green-700', 'Closed': 'bg-slate-200 text-slate-700' }
   return map[status] || 'bg-slate-100 text-slate-700'
+}
+
+const recommendBadge = (value) => {
+  const map = { 'Yes': 'bg-green-100 text-green-700', 'No': 'bg-red-100 text-red-700', 'Maybe': 'bg-amber-100 text-amber-700' }
+  return map[value] || 'bg-slate-100 text-slate-600'
 }
 
 const imgSrc = (path) => (path?.startsWith('http') ? path : `${API_BASE}/uploads/${path}`)
