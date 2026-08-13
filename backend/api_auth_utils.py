@@ -44,6 +44,9 @@ ACTIVITY_TYPES = {
     'officer_approved', 'officer_rejected', 'officer_suspended',
     'officer_reactivated', 'officer_updated', 'officer_transferred',
     'department_created', 'department_updated', 'department_deleted',
+    'department_application_submitted', 'department_application_withdrawn',
+    'department_application_approved', 'department_application_rejected',
+    'worker_suspended', 'worker_reactivated',
     'announcement_created', 'announcement_updated', 'announcement_published',
     'announcement_scheduled', 'announcement_archived', 'announcement_deleted',
 }

@@ -179,6 +179,32 @@ class OfficerNote(db.Model):
         return f'<OfficerNote id={self.id} complaint_id={self.complaint_id}>'
 
 
+class DepartmentApplication(db.Model):
+    """A worker's request to transfer into a department. Reviewed by Admin
+    on WorkerDepartmentApplications / admin department-applications screens."""
+    __tablename__ = 'department_applications'
+    __table_args__ = (
+        db.Index('ix_dept_apps_worker_status', 'worker_id', 'status'),
+    )
+
+    id            = db.Column(db.Integer,  primary_key=True, autoincrement=True)
+    worker_id     = db.Column(db.Integer,  db.ForeignKey('users.id'),       nullable=False)
+    department_id = db.Column(db.Integer,  db.ForeignKey('departments.id'), nullable=False)
+    status        = db.Column(db.String(20), nullable=False, default='Pending')  # Pending | Approved | Rejected | Withdrawn
+    message       = db.Column(db.String(500), nullable=True)   # worker's note when applying
+    remark        = db.Column(db.String(500), nullable=True)   # admin's note when deciding
+    applied_at    = db.Column(db.DateTime, nullable=False, default=now_ist)
+    reviewed_at   = db.Column(db.DateTime, nullable=True)
+    reviewed_by   = db.Column(db.Integer,  db.ForeignKey('users.id'), nullable=True)
+
+    worker     = db.relationship('User', foreign_keys=[worker_id])
+    department = db.relationship('Department', foreign_keys=[department_id])
+    reviewer   = db.relationship('User', foreign_keys=[reviewed_by])
+
+    def __repr__(self):
+        return f'<DepartmentApplication id={self.id} worker_id={self.worker_id} dept_id={self.department_id} status={self.status}>'
+
+
 class ComplaintImages(db.Model):
     __tablename__ = 'complaint_images'
 
