@@ -129,8 +129,8 @@ const menuItems = computed(() => {
       return [
         { name: 'Dashboard', icon: LayoutDashboard, route: '/officer/dashboard' },
         { name: 'Department Complaints', icon: ClipboardList, route: '/officer/complaints' },
-        { name: 'Complaint Details', icon: FileText, route: '/officer/complaintdetails/CMP-000' },
-        { name: 'Assign Worker', icon: UserPlus, route: '/officer/assign/CMP-000' },
+        { name: 'Complaint Details', icon: FileText, route: '/officer/complaintdetails' },
+        { name: 'Assign Worker', icon: UserPlus, route: '/officer/assign' },
         { name: 'Worker Management', icon: HardHat, route: '/officer/workers' },
         { name: 'Analytics & Reports', icon: PieChart, route: '/officer/analytics' },
         { name: 'Notifications', icon: Bell, route: '/officer/notifications' }
@@ -141,8 +141,8 @@ const menuItems = computed(() => {
         { name: 'Dashboard', icon: LayoutDashboard, route: '/worker/dashboard' },
         { name: 'Department Applications', icon: Briefcase, route: '/worker/departmentapplications' },
         { name: 'Assigned Tasks', icon: ListTodo, route: '/worker/tasks' },
-        { name: 'Task Details', icon: FileText, route: '/worker/task/CMP-000' },
-        { name: 'Update Complaint', icon: Wrench, route: '/worker/update/CMP-000' },
+        { name: 'Task Details', icon: FileText, route: '/worker/task' },
+        { name: 'Update Complaint', icon: Wrench, route: '/worker/update' },
         { name: 'Completed Tasks', icon: CheckSquare, route: '/worker/completed' },
         { name: 'Notifications', icon: Bell, route: '/worker/notifications' }
       ]

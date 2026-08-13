@@ -135,6 +135,7 @@ class Complaint(db.Model):
     feedback      = db.relationship('Feedback',        backref='complaint', lazy=True, uselist=False)
     notifications = db.relationship('Notification',    backref='complaint', lazy=True, cascade='all, delete-orphan')
     assignments   = db.relationship('Assignment',      backref='complaint', lazy=True, cascade='all, delete-orphan')
+    officer_notes = db.relationship('OfficerNote',     backref='complaint', lazy=True, cascade='all, delete-orphan')
 
     def __repr__(self):
         return f'<Complaint id={self.id} title={self.title!r} status={self.status}>'
@@ -155,6 +156,27 @@ class StatusLog(db.Model):
 
     def __repr__(self):
         return f'<StatusLog id={self.id} {self.old_status}→{self.new_status}>'
+
+
+class OfficerNote(db.Model):
+    """Internal, officer-only notes/observations on a complaint.
+    Never shown to the citizen or the worker — for ComplaintDetails.vue's
+    'Internal Officer Notes' panel."""
+    __tablename__ = 'officer_notes'
+    __table_args__ = (
+        db.Index('ix_officer_notes_complaint_created', 'complaint_id', 'created_at'),
+    )
+
+    id           = db.Column(db.Integer,  primary_key=True, autoincrement=True)
+    complaint_id = db.Column(db.Integer,  db.ForeignKey('complaints.id'), nullable=False)
+    author_id    = db.Column(db.Integer,  db.ForeignKey('users.id'),      nullable=False)
+    text         = db.Column(db.Text,     nullable=False)
+    created_at   = db.Column(db.DateTime, nullable=False, default=now_ist)
+
+    author = db.relationship('User', foreign_keys=[author_id])
+
+    def __repr__(self):
+        return f'<OfficerNote id={self.id} complaint_id={self.complaint_id}>'
 
 
 class ComplaintImages(db.Model):
@@ -219,6 +241,16 @@ class Assignment(db.Model):
     worker_id    = db.Column(db.Integer,  db.ForeignKey('users.id'),      nullable=False)
     assigned_by  = db.Column(db.Integer,  db.ForeignKey('users.id'),      nullable=False)
     assigned_at  = db.Column(db.DateTime, nullable=False, default=now_ist)
+
+    expected_completion_date = db.Column(db.Date, nullable=True)
+    expected_duration        = db.Column(db.String(20), nullable=True)  # e.g. 'Same Day', '1 Day', '2 Days', '3 Days', '1 Week'
+
+    internal_remarks = db.Column(db.Text, nullable=True)
+
+    checklist_verified  = db.Column(db.Boolean, nullable=False, default=False)
+    checklist_materials = db.Column(db.Boolean, nullable=False, default=False)
+    checklist_location   = db.Column(db.Boolean, nullable=False, default=False)
+    checklist_notified   = db.Column(db.Boolean, nullable=False, default=False)
 
     def __repr__(self):
         return f'<Assignment id={self.id} complaint_id={self.complaint_id} worker_id={self.worker_id}>'

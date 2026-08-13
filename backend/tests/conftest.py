@@ -4,7 +4,7 @@ import pytest
 from flask import Flask
 from api_auth_utils import limiter
 from werkzeug.security import generate_password_hash
-from models import db ,User
+from models import db ,User , Department , Complaint
 # Add parent directory to path for imports
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
@@ -33,15 +33,17 @@ def client():
         db.drop_all()
 
 
-
+#==============================================
+#----------ADMIN TEST FIXTURES----------------
+#==============================================
 
 @pytest.fixture
 def sample_admin_data():
     """Sample valid user data."""
     return {
-        "fullName": "Administrator",
-        "email": "admin@gmail.com",
-        "mobile": "9999999999",
+        "fullName": "Admin",
+        "email": "admin1@gmail.com",
+        "mobile": "9991999999",
         "role": "Admin",
         "address": "123 Main Street",
         "city": "Mumbai",
@@ -50,6 +52,59 @@ def sample_admin_data():
         "gender": "Male",
         "password": "Admin@123"
     }
+
+@pytest.fixture
+def registered_admin(sample_admin_data):
+    """Fixture that pre-registers an active user directly into the database."""
+    # Create the user object exactly how your backend expects it
+    user = User(
+        name=sample_admin_data["fullName"],
+        email=sample_admin_data["email"].lower(),
+        phone=sample_admin_data["mobile"],
+        password=generate_password_hash(sample_admin_data["password"]),
+        address=sample_admin_data["address"],
+        city=sample_admin_data["city"],
+        state=sample_admin_data.get("state"),
+        pincode=sample_admin_data["pincode"],
+        gender=sample_admin_data.get("gender"),
+        role=sample_admin_data["role"],
+        status='active'  # Explicitly make them active so login doesn't return 403
+    )
+    
+    db.session.add(user)
+    db.session.commit()
+    
+    # Return both the database user object and the raw password for testing login
+    return {
+        "user_record": user,
+        "raw_credentials": {
+            "email": sample_admin_data["email"],
+            "password": sample_admin_data["password"]
+        }
+    }
+
+
+@pytest.fixture
+def admin_auth_headers(client, registered_admin):
+    """Get authentication headers for admin user."""
+
+    credentaisl = registered_admin['raw_credentials']
+    response = client.post('/api/login', json={
+        'email': credentaisl['email'],
+        'password': credentaisl['password']
+    })
+    data = response.get_json()
+    return {
+        'Authorization': f"Bearer {data['access_token']}",
+        'refresh_token': data['refresh_token'],
+        'user_id': registered_admin['user_record'].id
+    }
+
+
+#==============================================
+#----------CITIZEN TEST FIXTURES----------------
+#==============================================
+
 
 @pytest.fixture
 def sample_officer_data():
@@ -66,6 +121,7 @@ def sample_officer_data():
         "gender": "Male",
         "password": "Officer@123"
     }
+
 
 
 @pytest.fixture
@@ -146,6 +202,10 @@ def registered_officer(sample_officer_data):
         }
     }
 
+@pytest.fixture
+def pending_officer(registered_officer):
+    return registered_officer['user_record']
+
 
 ###########################################################
 
@@ -187,6 +247,7 @@ def sample_complaint_data():
 
 @pytest.fixture
 def created_complaint(client, citizen_auth_headers, sample_complaint_data):
+
     """Create a complaint and return the complaint ID."""
     response = client.post('/api/citizen/complaints', 
                           data=sample_complaint_data,
@@ -194,3 +255,47 @@ def created_complaint(client, citizen_auth_headers, sample_complaint_data):
                           content_type='multipart/form-data')
     data = response.get_json()
     return data['complaint']['raw_id']
+
+
+#====================================================
+#====================================================
+
+@pytest.fixture
+def test_department(registered_admin):
+
+    """Create a test department."""
+    dept = Department(
+        department_name="Test Department",
+        code="TEST",
+        description="Test department for admin tests",
+        status="Active",
+        user_id=registered_admin['user_record'].id
+    )
+    db.session.add(dept)
+    db.session.commit()
+    db.session.refresh(dept)
+    return dept
+
+#=================================================
+#=================================================
+
+@pytest.fixture
+def test_complaint(client, registered_admin):
+    """Create a test complaint."""
+    complaint = Complaint(
+        title="Test Complaint",
+        category="Potholes",
+        description="This is a test complaint for admin testing.",
+        priority="High",
+        department="Test Department",
+        location="Test Location",
+        ward="Ward 1",
+        area="Test Area",
+        street="Test Street",
+        created_by=registered_admin['user_record'].id,
+        status="Pending"
+    )
+    db.session.add(complaint)
+    db.session.commit()
+    db.session.refresh(complaint)
+    return complaint
