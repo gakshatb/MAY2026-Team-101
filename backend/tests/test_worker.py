@@ -109,12 +109,12 @@ def test_update_task_to_in_progress(client, worker_auth_headers, assigned_compla
 
 def test_update_task_to_resolved(client, worker_auth_headers, assigned_complaint):
     """Test updating task status to 'Resolved'."""
-    # First set to In Progress
+    
     client.patch(f'/api/worker/tasks/{assigned_complaint.id}/status',
                 json={"status": "In Progress", "remark": "Started working"},
                 headers=worker_auth_headers)
     
-    # Then resolve
+    
     response = client.patch(f'/api/worker/tasks/{assigned_complaint.id}/status',
                            json={
                                "status": "Resolved",
@@ -127,3 +127,18 @@ def test_update_task_to_resolved(client, worker_auth_headers, assigned_complaint
     assert data['success'] is True
     assert 'Task updated' in data['message']
     assert data['task']['status'] == 'Resolved'
+
+def test_resolve_task_without_remark(client, worker_auth_headers, assigned_complaint):
+    """Test resolving task without providing a remark (should fail)."""
+    
+    client.patch(f'/api/worker/tasks/{assigned_complaint.id}/status',
+                json={"status": "In Progress", "remark": "Started working"},
+                headers=worker_auth_headers)
+    
+    response = client.patch(f'/api/worker/tasks/{assigned_complaint.id}/status',
+                           json={"status": "Resolved"},
+                           headers=worker_auth_headers)
+    data = response.get_json()
+    
+    assert response.status_code == 400
+    assert 'resolution note is required' in data['message']
