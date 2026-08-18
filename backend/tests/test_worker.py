@@ -177,3 +177,19 @@ def test_upload_task_photo_success(client, worker_auth_headers, assigned_complai
     assert response.status_code == 201
     assert data['success'] is True
     assert 'image_url' in data
+
+
+def test_get_worker_profile(client, worker_auth_headers):
+    """Test getting worker profile."""
+    response = client.get('/api/worker/profile', headers=worker_auth_headers)
+    data = response.get_json()
+    
+    assert response.status_code == 200
+    assert data['success'] is True
+    assert 'profile' in data
+    assert data['profile']['name'] == 'Worker Test'
+    assert data['profile']['email'] == 'worker@example.com'
+    assert data['profile']['empId'] == 'FW-0002'
+    assert 'department' in data['profile']
+    assert 'completedCount' in data['profile']
+    assert 'avgRating' in data['profile']
