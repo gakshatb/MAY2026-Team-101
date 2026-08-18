@@ -51,3 +51,18 @@ def test_list_tasks_filter_completed(client, worker_auth_headers, assigned_compl
     assert response.status_code == 200
     assert data['success'] is True
     assert len(data['tasks']) == 0
+
+def test_get_task_details_success(client, worker_auth_headers, assigned_complaint):
+    """Test getting detailed task information."""
+    response = client.get(f'/api/worker/tasks/{assigned_complaint.id}', 
+                         headers=worker_auth_headers)
+    data = response.get_json()
+    
+    assert response.status_code == 200
+    assert data['success'] is True
+    assert 'task' in data
+    assert data['task']['raw_id'] == assigned_complaint.id
+    assert data['task']['title'] == 'Assigned Task'
+    assert 'description' in data['task']
+    assert 'images' in data['task']
+    assert 'history' in data['task']
