@@ -106,3 +106,24 @@ def test_update_task_to_in_progress(client, worker_auth_headers, assigned_compla
     assert data['success'] is True
     assert 'Task updated' in data['message']
     assert data['task']['status'] == 'In Progress'
+
+def test_update_task_to_resolved(client, worker_auth_headers, assigned_complaint):
+    """Test updating task status to 'Resolved'."""
+    # First set to In Progress
+    client.patch(f'/api/worker/tasks/{assigned_complaint.id}/status',
+                json={"status": "In Progress", "remark": "Started working"},
+                headers=worker_auth_headers)
+    
+    # Then resolve
+    response = client.patch(f'/api/worker/tasks/{assigned_complaint.id}/status',
+                           json={
+                               "status": "Resolved",
+                               "remark": "Task completed successfully"
+                           },
+                           headers=worker_auth_headers)
+    data = response.get_json()
+    
+    assert response.status_code == 200
+    assert data['success'] is True
+    assert 'Task updated' in data['message']
+    assert data['task']['status'] == 'Resolved'
