@@ -91,3 +91,18 @@ def test_get_task_not_assigned(client, worker_auth_headers, registered_admin):
     
     assert response.status_code == 403
     assert 'not assigned to you' in data['message']
+
+def test_update_task_to_in_progress(client, worker_auth_headers, assigned_complaint):
+    """Test updating task status to 'In Progress'."""
+    response = client.patch(f'/api/worker/tasks/{assigned_complaint.id}/status',
+                           json={
+                               "status": "In Progress",
+                               "remark": "Started working on the task"
+                           },
+                           headers=worker_auth_headers)
+    data = response.get_json()
+    
+    assert response.status_code == 200
+    assert data['success'] is True
+    assert 'Task updated' in data['message']
+    assert data['task']['status'] == 'In Progress'
