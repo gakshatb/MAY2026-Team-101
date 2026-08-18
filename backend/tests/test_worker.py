@@ -248,3 +248,21 @@ def test_mark_notification_read(client, worker_auth_headers, worker_user):
     # Verify notification is read
     note = Notification.query.get(notification.id)
     assert note.is_read is True
+
+def test_apply_to_department_success(client, worker_auth_headers, test_department):
+    """Test applying to a department."""
+    application_data = {
+        "departmentId": test_department.id,
+        "message": "I would like to join this department"
+    }
+    
+    response = client.post('/api/worker/department-applications',
+                          json=application_data,
+                          headers=worker_auth_headers)
+    data = response.get_json()
+    
+    assert response.status_code == 201
+    assert data['success'] is True
+    assert 'application' in data
+    assert data['application']['departmentId'] == test_department.id
+    assert data['application']['status'] == 'Pending'
