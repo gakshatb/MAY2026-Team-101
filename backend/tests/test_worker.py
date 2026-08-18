@@ -129,7 +129,7 @@ def test_update_task_to_resolved(client, worker_auth_headers, assigned_complaint
     assert data['task']['status'] == 'Resolved'
 
 def test_resolve_task_without_remark(client, worker_auth_headers, assigned_complaint):
-    """Test resolving task without providing a remark (should fail)."""
+    """Test resolving task without providing a remark ."""
     
     client.patch(f'/api/worker/tasks/{assigned_complaint.id}/status',
                 json={"status": "In Progress", "remark": "Started working"},
@@ -144,7 +144,7 @@ def test_resolve_task_without_remark(client, worker_auth_headers, assigned_compl
     assert 'resolution note is required' in data['message']
 
 def test_update_completed_task(client, worker_auth_headers, assigned_complaint):
-    """Test updating a task that is already completed (should fail)."""
+    """Test updating a task that is already completed ."""
     
     client.patch(f'/api/worker/tasks/{assigned_complaint.id}/status',
                 json={"status": "In Progress", "remark": "Started"},
@@ -161,3 +161,19 @@ def test_update_completed_task(client, worker_auth_headers, assigned_complaint):
     
     assert response.status_code == 400
     assert 'completed task cannot be updated' in data['message']
+
+
+def test_upload_task_photo_success(client, worker_auth_headers, assigned_complaint):
+    """Test uploading a photo to a task."""
+    image_data = BytesIO(b'fake image data')
+    image_data.seek(0)
+    
+    response = client.post(f'/api/worker/tasks/{assigned_complaint.id}/photos',
+                          data={'image': (image_data, 'task_photo.jpg')},
+                          headers=worker_auth_headers,
+                          content_type='multipart/form-data')
+    data = response.get_json()
+    
+    assert response.status_code == 201
+    assert data['success'] is True
+    assert 'image_url' in data
