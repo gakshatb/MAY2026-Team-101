@@ -266,3 +266,22 @@ def test_apply_to_department_success(client, worker_auth_headers, test_departmen
     assert 'application' in data
     assert data['application']['departmentId'] == test_department.id
     assert data['application']['status'] == 'Pending'
+
+def test_apply_to_current_department(client, worker_auth_headers, test_department, worker_user):
+    """Test applying to the department worker is already in."""
+    # Set worker's department
+    worker_user.department_id = test_department.id
+    db.session.commit()
+    
+    application_data = {
+        "departmentId": test_department.id,
+        "message": "I want to stay in this department"
+    }
+    
+    response = client.post('/api/worker/department-applications',
+                          json=application_data,
+                          headers=worker_auth_headers)
+    data = response.get_json()
+    
+    assert response.status_code == 400
+    assert 'already in this department' in data['message']
