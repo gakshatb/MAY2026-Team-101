@@ -66,3 +66,28 @@ def test_get_task_details_success(client, worker_auth_headers, assigned_complain
     assert 'description' in data['task']
     assert 'images' in data['task']
     assert 'history' in data['task']
+
+def test_get_task_not_assigned(client, worker_auth_headers, registered_admin):
+    """Test getting a task not assigned to the worker."""
+    complaint = Complaint(
+        title="Other Complaint",
+        category="Garbage",
+        description="This complaint is not assigned to the worker.",
+        priority="Medium",
+        department="Test Department",
+        location="Other Location",
+        ward="Ward 2",
+        area="Other Area",
+        street="Other Street",
+        created_by=registered_admin['user_record'].id,
+        status="Pending"
+    )
+    db.session.add(complaint)
+    db.session.commit()
+    
+    response = client.get(f'/api/worker/tasks/{complaint.id}', 
+                         headers=worker_auth_headers)
+    data = response.get_json()
+    
+    assert response.status_code == 403
+    assert 'not assigned to you' in data['message']
