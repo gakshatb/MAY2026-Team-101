@@ -4,7 +4,7 @@ import pytest
 from flask import Flask
 from api_auth_utils import limiter
 from werkzeug.security import generate_password_hash
-from models import db ,User , Department , Complaint
+from models import db ,User , Department , Complaint , Assignment
 # Add parent directory to path for imports
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
@@ -299,3 +299,80 @@ def test_complaint(client, registered_admin):
     db.session.commit()
     db.session.refresh(complaint)
     return complaint
+
+@pytest.fixture
+def worker_user(client):
+    """Create a worker user."""
+    from werkzeug.security import generate_password_hash
+    
+    user = User(
+        name="Worker Test",
+        email="worker@example.com",
+        phone="9876543212",
+        password=generate_password_hash("TestPassword123"),
+        address="Worker Address",
+        city="Mumbai",
+        state="Maharashtra",
+        pincode="400003",
+        gender="Male",
+        role="Worker",
+        status="active"
+    )
+    db.session.add(user)
+    db.session.commit()
+    db.session.refresh(user)
+    return user
+
+@pytest.fixture
+def worker_auth_headers(client, worker_user):
+    """Get authentication headers for worker user."""
+    response = client.post('/api/login', json={
+        'email': worker_user.email,
+        'password': 'TestPassword123'
+    })
+    data = response.get_json()
+    return {
+        'Authorization': f"Bearer {data['access_token']}",
+        'refresh_token': data['refresh_token'],
+        'user_id': worker_user.id
+    }
+
+
+
+
+@pytest.fixture
+def assigned_complaint(client, worker_user, registered_admin, test_department):
+    """Create a complaint assigned to the worker."""
+    worker_user.department_id = test_department.id 
+    db.session.commit()
+
+    complaint = Complaint(
+        title="Assigned Task",
+        category="Potholes",
+        description="This is a task assigned to the worker for testing.",
+        priority="High",
+        department=test_department.department_name,
+        location="Test Location",
+        ward="Ward 1",
+        area="Test Area",
+        street="Test Street",
+        created_by=registered_admin['user_record'].id,
+        assigned_officer=registered_admin['user_record'].id,
+        status="Assigned"
+    )
+    db.session.add(complaint)
+    db.session.commit()
+    db.session.refresh(complaint)
+    
+    # Create assignment
+    assignment = Assignment(
+        complaint_id=complaint.id,
+        worker_id=worker_user.id,
+        assigned_by=registered_admin['user_record'].id
+    )
+    db.session.add(assignment)
+    db.session.commit()
+    
+    return complaint
+
+
