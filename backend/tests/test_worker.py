@@ -193,3 +193,25 @@ def test_get_worker_profile(client, worker_auth_headers):
     assert 'department' in data['profile']
     assert 'completedCount' in data['profile']
     assert 'avgRating' in data['profile']
+
+def test_update_worker_profile(client, worker_auth_headers):
+    """Test updating worker profile."""
+    update_data = {
+        "name": "Updated Worker",
+        "phone": "9876543219",
+        "address": "New Worker Address",
+        "city": "New Mumbai",
+        "state": "Maharashtra",
+        "pincode": "400099",
+        "gender": "Female",
+        "nationality": "Indian"
+    }
+    
+    response = client.put('/api/worker/profile',
+                         json=update_data,
+                         headers=worker_auth_headers)
+    data = response.get_json()
+    
+    assert response.status_code == 200
+    assert data['success'] is True
+    assert data['profile']['name'] == 'Updated Worker'
