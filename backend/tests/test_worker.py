@@ -285,3 +285,17 @@ def test_apply_to_current_department(client, worker_auth_headers, test_departmen
     
     assert response.status_code == 400
     assert 'already in this department' in data['message']
+
+def test_worker_endpoint_requires_auth(client):
+    """Test that worker endpoints require authentication."""
+    endpoints = [
+        '/api/worker/dashboard',
+        '/api/worker/tasks',
+        '/api/worker/profile',
+        '/api/worker/notifications',
+        '/api/worker/departments'
+    ]
+    
+    for endpoint in endpoints:
+        response = client.get(endpoint)
+        assert response.status_code == 401
