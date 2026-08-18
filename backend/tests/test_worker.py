@@ -142,3 +142,22 @@ def test_resolve_task_without_remark(client, worker_auth_headers, assigned_compl
     
     assert response.status_code == 400
     assert 'resolution note is required' in data['message']
+
+def test_update_completed_task(client, worker_auth_headers, assigned_complaint):
+    """Test updating a task that is already completed (should fail)."""
+    
+    client.patch(f'/api/worker/tasks/{assigned_complaint.id}/status',
+                json={"status": "In Progress", "remark": "Started"},
+                headers=worker_auth_headers)
+    client.patch(f'/api/worker/tasks/{assigned_complaint.id}/status',
+                json={"status": "Resolved", "remark": "Completed"},
+                headers=worker_auth_headers)
+    
+    
+    response = client.patch(f'/api/worker/tasks/{assigned_complaint.id}/status',
+                           json={"status": "In Progress", "remark": "Try again"},
+                           headers=worker_auth_headers)
+    data = response.get_json()
+    
+    assert response.status_code == 400
+    assert 'completed task cannot be updated' in data['message']
