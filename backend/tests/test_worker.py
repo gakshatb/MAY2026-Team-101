@@ -28,3 +28,16 @@ def test_worker_dashboard_success(client, worker_auth_headers, assigned_complain
   
     assert data['dashboard']['counts']['total'] >= 1
     assert data['dashboard']['counts']['active'] >= 1
+
+
+def test_list_tasks_success(client, worker_auth_headers, assigned_complaint):
+    """Test listing all tasks assigned to worker."""
+    response = client.get('/api/worker/tasks', headers=worker_auth_headers)
+    data = response.get_json()
+    
+    assert response.status_code == 200
+    assert data['success'] is True
+    assert 'tasks' in data
+    assert len(data['tasks']) >= 1
+    assert data['tasks'][0]['title'] == 'Assigned Task'
+    assert data['tasks'][0]['status'] == 'Assigned'
