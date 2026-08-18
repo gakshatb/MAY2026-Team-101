@@ -224,3 +224,27 @@ def test_list_worker_notifications(client, worker_auth_headers, assigned_complai
     assert response.status_code == 200
     assert data['success'] is True
     assert 'notifications' in data
+
+def test_mark_notification_read(client, worker_auth_headers, worker_user):
+    """Test marking a notification as read."""
+    # Create a notification
+    notification = Notification(
+        user_id=worker_user.id,
+        title="Test Notification",
+        message="Test message",
+        type="info",
+        is_read=False
+    )
+    db.session.add(notification)
+    db.session.commit()
+    
+    response = client.patch(f'/api/worker/notifications/{notification.id}/read',
+                           headers=worker_auth_headers)
+    data = response.get_json()
+    
+    assert response.status_code == 200
+    assert data['success'] is True
+    
+    # Verify notification is read
+    note = Notification.query.get(notification.id)
+    assert note.is_read is True
