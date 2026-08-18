@@ -299,3 +299,17 @@ def test_worker_endpoint_requires_auth(client):
     for endpoint in endpoints:
         response = client.get(endpoint)
         assert response.status_code == 401
+
+def test_worker_endpoint_requires_worker_role(client, admin_auth_headers):
+    """Test that worker endpoints require worker role."""
+    endpoints = [
+        '/api/worker/dashboard',
+        '/api/worker/tasks',
+        '/api/worker/profile',
+        '/api/worker/notifications',
+        '/api/worker/departments'
+    ]
+    
+    for endpoint in endpoints:
+        response = client.get(endpoint, headers=admin_auth_headers)
+        assert response.status_code in [403, 401]
