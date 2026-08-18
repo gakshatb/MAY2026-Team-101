@@ -64,3 +64,15 @@ This project uses `pytest` for running automated tests. Follow the instructions 
   ```bash
   python -m pytest --html=tests/test_report.html
   ```
+
+## 📊 Generating Coverage Report
+
+* **generate a complete coverage report:**
+  ```bash
+  ## 📊 Generating Reports
+
+* **Save test results to an HTML report:**
+  ```bash
+  python -m pytest --html=tests/test_report.html
+  ```
+
