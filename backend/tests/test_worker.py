@@ -215,3 +215,12 @@ def test_update_worker_profile(client, worker_auth_headers):
     assert response.status_code == 200
     assert data['success'] is True
     assert data['profile']['name'] == 'Updated Worker'
+
+def test_list_worker_notifications(client, worker_auth_headers, assigned_complaint):
+    """Test listing worker notifications."""
+    response = client.get('/api/worker/notifications', headers=worker_auth_headers)
+    data = response.get_json()
+    
+    assert response.status_code == 200
+    assert data['success'] is True
+    assert 'notifications' in data
