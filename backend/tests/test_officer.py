@@ -192,3 +192,16 @@ def test_assign_worker_to_complaint(client, officer_auth_headers, assigned_compl
     assignment = Assignment.query.filter_by(complaint_id=assigned_complaint_officer.id).first()
     assert assignment is not None
     assert assignment.worker_id == worker_user.id
+
+def test_list_workers_success(client, officer_auth_headers, worker_user):
+    """Test listing workers."""
+    response = client.get('/api/officer/workers', headers=officer_auth_headers)
+    data = response.get_json()
+    
+    assert response.status_code == 200
+    assert data['success'] is True
+    assert 'workers' in data
+    assert 'statistics' in data
+    assert 'topPerformers' in data
+    assert 'completionSummary' in data
+    assert len(data['workers']) >= 1
