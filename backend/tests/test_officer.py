@@ -248,3 +248,17 @@ def test_officer_endpoint_requires_auth(client):
     for endpoint in endpoints:
         response = client.get(endpoint)
         assert response.status_code == 401
+
+def test_officer_endpoint_requires_officer_role(client, citizen_auth_headers):
+    """Test that officer endpoints require officer role."""
+    endpoints = [
+        '/api/officer/dashboard',
+        '/api/officer/complaints',
+        '/api/officer/profile',
+        '/api/officer/notifications',
+        '/api/officer/workers'
+    ]
+    
+    for endpoint in endpoints:
+        response = client.get(endpoint, headers=citizen_auth_headers)
+        assert response.status_code in [403, 401]
