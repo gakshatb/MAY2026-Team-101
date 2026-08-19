@@ -129,3 +129,19 @@ def test_invalid_status_transition(client, officer_auth_headers, assigned_compla
     
     assert response.status_code == 400
     assert 'Cannot change' in data['message']
+
+def test_update_priority_success(client, officer_auth_headers, assigned_complaint_officer):
+    """Test updating complaint priority."""
+    response = client.patch(f'/api/officer/complaints/{assigned_complaint_officer.id}/priority',
+                           json={"priority": "Emergency"},
+                           headers=officer_auth_headers)
+    data = response.get_json()
+    
+    assert response.status_code == 200
+    assert data['success'] is True
+    assert 'Priority updated' in data['message']
+    assert data['complaint']['priority'] == 'Emergency'
+    
+    # Verify in database
+    complaint = Complaint.query.get(assigned_complaint_officer.id)
+    assert complaint.priority == 'Emergency'
