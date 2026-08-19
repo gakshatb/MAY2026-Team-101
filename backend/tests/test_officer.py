@@ -234,3 +234,17 @@ def test_get_officer_profile(client, officer_auth_headers):
     assert 'department' in data['profile']
     assert 'resolvedCount' in data['profile']
     assert 'avgRating' in data['profile']
+
+def test_officer_endpoint_requires_auth(client):
+    """Test that officer endpoints require authentication."""
+    endpoints = [
+        '/api/officer/dashboard',
+        '/api/officer/complaints',
+        '/api/officer/profile',
+        '/api/officer/notifications',
+        '/api/officer/workers'
+    ]
+    
+    for endpoint in endpoints:
+        response = client.get(endpoint)
+        assert response.status_code == 401
