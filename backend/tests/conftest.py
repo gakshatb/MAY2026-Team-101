@@ -380,6 +380,10 @@ def assigned_complaint(client, worker_user, registered_admin, test_department):
 def officer_auth_headers(client, registered_officer):
     """Get authentication headers for officer user."""
     credentials = registered_officer['raw_credentials']
+
+    registered_officer['user_record'].status = 'active'
+    db.session.commit()
+
     response = client.post('/api/login', json={
         'email': credentials['email'],
         'password': credentials['password']
