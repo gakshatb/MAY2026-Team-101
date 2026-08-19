@@ -95,3 +95,24 @@ def test_get_complaint_not_assigned(client, officer_auth_headers, registered_adm
     
     assert response.status_code == 403
     assert 'not assigned to you' in data['message']
+
+
+def test_update_status_to_in_progress(client, officer_auth_headers, assigned_complaint_officer):
+    """Test updating complaint status to 'In Progress'."""
+    response = client.patch(f'/api/officer/complaints/{assigned_complaint_officer.id}/status',
+                           json={
+                               "status": "In Progress",
+                               "remark": "Officer has reviewed and started work"
+                           },
+                           headers=officer_auth_headers)
+    data = response.get_json()
+    
+    assert response.status_code == 200
+    assert data['success'] is True
+    assert 'Status updated' in data['message']
+    assert data['complaint']['status'] == 'In Progress'
+    
+    # Verify status log was created
+    status_log = StatusLog.query.filter_by(complaint_id=assigned_complaint_officer.id).first()
+    assert status_log is not None
+    assert status_log.new_status == 'In Progress'
