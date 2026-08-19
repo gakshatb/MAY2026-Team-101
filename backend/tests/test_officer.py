@@ -171,3 +171,24 @@ def test_return_complaint_without_remark(client, officer_auth_headers, assigned_
     
     assert response.status_code == 400
     assert 'A remark explaining why this is being sent back is required.' in data['message']
+
+def test_assign_worker_to_complaint(client, officer_auth_headers, assigned_complaint_officer, worker_user):
+    """Test assigning a worker to a complaint."""
+    response = client.patch(f'/api/officer/complaints/{assigned_complaint_officer.id}/assign-worker',
+                           json={
+                               "worker_id": worker_user.id,
+                               "notes": "Please resolve this within 3 days",
+                               "priority": "Emergency"
+                           },
+                           headers=officer_auth_headers)
+    data = response.get_json()
+    
+    assert response.status_code == 200
+    assert data['success'] is True
+    assert 'Assigned to' in data['message']
+    assert data['complaint']['status'] == 'In Progress'
+    
+    # Verify assignment
+    assignment = Assignment.query.filter_by(complaint_id=assigned_complaint_officer.id).first()
+    assert assignment is not None
+    assert assignment.worker_id == worker_user.id
