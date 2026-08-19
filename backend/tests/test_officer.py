@@ -161,3 +161,13 @@ def test_return_complaint_to_admin(client, officer_auth_headers, assigned_compla
     complaint = Complaint.query.get(assigned_complaint_officer.id)
     assert complaint.status == 'Under Review'
     assert complaint.assigned_officer is None
+
+def test_return_complaint_without_remark(client, officer_auth_headers, assigned_complaint_officer):
+    """Test returning complaint without remark (should fail)."""
+    response = client.patch(f'/api/officer/complaints/{assigned_complaint_officer.id}/return-to-admin',
+                           json={},
+                           headers=officer_auth_headers)
+    data = response.get_json()
+    
+    assert response.status_code == 400
+    assert 'A remark explaining why this is being sent back is required.' in data['message']
