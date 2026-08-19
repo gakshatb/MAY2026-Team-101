@@ -7,7 +7,7 @@ from models import (
 )
 
 
-def test_officer_dashboard_success(client, officer_auth_headers, assigned_complaint):
+def test_officer_dashboard_success(client, officer_auth_headers, assigned_complaint_officer):
     """Test officer dashboard returns correct data."""
     response = client.get('/api/officer/dashboard', headers=officer_auth_headers)
     data = response.get_json()
@@ -22,6 +22,13 @@ def test_officer_dashboard_success(client, officer_auth_headers, assigned_compla
     assert 'recentComplaints' in data
     assert 'workerAvailability' in data
     assert 'topWorkers' in data
+
+    kpi = data['kpi']
+    assert kpi['total'] >= 1
+    assert kpi['assigned'] >= 1
+    assert 'inProgress' in kpi
+    assert 'resolved' in kpi
+    assert 'emergency' in kpi
 
 
 def test_list_officer_complaints_success(client, officer_auth_headers, assigned_complaint_officer):
