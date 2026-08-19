@@ -344,6 +344,7 @@ def worker_auth_headers(client, worker_user):
 def assigned_complaint(client, worker_user, registered_admin, test_department):
     """Create a complaint assigned to the worker."""
     worker_user.department_id = test_department.id 
+
     db.session.commit()
 
     complaint = Complaint(
@@ -376,3 +377,44 @@ def assigned_complaint(client, worker_user, registered_admin, test_department):
     return complaint
 
 
+@pytest.fixture
+def officer_auth_headers(client, registered_officer):
+    """Get authentication headers for officer user."""
+    credentials = registered_officer['raw_credentials']
+
+    registered_officer['user_record'].status = 'active'
+    db.session.commit()
+
+    response = client.post('/api/login', json={
+        'email': credentials['email'],
+        'password': credentials['password']
+    })
+    data = response.get_json()
+    return {
+        'Authorization': f"Bearer {data['access_token']}",
+        'refresh_token': data['refresh_token'],
+        'user_id': registered_officer["user_record"].id
+    }
+
+
+@pytest.fixture
+def assigned_complaint_officer(client, registered_officer, test_department):
+    """Create a complaint assigned to the officer."""
+    complaint = Complaint(
+        title="Officer Assigned Complaint",
+        category="Potholes",
+        description="This complaint is assigned to the officer for testing.",
+        priority="High",
+        department=test_department.department_name,
+        location="Test Location",
+        ward="Ward 1",
+        area="Test Area",
+        street="Test Street",
+        created_by=registered_officer['user_record'].id,
+        assigned_officer=registered_officer['user_record'].id,
+        status="Assigned"
+    )
+    db.session.add(complaint)
+    db.session.commit()
+    db.session.refresh(complaint)
+    return complaint
