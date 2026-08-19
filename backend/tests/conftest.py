@@ -376,3 +376,17 @@ def assigned_complaint(client, worker_user, registered_admin, test_department):
     return complaint
 
 
+@pytest.fixture
+def officer_auth_headers(client, registered_officer):
+    """Get authentication headers for officer user."""
+    credentials = registered_officer['raw_credentials']
+    response = client.post('/api/login', json={
+        'email': credentials['email'],
+        'password': credentials['password']
+    })
+    data = response.get_json()
+    return {
+        'Authorization': f"Bearer {data['access_token']}",
+        'refresh_token': data['refresh_token'],
+        'user_id': registered_officer["user_record"].id
+    }
