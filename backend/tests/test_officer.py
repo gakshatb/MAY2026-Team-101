@@ -42,3 +42,14 @@ def test_list_officer_complaints_success(client, officer_auth_headers, assigned_
     assert 'summary_stats' in data
     assert len(data['complaints']) >= 1
     assert data['complaints'][0]['title'] == 'Officer Assigned Complaint'
+
+def test_list_complaints_filter_by_status(client, officer_auth_headers, assigned_complaint_officer):
+    """Test filtering complaints by status."""
+    response = client.get('/api/officer/complaints?status=Assigned', 
+                         headers=officer_auth_headers)
+    data = response.get_json()
+    
+    assert response.status_code == 200
+    assert data['success'] is True
+    for complaint in data['complaints']:
+        assert complaint['status'] == 'Assigned'
