@@ -219,3 +219,18 @@ def test_get_worker_details(client, officer_auth_headers, worker_user):
     assert 'currentAssignments' in data['worker']
     assert 'timeline' in data['worker']
     assert 'totalCompleted' in data['worker']
+
+def test_get_officer_profile(client, officer_auth_headers):
+    """Test getting officer profile."""
+    response = client.get('/api/officer/profile', headers=officer_auth_headers)
+    data = response.get_json()
+    
+    assert response.status_code == 200
+    assert data['success'] is True
+    assert 'profile' in data
+    assert data['profile']['fullName'] == 'Officer'
+    assert data['profile']['email'] == 'officer@gmail.com'
+    assert data['profile']['empId'] in ['OFC-0001','OFC-0002']
+    assert 'department' in data['profile']
+    assert 'resolvedCount' in data['profile']
+    assert 'avgRating' in data['profile']
