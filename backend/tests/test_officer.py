@@ -22,4 +22,16 @@ def test_officer_dashboard_success(client, officer_auth_headers, assigned_compla
     assert 'recentComplaints' in data
     assert 'workerAvailability' in data
     assert 'topWorkers' in data
+
+
+def test_list_officer_complaints_success(client, officer_auth_headers, assigned_complaint_officer):
+    """Test listing complaints assigned to officer."""
+    response = client.get('/api/officer/complaints', headers=officer_auth_headers)
+    data = response.get_json()
     
+    assert response.status_code == 200
+    assert data['success'] is True
+    assert 'complaints' in data
+    assert 'summary_stats' in data
+    assert len(data['complaints']) >= 1
+    assert data['complaints'][0]['title'] == 'Officer Assigned Complaint'
