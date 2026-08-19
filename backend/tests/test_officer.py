@@ -70,3 +70,28 @@ def test_get_complaint_details_success(client, officer_auth_headers, assigned_co
     assert 'location' in data['complaint']
     assert 'history' in data['complaint']
     assert 'citizenDetails' in data['complaint']
+
+def test_get_complaint_not_assigned(client, officer_auth_headers, registered_admin):
+    """Test getting a complaint not assigned to the officer."""
+    complaint = Complaint(
+        title="Other Complaint",
+        category="Garbage",
+        description="This complaint is not assigned to this officer.",
+        priority="Medium",
+        department="Test Department",
+        location="Other Location",
+        ward="Ward 2",
+        area="Other Area",
+        street="Other Street",
+        created_by=registered_admin['user_record'].id,
+        status="Pending"
+    )
+    db.session.add(complaint)
+    db.session.commit()
+    
+    response = client.get(f'/api/officer/complaints/{complaint.id}', 
+                         headers=officer_auth_headers)
+    data = response.get_json()
+    
+    assert response.status_code == 403
+    assert 'not assigned to you' in data['message']
