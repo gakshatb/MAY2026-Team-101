@@ -145,3 +145,19 @@ def test_update_priority_success(client, officer_auth_headers, assigned_complain
     # Verify in database
     complaint = Complaint.query.get(assigned_complaint_officer.id)
     assert complaint.priority == 'Emergency'
+
+def test_return_complaint_to_admin(client, officer_auth_headers, assigned_complaint_officer):
+    """Test returning a complaint to admin for re-review."""
+    response = client.patch(f'/api/officer/complaints/{assigned_complaint_officer.id}/return-to-admin',
+                           json={"remark": "This needs admin review for resource allocation"},
+                           headers=officer_auth_headers)
+    data = response.get_json()
+    
+    assert response.status_code == 200
+    assert data['success'] is True
+    assert 'Complaint returned to admin' in data['message']
+    
+    # Verify
+    complaint = Complaint.query.get(assigned_complaint_officer.id)
+    assert complaint.status == 'Under Review'
+    assert complaint.assigned_officer is None
