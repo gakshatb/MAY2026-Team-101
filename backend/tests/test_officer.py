@@ -116,3 +116,16 @@ def test_update_status_to_in_progress(client, officer_auth_headers, assigned_com
     status_log = StatusLog.query.filter_by(complaint_id=assigned_complaint_officer.id).first()
     assert status_log is not None
     assert status_log.new_status == 'In Progress'
+
+def test_invalid_status_transition(client, officer_auth_headers, assigned_complaint_officer):
+    """Test invalid status transition (should fail)."""
+    response = client.patch(f'/api/officer/complaints/{assigned_complaint_officer.id}/status',
+                           json={
+                               "status": "Resolved",  # Officers can't set Resolved directly
+                               "remark": "Trying to resolve"
+                           },
+                           headers=officer_auth_headers)
+    data = response.get_json()
+    
+    assert response.status_code == 400
+    assert 'Cannot change' in data['message']
