@@ -205,3 +205,17 @@ def test_list_workers_success(client, officer_auth_headers, worker_user):
     assert 'topPerformers' in data
     assert 'completionSummary' in data
     assert len(data['workers']) >= 1
+
+def test_get_worker_details(client, officer_auth_headers, worker_user):
+    """Test getting worker details."""
+    response = client.get(f'/api/officer/workers/{worker_user.id}', 
+                         headers=officer_auth_headers)
+    data = response.get_json()
+    
+    assert response.status_code == 200
+    assert data['success'] is True
+    assert 'worker' in data
+    assert data['worker']['name'] == worker_user.name
+    assert 'currentAssignments' in data['worker']
+    assert 'timeline' in data['worker']
+    assert 'totalCompleted' in data['worker']
