@@ -13,6 +13,13 @@ from models import (
     ContactMessage, Notification, StatusLog, DepartmentApplication, now_ist
 )
 from api_auth_utils import log_activity, role_required, revoke_token
+from mail import (
+    send_worker_approved_email, send_officer_approved_email, send_account_rejected_email,
+    send_account_status_changed_email, send_officer_transferred_email,
+    send_complaint_assigned_email, send_complaint_status_updated_email,
+    send_department_application_approved_email, send_department_application_rejected_email,
+    send_announcement_email,
+)
 
 admin_bp = Blueprint('admin', __name__, url_prefix='/api/admin')
 
@@ -490,6 +497,13 @@ def approve_user(user_id):
         f'Approved {user.role.lower()} account for {user.name}.'
     )
     db.session.commit()
+
+    dept_name = user.member_department.department_name if user.member_department else None
+    if user.role == 'Worker':
+        send_worker_approved_email(to_email=user.email, name=user.name, department_name=dept_name)
+    else:
+        send_officer_approved_email(to_email=user.email, name=user.name, department_name=dept_name)
+
     return jsonify(success=True, message=f'{user.name} approved.'), 200
 
 
@@ -502,12 +516,18 @@ def reject_user(user_id):
     if user.status != 'pending':
         return jsonify(message="This account is not pending approval."), 400
 
+    data = request.get_json(silent=True) or {}
+    reason = (data.get('reason') or '').strip() or None
+
     user.status = 'rejected'
     log_activity(
         int(get_jwt_identity()), 'officer_rejected',
         f'Rejected {user.role.lower()} account for {user.name}.'
     )
     db.session.commit()
+
+    send_account_rejected_email(to_email=user.email, name=user.name, role=user.role, reason=reason)
+
     return jsonify(success=True, message=f'{user.name} rejected.'), 200
 
 
@@ -1043,6 +1063,8 @@ def suspend_officer(officer_id):
     )
     db.session.commit()
 
+    send_account_status_changed_email(to_email=officer.email, name=officer.name, new_status='suspended', reason=reason or None)
+
     return jsonify(success=True, message=f'{officer.name} suspended.', officer=_serialize_officer(officer)), 200
 
 
@@ -1061,6 +1083,8 @@ def reactivate_officer(officer_id):
         f'Reactivated officer {officer.name}.'
     )
     db.session.commit()
+
+    send_account_status_changed_email(to_email=officer.email, name=officer.name, new_status='active')
 
     return jsonify(success=True, message=f'{officer.name} reactivated.', officer=_serialize_officer(officer)), 200
 
@@ -1101,6 +1125,11 @@ def transfer_officer(officer_id):
         f'Transferred {officer.name} from {old_name} to {new_dept.department_name}.'
     )
     db.session.commit()
+
+    send_officer_transferred_email(
+        to_email=officer.email, name=officer.name,
+        old_department_name=old_name, new_department_name=new_dept.department_name
+    )
 
     return jsonify(
         success=True,
@@ -1447,6 +1476,16 @@ def review_department_application(application_id):
         ))
 
     db.session.commit()
+
+    if decision == 'Approved':
+        send_department_application_approved_email(
+            to_email=worker.email, worker_name=worker.name, department_name=dept.department_name
+        )
+    else:
+        send_department_application_rejected_email(
+            to_email=worker.email, worker_name=worker.name, department_name=dept.department_name, remark=remark
+        )
+
     return jsonify(success=True, application=_serialize_dept_application(application)), 200
 
 
@@ -1592,6 +1631,16 @@ def assign_complaint_officer(complaint_id):
     )
 
     db.session.commit()
+
+    if c.citizen:
+        send_complaint_assigned_email(
+            to_email=c.citizen.email,
+            name=c.citizen.name,
+            complaint_id=f"CMP-{c.id:05d}",
+            title=c.title,
+            department_name=officer.member_department.department_name if officer.member_department else c.department
+        )
+
     return jsonify(success=True, message=f'Complaint assigned to {officer.name}.', complaint=_serialize_admin_complaint(c)), 200
 
 
@@ -1637,6 +1686,17 @@ def close_complaint(complaint_id):
     )
 
     db.session.commit()
+
+    if c.citizen:
+        send_complaint_status_updated_email(
+            to_email=c.citizen.email,
+            name=c.citizen.name,
+            complaint_id=f"CMP-{c.id:05d}",
+            title=c.title,
+            new_status='Closed',
+            remark=remark
+        )
+
     return jsonify(success=True, message='Complaint closed.', complaint=_serialize_admin_complaint(c)), 200
 
 
@@ -1882,6 +1942,30 @@ def _serialize_announcement(a, author_name):
     }
 
 
+AUDIENCE_ROLE_MAP = {
+    'Citizens': ['Citizen'],
+    'Officers': ['Officer'],
+    'Workers':  ['Worker'],
+    'All Users': ['Citizen', 'Officer', 'Worker'],
+}
+
+
+def _notify_announcement_audience(ann):
+    """Emails every active user in the announcement's target audience.
+    Best-effort — mail failures are swallowed by send_email itself."""
+    roles = AUDIENCE_ROLE_MAP.get(ann.audience, [])
+    if not roles:
+        return
+    recipients = User.query.filter(User.role.in_(roles), User.status == 'active').all()
+    for user in recipients:
+        send_announcement_email(
+            to_email=user.email,
+            name=user.name,
+            announcement_title=ann.title,
+            announcement_body=ann.summary or ann.content
+        )
+
+
 @admin_bp.route('/announcements', methods=['GET'])
 @role_required('Admin')
 def list_announcements():
@@ -2033,6 +2117,9 @@ def create_announcement():
     log_activity(admin_id, activity_type, f'{"Scheduled" if status == "Scheduled" else status} announcement "{title}".')
     db.session.commit()
 
+    if status == 'Published':
+        _notify_announcement_audience(ann)
+
     author = User.query.get(admin_id)
     return jsonify(success=True, announcement=_serialize_announcement(ann, author.name)), 201
 
@@ -2113,6 +2200,8 @@ def publish_announcement(ann_id):
     admin_id = int(get_jwt_identity())
     log_activity(admin_id, 'announcement_published', f'Published announcement "{ann.title}".')
     db.session.commit()
+
+    _notify_announcement_audience(ann)
 
     author = User.query.get(ann.author_id)
     return jsonify(success=True, announcement=_serialize_announcement(ann, author.name if author else 'Unknown')), 200

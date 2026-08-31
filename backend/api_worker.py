@@ -9,6 +9,7 @@ from models import (
 )
 from api_auth_utils import log_activity, role_required
 from api_citizen import _save_uploaded_image
+from mail import send_complaint_resolved_email, send_complaint_status_updated_email
 
 worker_bp = Blueprint('worker', __name__, url_prefix='/api/worker')
 
@@ -175,6 +176,26 @@ def update_task_status(complaint_id):
     log_activity(worker.id, 'task_completed' if new_status == 'Resolved' else 'complaint_status_updated',
                  f'Updated CMP-{complaint.id:05d} to {new_status}.', complaint_id=complaint.id)
     db.session.commit()
+
+    citizen = User.query.get(complaint.created_by)
+    if citizen:
+        if new_status == 'Resolved':
+            send_complaint_resolved_email(
+                to_email=citizen.email,
+                name=citizen.name,
+                complaint_id=f"CMP-{complaint.id:05d}",
+                title=complaint.title
+            )
+        else:
+            send_complaint_status_updated_email(
+                to_email=citizen.email,
+                name=citizen.name,
+                complaint_id=f"CMP-{complaint.id:05d}",
+                title=complaint.title,
+                new_status=new_status,
+                remark=remark or None
+            )
+
     return jsonify(success=True, message='Task updated.', task=_serialize_task(complaint, True)), 200
 
 
