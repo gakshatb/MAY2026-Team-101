@@ -14,6 +14,10 @@ from api_auth_utils import (
     VALID_ROLES, is_token_revoked, is_valid_email, is_valid_phone, limiter,
     log_activity, parse_user_agent, revoke_token, token_not_revoked
 )
+from mail import (
+    send_welcome_email, send_registration_pending_email,
+    send_password_reset_otp_email, send_password_changed_email,
+)
 
 auth_bp = Blueprint('auth', __name__, url_prefix='/api')
 
@@ -92,6 +96,11 @@ def register():
 
     log_activity(new_user.id, 'register', f'Account created as {role}.')
     db.session.commit()
+
+    if initial_status == 'active':
+        send_welcome_email(to_email=email, name=name)
+    else:
+        send_registration_pending_email(to_email=email, name=name, role=role)
 
     message = (
         "Registration successful. You can now log in."
@@ -286,6 +295,8 @@ def forgot_password():
     log_activity(user.id, 'password_reset_requested', 'Requested a password reset OTP.')
     db.session.commit()
 
+    send_password_reset_otp_email(to_email=user.email, name=user.name, otp=otp)
+
     response_data = dict(success=True, message="OTP sent successfully.")
     if current_app.debug:
         response_data["dev_otp"] = otp
@@ -346,6 +357,8 @@ def reset_password():
     db.session.delete(record)
     db.session.commit()
 
+    send_password_changed_email(to_email=user.email, name=user.name)
+
     return jsonify(
         success=True,
         message="Password reset successful. You can now log in."
@@ -387,6 +400,8 @@ def change_password():
     user.password = generate_password_hash(new_password)
     log_activity(user.id, 'password_changed', 'Password changed.')
     db.session.commit()
+
+    send_password_changed_email(to_email=user.email, name=user.name)
 
     return jsonify(
         success=True,
