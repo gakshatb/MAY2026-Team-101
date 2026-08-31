@@ -9,6 +9,7 @@ from werkzeug.utils import secure_filename # type: ignore
 
 from models import db, User, Complaint, StatusLog, ComplaintImages, Feedback, Notification, ActivityLog, now_ist
 from api_auth_utils import log_activity, role_required, is_valid_email
+from mail import send_complaint_submitted_email
 
 citizen_bp = Blueprint('citizen', __name__, url_prefix='/api/citizen')
 
@@ -118,6 +119,7 @@ def _serialize_complaint(c, include_full=False):
 @role_required('Citizen')
 def submit_complaint():
     user_id = int(get_jwt_identity())
+    citizen = User.query.get(user_id)
 
     # multipart/form-data puts regular fields in request.form, not request.json
     form = request.form
@@ -215,6 +217,15 @@ def submit_complaint():
     )
 
     db.session.commit()
+
+    if citizen:
+        send_complaint_submitted_email(
+            to_email=citizen.email,
+            name=citizen.name,
+            complaint_id=f"CMP-{complaint.id:05d}",
+            title=title,
+            category=category
+        )
 
     return jsonify(
         success=True,

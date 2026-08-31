@@ -12,6 +12,10 @@ from api_auth_utils import log_activity, role_required
 # Reuses the same image-upload helper citizens use for complaint photos —
 # same validation, same Uploads folder, no need to duplicate it here.
 from api_citizen import _save_uploaded_image
+from mail import (
+    send_complaint_status_updated_email, send_worker_task_assigned_email,
+    send_account_status_changed_email,
+)
 
 officer_bp = Blueprint('officer', __name__, url_prefix='/api/officer')
 
@@ -241,6 +245,17 @@ def update_status(complaint_id):
     log_activity(officer.id, 'complaint_status_updated',
                  f'Updated CMP-{c.id:05d} status to {new_status}.', complaint_id=c.id)
     db.session.commit()
+
+    if c.citizen:
+        send_complaint_status_updated_email(
+            to_email=c.citizen.email,
+            name=c.citizen.name,
+            complaint_id=f"CMP-{c.id:05d}",
+            title=c.title,
+            new_status=new_status,
+            remark=remark
+        )
+
     return jsonify(success=True, message='Status updated.', complaint=_serialize_officer_complaint(c)), 200
 
 
@@ -310,6 +325,17 @@ def return_to_admin(complaint_id):
     log_activity(officer.id, 'complaint_returned',
                  f'Returned CMP-{c.id:05d} to admin: {remark}', complaint_id=c.id)
     db.session.commit()
+
+    if c.citizen:
+        send_complaint_status_updated_email(
+            to_email=c.citizen.email,
+            name=c.citizen.name,
+            complaint_id=f"CMP-{c.id:05d}",
+            title=c.title,
+            new_status='Under Review',
+            remark=remark
+        )
+
     return jsonify(success=True, message='Complaint returned to admin.'), 200
 
 
@@ -598,6 +624,12 @@ def set_worker_status(worker_id):
         + (f' Reason: {reason}' if reason and new_status == 'suspended' else '')
     )
     db.session.commit()
+
+    send_account_status_changed_email(
+        to_email=worker.email, name=worker.name,
+        new_status=new_status, reason=reason or None
+    )
+
     return jsonify(success=True, message=f'{worker.name} is now {new_status}.', accountStatus=worker.status), 200
 
 
@@ -678,6 +710,25 @@ def assign_worker(complaint_id):
     log_activity(officer.id, 'worker_assigned',
                  f'Assigned CMP-{c.id:05d} to worker {worker.name}.', complaint_id=c.id)
     db.session.commit()
+
+    send_worker_task_assigned_email(
+        to_email=worker.email,
+        worker_name=worker.name,
+        complaint_id=f"CMP-{c.id:05d}",
+        title=c.title,
+        priority=c.priority,
+        area=c.area or c.city or c.location or '-'
+    )
+    if c.citizen:
+        send_complaint_status_updated_email(
+            to_email=c.citizen.email,
+            name=c.citizen.name,
+            complaint_id=f"CMP-{c.id:05d}",
+            title=c.title,
+            new_status=c.status,
+            remark=remark
+        )
+
     return jsonify(success=True, message=f'Assigned to {worker.name}.', complaint=_serialize_officer_complaint(c)), 200
 
 # ─────────────────────────────────────────────────────────────────────────

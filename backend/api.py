@@ -2,6 +2,7 @@ from flask import Blueprint, jsonify, request, send_from_directory, current_app 
 
 from models import db, ContactMessage, Complaint, User
 from api_auth_utils import is_valid_email
+from mail import send_contact_ack_email
 
 general_bp = Blueprint('general', __name__, url_prefix='/api')
 
@@ -43,6 +44,8 @@ def contact():
     )
     db.session.add(new_message)
     db.session.commit()
+
+    send_contact_ack_email(to_email=email, name=name, subject=subject)
 
     return jsonify(
         success=True,
